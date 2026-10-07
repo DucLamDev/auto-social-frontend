@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f5f7fb; --foreground: #162033; --surface: #fff; --surface-muted: #f8fafc;
+  --border: #e5eaf2; --muted: #64748b; --primary: #5b5ce2; --primary-hover: #4b4cc7;
+  --primary-soft: #eeefff; --success: #15996f; --warning: #d88714; --danger: #dc4c64; --sidebar: #101728;
+}
+@theme inline {
+  --color-background: var(--background); --color-foreground: var(--foreground); --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted); --color-border: var(--border); --color-muted: var(--muted);
+  --color-primary: var(--primary); --color-primary-hover: var(--primary-hover); --color-primary-soft: var(--primary-soft);
+  --color-success: var(--success); --color-warning: var(--warning); --color-danger: var(--danger); --color-sidebar: var(--sidebar);
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+* { box-sizing: border-box; }
+html { color-scheme: light; }
+body { min-height: 100vh; margin: 0; background: var(--background); color: var(--foreground); font-family: var(--font-sans); font-feature-settings: "cv02", "cv03", "cv04", "cv11"; }
+button, input, textarea, select { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+::selection { background: #dcdcff; color: #27286e; }
+@keyframes shimmer { 100% { transform: translateX(100%); } }
+@keyframes enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.animate-enter { animation: enter .35s ease both; }
+.animate-enter-delay { animation: enter .35s .08s ease both; }
+.text-balance { text-wrap: balance; }
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb { background: #cbd3e1; border: 2px solid transparent; background-clip: padding-box; border-radius: 999px; }
+::-webkit-scrollbar-track { background: transparent; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }

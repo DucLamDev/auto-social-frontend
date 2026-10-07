@@ -1,0 +1,4 @@
+import Link from "next/link";
+import { ArrowLeft, MapPinOff } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
+export default function NotFound() { return <div className="grid min-h-screen place-items-center bg-background p-6"><div className="max-w-md text-center"><span className="mx-auto grid size-14 place-items-center rounded-2xl bg-primary-soft text-primary"><MapPinOff className="size-6" /></span><p className="mt-5 text-xs font-bold uppercase tracking-widest text-primary">404</p><h1 className="mt-2 text-2xl font-bold">Không tìm thấy trang</h1><p className="mt-2 text-sm leading-6 text-muted">Đường dẫn có thể đã thay đổi hoặc bạn không có quyền xem tài nguyên này.</p><Link href="/dashboard" className={`${buttonVariants({ variant: "primary" })} mt-6`}><ArrowLeft className="size-4" />Về Dashboard</Link></div></div>; }

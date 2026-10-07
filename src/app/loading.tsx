@@ -1,0 +1,2 @@
+import { LoaderCircle } from "lucide-react";
+export default function Loading() { return <div className="grid min-h-screen place-items-center bg-background"><div className="text-center"><span className="mx-auto grid size-12 place-items-center rounded-2xl bg-primary-soft text-primary"><LoaderCircle className="size-6 animate-spin" /></span><p className="mt-4 text-sm font-semibold">Đang chuẩn bị workspace…</p></div></div>; }
