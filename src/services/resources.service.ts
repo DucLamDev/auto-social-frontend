@@ -1,23 +1,25 @@
 import { apiList, apiRequest } from "@/services/api/client";
 import type { ListResult } from "@/services/api/types";
 import type { AuditLog, Campaign, Capability, Content, ContentSource, ContentVariant, MediaAsset, Platform, PlatformAccount, PromptTemplate, PublishJob, SourceArticle, Status, SystemSettings } from "@/types/domain";
+import type { components } from "@/generated/api/schema";
 
 type QueryValue = string | number | boolean | null | undefined;
 export type ListParams = { [key: string]: QueryValue; page?: number; limit?: number; search?: string; status?: string; sourceId?: string; platformId?: string; contentId?: string; variantId?: string; from?: string; to?: string };
-type RawPlatform = { id: string; name: string; slug: string; mode: Platform["mode"]; availability: string; enabled: boolean; capability?: Partial<Capability> | null; _count?: { accounts?: number } };
-type RawAccount = { id: string; platformId: string; name: string; username?: string | null; externalId?: string | null; settings?: Record<string, unknown> | null; enabled: boolean; status: PlatformAccount["status"]; lastTestedAt?: string | null; platform?: RawPlatform; credential?: PlatformAccount["credential"]; oauthToken?: { expiresAt?: string | null; updatedAt?: string | null } | null };
-type RawSource = { id: string; name: string; type: ContentSource["type"]; url?: string | null; enabled: boolean; lastFetchedAt?: string | null; _count?: { articles?: number } };
-type RawSourceArticle = { id: string; sourceId: string; title: string; description?: string | null; canonicalUrl?: string | null; author?: string | null; publishedAt?: string | null; tags?: string[]; status: SourceArticle["status"]; errorMessage?: string | null; createdAt: string; source: SourceArticle["source"]; content?: SourceArticle["content"] };
-type RawVariant = { id: string; contentId: string; title?: string | null; body: string; summary?: string | null; hashtags?: string[]; cta?: string | null; status: Status; recommended?: boolean; reason?: string | null; updatedAt?: string; platform?: { slug: string; name: string } };
-type RawContent = { id: string; title: string; body?: string; summary?: string | null; canonicalUrl?: string | null; status: Status; createdAt: string; updatedAt?: string; _count?: { variants?: number }; sourceArticle?: { source?: { id: string; name: string; type?: ContentSource["type"] } } | null; variants?: RawVariant[] };
+type Contract = components["schemas"];
+type RawPlatform = Contract["PlatformContractDto"];
+type RawAccount = Contract["PlatformAccountContractDto"];
+type RawSource = Contract["ContentSourceContractDto"];
+type RawSourceArticle = Omit<Contract["SourceArticleContractDto"], "content"> & { content?: SourceArticle["content"] };
+type RawVariant = Contract["ContentVariantContractDto"];
+type RawContent = Contract["ContentContractDto"] & { variants?: RawVariant[] };
 type RawCampaign = { id: string; name: string; status: Status; scheduledAt?: string | null; createdAt: string; content?: { id: string; title: string }; _count?: { targets?: number }; targets?: Array<{ publishJobs?: RawJob[] }>; progress?: { total?: number; published?: number; failed?: number; needsAction?: number; active?: number; scheduled?: number; cancelled?: number } };
-type RawAttempt = { id?: string; attemptNumber: number; status?: string; errorCode?: string | null; errorMessage?: string | null; startedAt?: string | null; finishedAt?: string | null };
+type RawAttempt = Contract["PublishAttemptLogContractDto"];
 type RawJob = { id: string; status: Status; scheduledAt?: string | null; attemptCount: number; maxAttempts: number; lastErrorCode?: string | null; lastErrorMessage?: string | null; platformAccount?: { name: string; platform?: { slug: string; name: string } }; target?: { campaign?: { id: string; name: string }; contentVariant?: { id?: string; title?: string | null } }; publishedPost?: { url?: string | null } | null; attempts?: RawAttempt[] };
-type RawPrompt = { id: string; name: string; systemPrompt: string; userTemplate: string; version: number; active: boolean; updatedAt: string; platform?: { slug: string; name: string } | null };
-type RawSetting = { key: string; value: unknown; description?: string | null; secret: boolean; updatedAt: string };
-type RawPublishLog = RawAttempt & { id: string; job: RawJob };
-type RawAuditLog = { id: string; action: string; entityType: string; entityId?: string | null; actorId?: string | null; actor?: { displayName?: string; email?: string } | null; requestId?: string | null; createdAt: string; after?: Record<string, unknown> | null };
-type RawMedia = { id: string; contentId?: string | null; variantId?: string | null; type: MediaAsset["type"]; storageKey: string; publicUrl?: string | null; mimeType: string; sizeBytes: string | number; createdAt: string };
+type RawPrompt = Omit<Contract["PromptTemplateContractDto"], "platform"> & { platform?: { slug: string; name: string } | null };
+type RawSetting = Contract["SystemSettingContractDto"];
+type RawPublishLog = Omit<Contract["PublishAttemptLogContractDto"], "job"> & { job: RawJob };
+type RawAuditLog = Omit<Contract["AuditLogContractDto"], "actor"> & { actor?: { displayName?: string; email?: string } | null };
+type RawMedia = Contract["MediaAssetContractDto"];
 
 const defaultCapability: Capability = { text: false, image: false, video: false, article: false, delete: false, schedule: false, analytics: false };
 const mapPlatform = (item: RawPlatform): Platform => ({ id: item.id, name: item.name, slug: item.slug, mode: item.mode, enabled: item.enabled, connectorStatus: item.availability as Platform["connectorStatus"], capabilities: { ...defaultCapability, ...item.capability }, accountCount: item._count?.accounts ?? 0 });

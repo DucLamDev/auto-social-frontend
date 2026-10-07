@@ -736,7 +736,7 @@ export interface components {
             displayName: string;
             enabled: boolean;
             /** Format: date-time */
-            lastLoginAt?: string;
+            lastLoginAt?: string | null;
             /** Format: date-time */
             createdAt: string;
             roles?: {
@@ -1163,7 +1163,7 @@ export interface components {
             status: "SCHEDULED" | "QUEUED" | "PUBLISHING" | "PROCESSING" | "PUBLISHED" | "RETRY" | "FAILED" | "NEEDS_ACTION" | "POSSIBLE_DUPLICATE" | "CANCELLED";
             platform: string;
             accountName: string;
-            title?: string;
+            title?: string | null;
             body: string;
             hashtags: string[];
             suggestedExternalPostId?: string;
@@ -1183,7 +1183,7 @@ export interface components {
             platformAccountId: string;
             externalPostId: string;
             /** Format: uri */
-            url?: string;
+            url?: string | null;
             /** Format: date-time */
             publishedAt: string;
             platformAccount?: {
@@ -1197,14 +1197,14 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** Format: uuid */
-            contentId?: string;
+            contentId?: string | null;
             /** Format: uuid */
-            variantId?: string;
+            variantId?: string | null;
             /** @enum {string} */
             type: "IMAGE" | "VIDEO" | "DOCUMENT";
             storageKey: string;
             /** Format: uri */
-            publicUrl?: string;
+            publicUrl?: string | null;
             mimeType: string;
             /** @description Decimal byte count serialized as a string */
             sizeBytes: string;
@@ -1217,12 +1217,12 @@ export interface components {
             id: string;
             attemptNumber: number;
             status: string;
-            errorCode?: string;
-            errorMessage?: string;
+            errorCode?: string | null;
+            errorMessage?: string | null;
             /** Format: date-time */
             startedAt: string;
             /** Format: date-time */
-            finishedAt?: string;
+            finishedAt?: string | null;
             job?: {
                 [key: string]: unknown;
             };
@@ -1231,23 +1231,30 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** Format: uuid */
-            actorId?: string;
+            actorId?: string | null;
             action: string;
             entityType: string;
-            entityId?: string;
-            requestId?: string;
+            entityId?: string | null;
+            requestId?: string | null;
+            ipAddress?: string | null;
             /** Format: date-time */
             createdAt: string;
             actor?: {
                 [key: string]: unknown;
-            };
+            } | null;
+            before?: {
+                [key: string]: unknown;
+            } | null;
+            after?: {
+                [key: string]: unknown;
+            } | null;
         };
         SystemSettingContractDto: {
             key: string;
             value: {
                 [key: string]: unknown;
             };
-            description?: string;
+            description?: string | null;
             secret: boolean;
             /** Format: date-time */
             updatedAt: string;

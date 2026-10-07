@@ -33,7 +33,7 @@ The client appends `/api/v1` to `NEXT_PUBLIC_API_URL` and unwraps `{ "success": 
 
 ## Adapters
 
-The backend uses relational shapes such as `capability`, `_count`, nested `platformAccount`, campaign targets and attempts. `resources.service.ts` maps them into display-focused models (`capabilities`, `accountCount`, flattened publish jobs). This keeps pages readable without copying backend request DTOs.
+The backend uses relational shapes such as `capability`, `_count`, nested `platformAccount`, campaign targets and attempts. `resources.service.ts` imports the generated OpenAPI component schemas for the stable transport models, narrows only relational objects that OpenAPI intentionally leaves generic, then maps them into display-focused models (`capabilities`, `accountCount`, flattened publish jobs). This keeps pages readable while making backend contract changes fail TypeScript checks.
 
 The high-volume collections `GET /contents`, `GET /source-articles`, `GET /publish-jobs` and `GET /media` are server-paginated. Their screens forward the supported filters (including source/date/status where applicable); rows arrive in `data`, while `page`, `limit`, `total` and `totalPages` come from envelope `meta`. Do not apply a second client-side filter to a partial page. Dashboard counters use `GET /publish-jobs/metrics` so totals are not inferred from the visible job page.
 
