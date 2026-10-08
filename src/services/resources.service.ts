@@ -3,6 +3,8 @@ import type { ListResult } from "@/services/api/types";
 import type { AuditLog, Campaign, Capability, Content, ContentSource, ContentVariant, MediaAsset, Platform, PlatformAccount, PromptTemplate, PublishJob, SourceArticle, Status, SystemSettings } from "@/types/domain";
 import type { components } from "@/generated/api/schema";
 
+export type AccountConnectionTestResult = components["schemas"]["ConnectionTestContractDto"];
+
 type QueryValue = string | number | boolean | null | undefined;
 export type ListParams = { [key: string]: QueryValue; page?: number; limit?: number; search?: string; status?: string; sourceId?: string; platformId?: string; contentId?: string; variantId?: string; from?: string; to?: string };
 type Contract = components["schemas"];
@@ -13,7 +15,7 @@ type RawSourceArticle = Omit<Contract["SourceArticleContractDto"], "content"> & 
 type RawVariant = Contract["ContentVariantContractDto"];
 type RawContent = Contract["ContentContractDto"] & { variants?: RawVariant[] };
 type RawCampaign = { id: string; name: string; status: Status; scheduledAt?: string | null; createdAt: string; content?: { id: string; title: string }; _count?: { targets?: number }; targets?: Array<{ publishJobs?: RawJob[] }>; progress?: { total?: number; published?: number; failed?: number; needsAction?: number; active?: number; scheduled?: number; cancelled?: number } };
-type RawAttempt = Contract["PublishAttemptLogContractDto"];
+type RawAttempt = Contract["PublishAttemptLogContractDto"] & { responseMetadata?: unknown };
 type RawJob = { id: string; status: Status; scheduledAt?: string | null; attemptCount: number; maxAttempts: number; lastErrorCode?: string | null; lastErrorMessage?: string | null; platformAccount?: { name: string; platform?: { slug: string; name: string } }; target?: { campaign?: { id: string; name: string }; contentVariant?: { id?: string; title?: string | null } }; publishedPost?: { url?: string | null } | null; attempts?: RawAttempt[] };
 type RawPrompt = Omit<Contract["PromptTemplateContractDto"], "platform"> & { platform?: { slug: string; name: string } | null };
 type RawSetting = Contract["SystemSettingContractDto"];
@@ -29,7 +31,52 @@ const mapVariant = (item: RawVariant): ContentVariant => ({ id: item.id, content
 const mapContent = (item: RawContent): Content => ({ id: item.id, title: item.title, body: item.body, description: item.summary, canonicalUrl: item.canonicalUrl, status: item.status, source: item.sourceArticle?.source ?? null, variantsCount: item._count?.variants ?? item.variants?.length ?? 0, createdAt: item.createdAt, updatedAt: item.updatedAt });
 const mapMedia = (item: RawMedia): MediaAsset => ({ ...item, sizeBytes: Number(item.sizeBytes) });
 const mapCampaign = (item: RawCampaign): Campaign => { const jobs = item.targets?.flatMap((target) => target.publishJobs ?? []) ?? []; return { id: item.id, name: item.name, content: item.content, status: item.status, targetsCount: item.progress?.total ?? item._count?.targets ?? item.targets?.length ?? 0, publishedCount: item.progress?.published ?? jobs.filter((job) => job.status === "PUBLISHED").length, failedCount: item.progress?.failed ?? jobs.filter((job) => ["FAILED", "POSSIBLE_DUPLICATE"].includes(job.status)).length, needsActionCount: item.progress?.needsAction ?? jobs.filter((job) => job.status === "NEEDS_ACTION").length, activeCount: item.progress?.active ?? jobs.filter((job) => ["QUEUED", "PUBLISHING", "PROCESSING", "RETRY"].includes(job.status)).length, scheduledCount: item.progress?.scheduled ?? jobs.filter((job) => job.status === "SCHEDULED").length, scheduledAt: item.scheduledAt, createdAt: item.createdAt }; };
-const mapJob = (item: RawJob): PublishJob => { const latest = item.attempts?.[0]; return { id: item.id, campaignId: item.target?.campaign?.id, platform: item.platformAccount?.platform?.name ?? "Platform", account: item.platformAccount?.name ?? "—", contentTitle: item.target?.contentVariant?.title || item.target?.campaign?.name || "Nội dung không có tiêu đề", status: item.status, attempt: item.attemptCount, maxAttempts: item.maxAttempts, scheduledAt: item.scheduledAt, startedAt: latest?.startedAt, finishedAt: latest?.finishedAt, publishedUrl: item.publishedPost?.url, error: item.lastErrorCode || latest?.errorCode ? { code: item.lastErrorCode || latest?.errorCode || "PUBLISH_ERROR", message: item.lastErrorMessage || latest?.errorMessage || "Xuất bản thất bại" } : null }; };
+const mapJob = (item: RawJob): PublishJob => {
+  const latest = item.attempts?.[0];
+  const metadata = latest?.responseMetadata
+    && typeof latest.responseMetadata === "object"
+    && !Array.isArray(latest.responseMetadata)
+    ? latest.responseMetadata as Record<string, unknown>
+    : {};
+  const commonProviderFields = {
+    ...(typeof metadata.externalPostId === "string" ? { externalPostId: metadata.externalPostId } : {}),
+    ...(typeof metadata.url === "string" ? { url: metadata.url } : {}),
+  };
+  const workerCrashUncertain = item.lastErrorCode === "WORKER_CRASH_UNCERTAIN_RESULT";
+  const providerAction = metadata.moderationQueue === true
+    ? { kind: "MODERATION" as const, ...commonProviderFields }
+    : metadata.reconciliationRequired === true || workerCrashUncertain
+      ? {
+          kind: "RECONCILIATION" as const,
+          ...commonProviderFields,
+          canRetryAfterNotFound: workerCrashUncertain
+            || (metadata.submissionUncertain === true
+              && metadata.providerAccepted !== true
+              && metadata.persistenceRecoveryRequired !== true),
+        }
+      : undefined;
+  return {
+    id: item.id,
+    campaignId: item.target?.campaign?.id,
+    platform: item.platformAccount?.platform?.name ?? "Platform",
+    account: item.platformAccount?.name ?? "—",
+    contentTitle: item.target?.contentVariant?.title || item.target?.campaign?.name || "Nội dung không có tiêu đề",
+    status: item.status,
+    attempt: item.attemptCount,
+    maxAttempts: item.maxAttempts,
+    scheduledAt: item.scheduledAt,
+    startedAt: latest?.startedAt,
+    finishedAt: latest?.finishedAt,
+    publishedUrl: item.publishedPost?.url,
+    error: item.lastErrorCode || latest?.errorCode
+      ? {
+          code: item.lastErrorCode || latest?.errorCode || "PUBLISH_ERROR",
+          message: item.lastErrorMessage || latest?.errorMessage || "Xuất bản thất bại",
+        }
+      : null,
+    needsAction: providerAction,
+  };
+};
 const filterItems = <T>(items: T[], params: ListParams | undefined, text: (item: T) => string, status?: (item: T) => string) => items.filter((item) => (!params?.search || text(item).toLowerCase().includes(params.search.toLowerCase())) && (!params?.status || !status || status(item) === params.status));
 const result = <T, U>(raw: ListResult<T>, items: U[]): ListResult<U> => ({ items, meta: raw.meta });
 
@@ -38,9 +85,9 @@ export const resourcesService = {
   async updatePlatform(idOrSlug: string, input: Pick<Platform, "enabled">) { const platforms = await resourcesService.platforms(); const slug = platforms.items.find((item) => item.id === idOrSlug)?.slug ?? idOrSlug; return mapPlatform(await apiRequest<RawPlatform>(`/platforms/${slug}`, { method: "PATCH", body: input })); },
   async accounts(params?: ListParams) { const raw = await apiList<RawAccount>("/platform-accounts"); let items = raw.items.map(mapAccount); if (params?.platformId) items = items.filter((item) => item.platformId === params.platformId); return result(raw, filterItems(items, params, (item) => `${item.name} ${item.username ?? ""} ${item.platform?.name ?? ""}`, (item) => item.status)); },
   async createAccount(input: { platformSlug: string; name: string; username?: string; externalId?: string; settings?: Record<string, unknown>; credential: Record<string, unknown>; enabled?: boolean }) { return mapAccount(await apiRequest<RawAccount>("/platform-accounts", { method: "POST", body: input })); },
-  async updateAccountCredential(id: string, credential: Record<string, unknown>) { return mapAccount(await apiRequest<RawAccount>(`/platform-accounts/${id}/credential`, { method: "PUT", body: { credential } })); },
+  async updateAccountCredential(id: string, input: { credential: Record<string, unknown>; settings?: Record<string, unknown> }) { return mapAccount(await apiRequest<RawAccount>(`/platform-accounts/${id}/credential`, { method: "PUT", body: input })); },
   async updateAccount(id: string, input: Pick<PlatformAccount, "enabled">) { return mapAccount(await apiRequest<RawAccount>(`/platform-accounts/${id}`, { method: "PATCH", body: input })); },
-  testAccount: (id: string) => apiRequest<{ ok: boolean; accountName?: string; manual?: boolean; message?: string; details?: Record<string, unknown> }>(`/platform-accounts/${id}/test`, { method: "POST" }),
+  testAccount: (id: string) => apiRequest<AccountConnectionTestResult>(`/platform-accounts/${id}/test`, { method: "POST" }),
   oauthProviders: () => apiRequest<Array<{ provider: string; platform?: string; status: string; callback?: string }>>("/oauth/providers"),
   async oauthStart(provider: string) { return apiRequest<{ authorizationUrl: string }>(`/oauth/${provider}/start`); },
   async sources(params?: ListParams) { const raw = await apiList<RawSource>("/content-sources"); return result(raw, filterItems(raw.items.map(mapSource), params, (item) => `${item.name} ${item.url ?? ""}`, (item) => item.status)); },
@@ -60,6 +107,7 @@ export const resourcesService = {
   async publishJobs(params?: ListParams) { const raw = await apiList<RawJob>("/publish-jobs", { query: { page: params?.page, limit: params?.limit, search: params?.search, status: params?.status, from: params?.from, to: params?.to } }); return result(raw, raw.items.map(mapJob)); },
   publishJobMetrics: (todayFrom: string, todayTo: string) => apiRequest<{ publishedToday: number; scheduled: number; processing: number; failed: number }>("/publish-jobs/metrics", { query: { todayFrom, todayTo } }),
   retryJob: (id: string) => apiRequest<{ queued: boolean }>(`/publish-jobs/${id}/retry`, { method: "POST" }),
+  reconcileNotFound: (id: string) => apiRequest<{ queued: boolean }>(`/publish-jobs/${id}/reconcile-not-found`, { method: "POST", body: { confirmedNotFound: true } }),
   async manualPayload(id: string) { const value = await apiRequest<{ title?: string | null; body: string; hashtags?: string[]; openUrl?: string }>(`/publish-jobs/${id}/manual-payload`); return { content: [value.title, value.body, value.hashtags?.map((tag) => `#${tag.replace(/^#/, "")}`).join(" ")].filter(Boolean).join("\n\n"), platformUrl: value.openUrl }; },
   markPublished: (id: string, input: { externalPostId: string; url?: string }) => apiRequest<{ published: boolean }>(`/publish-jobs/${id}/mark-published`, { method: "POST", body: input }),
   async prompts(params?: ListParams) { const raw = await apiList<RawPrompt>("/prompts"); return result(raw, filterItems(raw.items.map((item): PromptTemplate => ({ id: item.id, platform: item.platform?.name ?? item.platform?.slug ?? "Global", platformSlug: item.platform?.slug ?? "global", name: item.name, systemPrompt: item.systemPrompt, userPrompt: item.userTemplate, version: item.version, active: item.active, updatedAt: item.updatedAt })), params, (item) => `${item.platform} ${item.name}`)); },

@@ -139,12 +139,179 @@ describe("resourcesService contract adapters", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await resourcesService.createAccount({ platformSlug: "wordpress", name: "Blog", credential: { applicationPassword: "secret" } });
-    await resourcesService.updateAccountCredential("account-1", { applicationPassword: "new-secret" });
+    await resourcesService.updateAccountCredential("account-1", {
+      credential: { applicationPassword: "new-secret" },
+      settings: { publishStatus: "draft" },
+    });
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe("http://localhost:3001/api/v1/platform-accounts");
     expect(fetchMock.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ method: "POST", body: expect.stringContaining("applicationPassword") }));
     expect(fetchMock.mock.calls[1]?.[0]).toBe("http://localhost:3001/api/v1/platform-accounts/account-1/credential");
-    expect(fetchMock.mock.calls[1]?.[1]).toEqual(expect.objectContaining({ method: "PUT", body: JSON.stringify({ credential: { applicationPassword: "new-secret" } }) }));
+    expect(fetchMock.mock.calls[1]?.[1]).toEqual(expect.objectContaining({
+      method: "PUT",
+      body: JSON.stringify({
+        credential: { applicationPassword: "new-secret" },
+        settings: { publishStatus: "draft" },
+      }),
+    }));
+  });
+
+  it("distinguishes an already-submitted moderation job from manual publishing", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(apiResponse([{
+      id: "job-1",
+      status: "NEEDS_ACTION",
+      attemptCount: 1,
+      maxAttempts: 3,
+      platformAccount: {
+        name: "Forum staging",
+        platform: { slug: "discourse", name: "Discourse" },
+      },
+      target: {
+        campaign: { id: "campaign-1", name: "Forum test" },
+        contentVariant: { id: "variant-1", title: "Test topic" },
+      },
+      attempts: [{
+        id: "attempt-1",
+        attemptNumber: 1,
+        status: "SUCCEEDED",
+        startedAt: "2026-10-08T00:00:00.000Z",
+        responseMetadata: {
+          moderationQueue: true,
+          externalPostId: "42",
+          url: "https://forum.example.com/t/test/42",
+        },
+      }],
+    }])));
+
+    const response = await resourcesService.publishJobs();
+
+    expect(response.items[0]?.needsAction).toEqual({
+      kind: "MODERATION",
+      externalPostId: "42",
+      url: "https://forum.example.com/t/test/42",
+    });
+  });
+
+  it("marks an ambiguous Discourse submission for reconciliation instead of manual reposting", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(apiResponse([{
+      id: "job-uncertain",
+      status: "NEEDS_ACTION",
+      attemptCount: 1,
+      maxAttempts: 3,
+      platformAccount: {
+        name: "Forum staging",
+        platform: { slug: "discourse", name: "Discourse" },
+      },
+      target: {
+        campaign: { id: "campaign-1", name: "Forum test" },
+        contentVariant: { id: "variant-1", title: "Test topic" },
+      },
+      attempts: [{
+        id: "attempt-1",
+        attemptNumber: 1,
+        status: "SUCCEEDED",
+        startedAt: "2026-10-08T00:00:00.000Z",
+        responseMetadata: {
+          reconciliationRequired: true,
+          submissionUncertain: true,
+          providerExternalId: "sp-provider-id",
+        },
+      }],
+    }])));
+
+    const response = await resourcesService.publishJobs();
+
+    expect(response.items[0]?.needsAction).toEqual({
+      kind: "RECONCILIATION",
+      canRetryAfterNotFound: true,
+    });
+  });
+
+  it("does not offer provider-accepted persistence recovery jobs for resend", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(apiResponse([{
+      id: "job-persist-recovery",
+      status: "NEEDS_ACTION",
+      attemptCount: 1,
+      maxAttempts: 3,
+      platformAccount: {
+        name: "Forum staging",
+        platform: { slug: "discourse", name: "Discourse" },
+      },
+      target: {
+        campaign: { id: "campaign-1", name: "Forum test" },
+        contentVariant: { id: "variant-1", title: "Test topic" },
+      },
+      attempts: [{
+        id: "attempt-1",
+        attemptNumber: 1,
+        status: "SUCCEEDED",
+        startedAt: "2026-10-08T00:00:00.000Z",
+        responseMetadata: {
+          reconciliationRequired: true,
+          submissionUncertain: true,
+          providerAccepted: true,
+          persistenceRecoveryRequired: true,
+          externalPostId: "42",
+        },
+      }],
+    }])));
+
+    const response = await resourcesService.publishJobs();
+
+    expect(response.items[0]?.needsAction).toEqual({
+      kind: "RECONCILIATION",
+      externalPostId: "42",
+      canRetryAfterNotFound: false,
+    });
+  });
+
+  it("maps a stale worker delivery to explicit reconciliation instead of manual reposting", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(apiResponse([{
+      id: "job-worker-crash",
+      status: "NEEDS_ACTION",
+      attemptCount: 1,
+      maxAttempts: 3,
+      lastErrorCode: "WORKER_CRASH_UNCERTAIN_RESULT",
+      lastErrorMessage: "Verify the provider before publishing again",
+      platformAccount: {
+        name: "Forum staging",
+        platform: { slug: "discourse", name: "Discourse" },
+      },
+      target: {
+        campaign: { id: "campaign-1", name: "Forum test" },
+        contentVariant: { id: "variant-1", title: "Test topic" },
+      },
+      attempts: [{
+        id: "attempt-1",
+        attemptNumber: 1,
+        status: "STARTED",
+        startedAt: "2026-10-08T00:00:00.000Z",
+        responseMetadata: null,
+      }],
+    }])));
+
+    const response = await resourcesService.publishJobs();
+
+    expect(response.items[0]?.needsAction).toEqual({
+      kind: "RECONCILIATION",
+      canRetryAfterNotFound: true,
+    });
+  });
+
+  it("sends explicit operator confirmation when retrying an absent reconciled topic", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(apiResponse({ queued: true }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(resourcesService.reconcileNotFound("job-uncertain"))
+      .resolves.toEqual({ queued: true });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3001/api/v1/publish-jobs/job-uncertain/reconcile-not-found",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ confirmedNotFound: true }),
+      }),
+    );
   });
 
   it("uploads multipart media attached to the selected variant", async () => {

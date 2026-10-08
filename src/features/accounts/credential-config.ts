@@ -19,6 +19,11 @@ export interface CredentialConnectorConfig {
   fields: CredentialField[];
 }
 
+interface BuildCredentialPayloadOptions {
+  includeSettings?: boolean;
+  includeEmptySettings?: boolean;
+}
+
 export const credentialConnectorConfigs: Record<string, CredentialConnectorConfig> = {
   wordpress: {
     slug: "wordpress",
@@ -46,6 +51,18 @@ export const credentialConnectorConfigs: Record<string, CredentialConnectorConfi
     title: "Discord",
     description: "Webhook URL chính thức của channel. URL được lưu mã hóa và không được đọc lại.",
     fields: [{ key: "webhookUrl", label: "Webhook URL", storage: "credential", type: "password", required: true, placeholder: "https://discord.com/api/webhooks/…" }],
+  },
+  discourse: {
+    slug: "discourse",
+    title: "Discourse",
+    description: "API key do quản trị viên Discourse cấp, có quyền tạo topic bằng API. Không dùng cookie hoặc mật khẩu đăng nhập diễn đàn.",
+    fields: [
+      { key: "baseUrl", label: "Forum URL", storage: "setting", type: "url", required: true, placeholder: "https://community.example.com" },
+      { key: "apiUsername", label: "API Username", storage: "setting", type: "text", required: true, placeholder: "publisher-bot" },
+      { key: "apiKey", label: "API Key", storage: "credential", type: "password", required: true },
+      { key: "categoryId", label: "Category ID", storage: "setting", type: "text", required: true, placeholder: "12", help: "ID số của category mặc định nhận topic mới." },
+      { key: "defaultTags", label: "Tags mặc định", storage: "setting", type: "text", placeholder: "nodejs, tutorial", help: "Không bắt buộc. Chỉ nhập tag đã tồn tại và được phép trên forum; phân tách bằng dấu phẩy." },
+    ],
   },
   bluesky: {
     slug: "bluesky",
@@ -99,11 +116,27 @@ export function getCredentialConfig(slug?: string | null) {
   return slug ? credentialConnectorConfigs[slug] : undefined;
 }
 
-export function getInitialCredentialValues(config: CredentialConnectorConfig) {
-  return Object.fromEntries(config.fields.map((field) => [field.key, field.defaultValue ?? (field.type === "checkbox" ? false : "")])) as Record<string, CredentialValue>;
+export function getInitialCredentialValues(config: CredentialConnectorConfig, settings?: Record<string, unknown>) {
+  return Object.fromEntries(config.fields.map((field) => {
+    const saved = field.storage === "setting" ? settings?.[field.key] : undefined;
+    const savedValue = typeof saved === "boolean"
+      ? saved
+      : typeof saved === "string" || typeof saved === "number"
+        ? String(saved)
+        : Array.isArray(saved) && saved.every((item) => typeof item === "string")
+          ? saved.join(", ")
+        : undefined;
+    return [field.key, savedValue ?? field.defaultValue ?? (field.type === "checkbox" ? false : "")];
+  })) as Record<string, CredentialValue>;
 }
 
-export function buildCredentialPayload(config: CredentialConnectorConfig, values: Record<string, CredentialValue>, includeSettings = true) {
+export function buildCredentialPayload(
+  config: CredentialConnectorConfig,
+  values: Record<string, CredentialValue>,
+  options: boolean | BuildCredentialPayloadOptions = {},
+) {
+  const includeSettings = typeof options === "boolean" ? options : options.includeSettings ?? true;
+  const includeEmptySettings = typeof options === "boolean" ? false : options.includeEmptySettings ?? false;
   const credential: Record<string, unknown> = {};
   const settings: Record<string, unknown> = {};
   for (const field of config.fields) {
@@ -111,7 +144,10 @@ export function buildCredentialPayload(config: CredentialConnectorConfig, values
     const raw = values[field.key];
     const value = typeof raw === "string" ? raw.trim() : raw;
     if (field.required && (value === "" || value === undefined)) throw new Error(`${field.label} là bắt buộc.`);
-    if (value === "" || value === undefined) continue;
+    if (value === "" || value === undefined) {
+      if (field.storage === "setting" && value === "" && includeEmptySettings) settings[field.key] = "";
+      continue;
+    }
     if (field.type === "url") {
       let url: URL;
       try { url = new URL(String(value)); } catch { throw new Error(`${field.label} phải là URL hợp lệ.`); }

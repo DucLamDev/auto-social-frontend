@@ -16,20 +16,29 @@ import { Table, TableWrap, Td, Th } from "@/components/ui/table";
 import { Toolbar } from "@/components/ui/toolbar";
 import { useAccounts, useInvalidate, useOAuthProviders, usePlatforms, useResourceMutation } from "@/hooks/use-resources";
 import { fromNow } from "@/lib/utils";
-import { resourcesService } from "@/services/resources.service";
+import { resourcesService, type AccountConnectionTestResult } from "@/services/resources.service";
 import type { PlatformAccount } from "@/types/domain";
+import { getTagPolicyWarning } from "./connection-test-feedback";
 import { buildCredentialPayload, getCredentialConfig, getInitialCredentialValues, type CredentialValue } from "./credential-config";
 
 interface CredentialTarget { slug: string; account?: PlatformAccount }
+
+function showSuccessfulConnectionTest(result: AccountConnectionTestResult, message: string) {
+  toast.success(message);
+  const tagPolicyWarning = getTagPolicyWarning(result);
+  if (tagPolicyWarning) toast.warning(tagPolicyWarning, { duration: 12_000 });
+}
 
 function CredentialAccountForm({ target, onClose }: { target: CredentialTarget; onClose: () => void }) {
   const config = getCredentialConfig(target.slug);
   const [accountName, setAccountName] = useState(target.account?.name ?? "");
   const [username, setUsername] = useState(target.account?.username ?? "");
-  const [values, setValues] = useState<Record<string, CredentialValue>>(() => config ? getInitialCredentialValues(config) : {});
+  const [values, setValues] = useState<Record<string, CredentialValue>>(() => config
+    ? getInitialCredentialValues(config, target.account?.settings)
+    : {});
   const invalidate = useInvalidate();
   const save = useResourceMutation(async (input: { credential: Record<string, unknown>; settings: Record<string, unknown> }) => {
-    if (target.account) return resourcesService.updateAccountCredential(target.account.id, input.credential);
+    if (target.account) return resourcesService.updateAccountCredential(target.account.id, input);
     return resourcesService.createAccount({
       platformSlug: target.slug,
       name: accountName.trim(),
@@ -42,23 +51,26 @@ function CredentialAccountForm({ target, onClose }: { target: CredentialTarget; 
   const verify = useResourceMutation((id: string) => resourcesService.testAccount(id), ["accounts"]);
 
   if (!config) return <p className="text-sm text-danger">Connector này chưa khai báo credential form.</p>;
-  const visibleFields = target.account ? config.fields.filter((field) => field.storage === "credential") : config.fields;
+  const visibleFields = config.fields;
   const busy = save.isPending || verify.isPending;
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
       if (!target.account && accountName.trim().length < 2) throw new Error("Tên tài khoản cần ít nhất 2 ký tự.");
-      const payload = buildCredentialPayload(config, values, !target.account);
+      const payload = buildCredentialPayload(config, values, {
+        includeEmptySettings: Boolean(target.account),
+      });
       const account = await save.mutateAsync(payload);
       toast.success("Credential đã được mã hóa và lưu. Đang kiểm tra kết nối…");
       try {
         const result = await verify.mutateAsync(account.id);
         if (!result.ok) throw new Error(result.message || "Connector không hỗ trợ kiểm tra tự động.");
-        toast.success(`Kết nối thành công${result.accountName ? `: ${result.accountName}` : ""}`);
+        showSuccessfulConnectionTest(result, `Kết nối thành công${result.accountName ? `: ${result.accountName}` : ""}`);
         onClose();
       } catch (error) {
         await invalidate("accounts");
         toast.error(`Credential đã lưu nhưng test thất bại: ${error instanceof Error ? error.message : "không xác định"}`);
+        onClose();
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Không thể lưu credential");
@@ -67,7 +79,7 @@ function CredentialAccountForm({ target, onClose }: { target: CredentialTarget; 
 
   return <form className="space-y-5" onSubmit={(event) => void submit(event)}>
     <div className="flex gap-3 rounded-xl border border-indigo-100 bg-indigo-50 p-4 text-xs leading-5 text-indigo-900"><LockKeyhole className="mt-0.5 size-4 shrink-0" /><p>{config.description} Secret chỉ được gửi một chiều và không bao giờ được API trả lại.</p></div>
-    {target.account ? <div className="rounded-xl border border-border bg-slate-50 p-4"><p className="text-xs font-bold">{target.account.name}</p><p className="mt-1 text-[11px] text-muted">Đang thay credential cho {target.account.platform?.name}. Metadata/settings hiện có được giữ nguyên.</p></div> : <div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="credential-account-name">Tên hiển thị</Label><Input id="credential-account-name" required minLength={2} value={accountName} onChange={(event) => setAccountName(event.target.value)} placeholder={`${config.title} · Marketing`} /></div><div><Label htmlFor="credential-account-username">Username (tuỳ chọn)</Label><Input id="credential-account-username" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="account_handle" /></div></div>}
+    {target.account ? <div className="rounded-xl border border-border bg-slate-50 p-4"><p className="text-xs font-bold">{target.account.name}</p><p className="mt-1 text-[11px] text-muted">Có thể sửa connector settings bên dưới. Secret cũ không được tải về, vì vậy cần nhập lại đầy đủ credential.</p></div> : <div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="credential-account-name">Tên hiển thị</Label><Input id="credential-account-name" required minLength={2} value={accountName} onChange={(event) => setAccountName(event.target.value)} placeholder={`${config.title} · Marketing`} /></div><div><Label htmlFor="credential-account-username">Username (tuỳ chọn)</Label><Input id="credential-account-username" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="account_handle" /></div></div>}
     <div className="grid gap-4 sm:grid-cols-2">{visibleFields.map((field) => {
       const value = values[field.key] ?? "";
       if (field.type === "checkbox") return <div key={field.key} className="flex items-center justify-between gap-4 rounded-xl border border-border p-3 sm:col-span-2"><div><p className="text-sm font-semibold">{field.label}</p>{field.help && <p className="mt-1 text-xs text-muted">{field.help}</p>}</div><Switch checked={Boolean(value)} onChange={(checked) => setValues((current) => ({ ...current, [field.key]: checked }))} label={field.label} /></div>;
@@ -95,7 +107,7 @@ export function AccountsView() {
   useEffect(() => { const params = new URLSearchParams(window.location.search); if (params.get("oauth") === "success") { toast.success(`Đã kết nối ${params.get("provider") || "tài khoản"} thành công`); window.history.replaceState({}, "", window.location.pathname); } }, []);
 
   const testConnection = async (id: string) => {
-    try { const response = await test.mutateAsync(id); if (response.ok) toast.success(`Kết nối hoạt động tốt${response.accountName ? `: ${response.accountName}` : ""}`); else toast.warning(response.message || "Connector cần thao tác thủ công"); }
+    try { const response = await test.mutateAsync(id); if (response.ok) showSuccessfulConnectionTest(response, `Kết nối hoạt động tốt${response.accountName ? `: ${response.accountName}` : ""}`); else toast.warning(response.message || "Connector cần thao tác thủ công"); }
     catch (error) { toast.error(error instanceof Error ? error.message : "Kiểm tra thất bại"); }
   };
   const connect = async (provider: string) => {

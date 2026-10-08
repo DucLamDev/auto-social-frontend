@@ -480,6 +480,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/publish-jobs/{id}/reconcile-not-found": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PublishJobs_reconcileNotFound"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/publish-jobs/{id}/mark-published": {
         parameters: {
             query?: never;
@@ -862,6 +878,10 @@ export interface components {
             credential: {
                 [key: string]: unknown;
             };
+            /** @description Non-secret connector settings to merge into the existing account settings. */
+            settings?: {
+                [key: string]: unknown;
+            };
         };
         UpdatePlatformAccountDto: {
             enabled: boolean;
@@ -871,6 +891,9 @@ export interface components {
             accountName?: string;
             manual?: boolean;
             message?: string;
+            details?: {
+                [key: string]: unknown;
+            };
         };
         ContentSourceContractDto: {
             /** Format: uuid */
@@ -1170,6 +1193,13 @@ export interface components {
             /** Format: uri */
             openUrl?: string;
         };
+        ReconcileNotFoundDto: {
+            /**
+             * @description Explicit confirmation that the operator checked topics and moderation queues
+             * @example true
+             */
+            confirmedNotFound: boolean;
+        };
         ManualPublishedDto: {
             externalPostId: string;
             url?: string;
@@ -1223,6 +1253,9 @@ export interface components {
             startedAt: string;
             /** Format: date-time */
             finishedAt?: string | null;
+            responseMetadata?: {
+                [key: string]: unknown;
+            } | null;
             job?: {
                 [key: string]: unknown;
             };
@@ -3132,6 +3165,58 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["MutationResultContractDto"];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    PublishJobs_reconcileNotFound: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReconcileNotFoundDto"];
+            };
+        };
         responses: {
             201: {
                 headers: {

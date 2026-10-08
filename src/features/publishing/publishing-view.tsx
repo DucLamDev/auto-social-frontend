@@ -1,5 +1,5 @@
 "use client";
-import { Copy, ExternalLink, RefreshCw, RotateCcw } from "lucide-react";
+import { Clock3, Copy, ExternalLink, RefreshCw, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/auth/permission-gate";
@@ -19,6 +19,7 @@ import { usePublishJobs, useResourceMutation } from "@/hooks/use-resources";
 import { cn, formatDate } from "@/lib/utils";
 import { resourcesService } from "@/services/resources.service";
 import { env } from "@/config/env";
+import type { PublishJob } from "@/types/domain";
 
 const tabs = ["", "QUEUED", "PUBLISHING", "PROCESSING", "PUBLISHED", "RETRY", "FAILED", "NEEDS_ACTION"] as const;
 
@@ -30,8 +31,11 @@ export function PublishingView() {
   const [externalPostId, setExternalPostId] = useState("");
   const [publishedUrl, setPublishedUrl] = useState("");
   const [retryTarget, setRetryTarget] = useState<{ id: string; contentTitle: string; account: string } | null>(null);
+  const [reconcileRetryTarget, setReconcileRetryTarget] = useState<PublishJob | null>(null);
   const query = usePublishJobs({ page, limit: 50, status: status || undefined, search: search || undefined });
+  const confirmationJob = query.data?.items.find((job) => job.id === manualJobId);
   const retry = useResourceMutation((id: string) => resourcesService.retryJob(id), ["publish-jobs"]);
+  const reconcileRetry = useResourceMutation((id: string) => resourcesService.reconcileNotFound(id), ["publish-jobs"]);
   const mark = useResourceMutation((input: { id: string; externalPostId: string; url?: string }) => resourcesService.markPublished(input.id, { externalPostId: input.externalPostId, url: input.url }), ["publish-jobs"]);
 
   const copyAndOpen = async (id: string) => {
@@ -49,6 +53,11 @@ export function PublishingView() {
       toast.success("Đã đánh dấu published"); setManualJobId(null); setExternalPostId(""); setPublishedUrl("");
     } catch (error) { toast.error(error instanceof Error ? error.message : "Không thể cập nhật"); }
   };
+  const openPublishedConfirmation = (job: PublishJob) => {
+    setManualJobId(job.id);
+    setExternalPostId(job.needsAction?.externalPostId ?? "");
+    setPublishedUrl(job.needsAction?.url ?? "");
+  };
   const confirmRetry = async () => {
     if (!retryTarget) return;
     try {
@@ -57,6 +66,16 @@ export function PublishingView() {
       setRetryTarget(null);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Có lỗi");
+    }
+  };
+  const confirmReconciliationRetry = async () => {
+    if (!reconcileRetryTarget) return;
+    try {
+      await reconcileRetry.mutateAsync(reconcileRetryTarget.id);
+      toast.success("Đã xác nhận không tìm thấy topic và đưa job cũ vào hàng đợi");
+      setReconcileRetryTarget(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không thể xếp hàng lại job");
     }
   };
 
@@ -70,11 +89,11 @@ export function PublishingView() {
         <Td className="max-w-xs"><p className="truncate font-semibold text-foreground">{job.contentTitle}</p>{job.error && <p title={job.error.message} className="mt-1 truncate text-[10px] text-danger">{job.error.code}: {job.error.message}</p>}</Td>
         <Td><Badge value={job.status} /></Td><Td><span className="text-xs font-semibold">{job.attempt}/{job.maxAttempts ?? 3}</span></Td>
         <Td className="text-xs"><p>{formatDate(job.startedAt || job.scheduledAt)}</p>{job.finishedAt && <p className="mt-0.5 text-[10px] text-muted">Xong {formatDate(job.finishedAt)}</p>}</Td>
-        <Td><div className="flex justify-end gap-1">{job.publishedUrl && <a href={job.publishedUrl} target="_blank" rel="noreferrer" className="grid size-9 place-items-center rounded-lg text-primary hover:bg-indigo-50" aria-label="Mở bài đã đăng"><ExternalLink className="size-4" /></a>}<PermissionGate allow={["ADMIN", "EDITOR"]}>{job.status === "FAILED" && <Button variant="ghost" size="sm" onClick={() => setRetryTarget({ id: job.id, contentTitle: job.contentTitle, account: job.account })}><RotateCcw className="size-4" />Retry</Button>}{job.status === "NEEDS_ACTION" && <><Button variant="ghost" size="sm" onClick={() => void copyAndOpen(job.id)}><Copy className="size-4" />Copy & mở</Button><Button variant="secondary" size="sm" onClick={() => setManualJobId(job.id)}>Đã đăng</Button></>}</PermissionGate></div></Td>
+        <Td><div className="flex justify-end gap-1">{job.publishedUrl && <a href={job.publishedUrl} target="_blank" rel="noreferrer" className="grid size-9 place-items-center rounded-lg text-primary hover:bg-indigo-50" aria-label="Mở bài đã đăng"><ExternalLink className="size-4" /></a>}<PermissionGate allow={["ADMIN", "EDITOR"]}>{job.status === "FAILED" && <Button variant="ghost" size="sm" onClick={() => setRetryTarget({ id: job.id, contentTitle: job.contentTitle, account: job.account })}><RotateCcw className="size-4" />Retry</Button>}{job.status === "NEEDS_ACTION" && (job.needsAction ? <><span className="inline-flex items-center gap-1 px-2 text-[11px] font-semibold text-amber-700" title="Topic có thể đã được gửi; phải đối soát trước khi tạo bài khác."><Clock3 className="size-3.5" />{job.needsAction.kind === "MODERATION" ? "Chờ forum duyệt" : "Cần đối soát"}</span>{job.needsAction.url && <a href={job.needsAction.url} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-primary hover:bg-indigo-50"><ExternalLink className="size-4" />Kiểm tra</a>}<Button variant="secondary" size="sm" onClick={() => openPublishedConfirmation(job)}>{job.needsAction.kind === "MODERATION" ? "Đã được duyệt" : "Đã tìm thấy bài"}</Button>{job.needsAction.kind === "RECONCILIATION" && job.needsAction.canRetryAfterNotFound && <Button variant="ghost" size="sm" onClick={() => setReconcileRetryTarget(job)}><RotateCcw className="size-4" />Không tìm thấy</Button>}</> : <><Button variant="ghost" size="sm" onClick={() => void copyAndOpen(job.id)}><Copy className="size-4" />Copy & mở</Button><Button variant="secondary" size="sm" onClick={() => openPublishedConfirmation(job)}>Đã đăng</Button></>)}</PermissionGate></div></Td>
       </tr>)}</tbody></Table></TableWrap><Pagination page={Number(query.data.meta?.page ?? page)} totalPages={Number(query.data.meta?.totalPages ?? 1)} total={Number(query.data.meta?.total ?? query.data.items.length)} onPage={setPage} /></>}
     </Card>
-    <Modal open={Boolean(manualJobId)} onClose={() => setManualJobId(null)} title="Xác nhận đã đăng thủ công" description="Lưu ID thật từ nền tảng để chống đăng trùng và giữ lịch sử chính xác.">
-      <div className="space-y-4"><div><Label htmlFor="external-post-id">External post ID</Label><Input id="external-post-id" value={externalPostId} onChange={(event) => setExternalPostId(event.target.value)} placeholder="Ví dụ: 1834928301" /></div><div><Label htmlFor="published-url">Published URL (không bắt buộc)</Label><Input id="published-url" type="url" value={publishedUrl} onChange={(event) => setPublishedUrl(event.target.value)} placeholder="https://platform.example/post/..." /></div><div className="flex justify-end gap-2 pt-2"><Button variant="secondary" onClick={() => setManualJobId(null)}>Hủy</Button><Button loading={mark.isPending} onClick={() => void confirmPublished()}>Xác nhận</Button></div></div>
+    <Modal open={Boolean(manualJobId)} onClose={() => setManualJobId(null)} title={confirmationJob?.needsAction?.kind === "MODERATION" ? "Xác nhận forum đã duyệt" : confirmationJob?.needsAction?.kind === "RECONCILIATION" ? "Xác nhận đã tìm thấy topic" : "Xác nhận đã đăng thủ công"} description={confirmationJob?.needsAction?.kind === "MODERATION" ? "Topic đã được gửi một lần. Chỉ xác nhận sau khi forum hiển thị bài; không đăng lại nội dung." : confirmationJob?.needsAction?.kind === "RECONCILIATION" ? "Request trước có kết quả chưa chắc chắn. Hãy kiểm tra topic gần đây và hàng đợi moderation; không đăng lại trước khi đối soát." : "Lưu ID thật từ nền tảng để chống đăng trùng và giữ lịch sử chính xác."}>
+      <div className="space-y-4"><div><Label htmlFor="external-post-id">External post ID</Label><Input id="external-post-id" value={externalPostId} onChange={(event) => setExternalPostId(event.target.value)} placeholder="Ví dụ: 1834928301" /></div><div><Label htmlFor="published-url">Published URL (không bắt buộc)</Label><Input id="published-url" type="url" value={publishedUrl} onChange={(event) => setPublishedUrl(event.target.value)} placeholder="https://platform.example/post/..." /></div><div className="flex justify-end gap-2 pt-2"><Button variant="secondary" onClick={() => setManualJobId(null)}>Hủy</Button><Button loading={mark.isPending} onClick={() => void confirmPublished()}>{confirmationJob?.needsAction?.kind === "MODERATION" ? "Xác nhận đã duyệt" : confirmationJob?.needsAction?.kind === "RECONCILIATION" ? "Xác nhận topic" : "Xác nhận"}</Button></div></div>
     </Modal>
     <ConfirmDialog
       open={Boolean(retryTarget)}
@@ -85,6 +104,16 @@ export function PublishingView() {
       danger
       onClose={() => setRetryTarget(null)}
       onConfirm={confirmRetry}
+    />
+    <ConfirmDialog
+      open={Boolean(reconcileRetryTarget)}
+      title="Xác nhận không có topic hoặc bài chờ duyệt"
+      description={`Chỉ tiếp tục nếu bạn đã kiểm tra topic gần đây và moderation queue của ${reconcileRetryTarget?.account ?? "forum"}, và chắc chắn request trước không tạo hoặc enqueue bài. Hệ thống sẽ gửi lại chính job này với cùng idempotency key.`}
+      confirmLabel="Đã kiểm tra, gửi lại"
+      busy={reconcileRetry.isPending}
+      danger
+      onClose={() => setReconcileRetryTarget(null)}
+      onConfirm={confirmReconciliationRetry}
     />
   </div>;
 }
