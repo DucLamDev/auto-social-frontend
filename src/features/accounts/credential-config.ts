@@ -1,3 +1,5 @@
+import { env } from "@/config/env";
+
 export type CredentialValue = string | boolean;
 
 export interface CredentialField {
@@ -57,10 +59,10 @@ export const credentialConnectorConfigs: Record<string, CredentialConnectorConfi
     title: "Discourse",
     description: "API key do quản trị viên Discourse cấp, có quyền tạo topic bằng API. Không dùng cookie hoặc mật khẩu đăng nhập diễn đàn.",
     fields: [
-      { key: "baseUrl", label: "Forum URL", storage: "setting", type: "url", required: true, placeholder: "https://community.example.com" },
-      { key: "apiUsername", label: "API Username", storage: "setting", type: "text", required: true, placeholder: "publisher-bot" },
+      { key: "baseUrl", label: "Forum URL", storage: "setting", type: "url", required: true, defaultValue: env.defaultDiscourseUrl, placeholder: "https://community.example.com", help: "Phải là HTTPS. Có thể đặt URL mặc định lúc build bằng NEXT_PUBLIC_DEFAULT_DISCOURSE_URL; API key không được lưu trong biến public." },
+      { key: "apiUsername", label: "API Username", storage: "setting", type: "text", required: true, defaultValue: env.defaultDiscourseUsername, placeholder: "publisher-bot", help: "Username chính xác được gắn với API key. Mặc định public chỉ dành cho smoke test; production nên dùng publisher-bot quyền tối thiểu." },
       { key: "apiKey", label: "API Key", storage: "credential", type: "password", required: true },
-      { key: "categoryId", label: "Category ID", storage: "setting", type: "text", required: true, placeholder: "12", help: "ID số của category mặc định nhận topic mới." },
+      { key: "categoryId", label: "Category ID", storage: "setting", type: "text", required: true, defaultValue: env.defaultDiscourseCategoryId, placeholder: "12", help: "ID số của category mặc định nhận topic mới. Mặc định public chỉ dành cho smoke test; production nên dùng category staging hoặc category đích đã duyệt." },
       { key: "defaultTags", label: "Tags mặc định", storage: "setting", type: "text", placeholder: "nodejs, tutorial", help: "Không bắt buộc. Chỉ nhập tag đã tồn tại và được phép trên forum; phân tách bằng dấu phẩy." },
     ],
   },

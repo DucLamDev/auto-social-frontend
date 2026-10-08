@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { buildCredentialPayload, credentialConnectorConfigs, getInitialCredentialValues } from "./credential-config";
 
 describe("credential connector configuration", () => {
@@ -47,6 +47,28 @@ describe("credential connector configuration", () => {
         defaultTags: "nodejs, tutorial",
       },
     });
+  });
+
+  it("prefills only public deployment metadata for the first Discourse smoke test", async () => {
+    vi.stubEnv("NEXT_PUBLIC_DEFAULT_DISCOURSE_URL", "https://vpsttt.discourse.diy");
+    vi.stubEnv("NEXT_PUBLIC_DEFAULT_DISCOURSE_USERNAME", "Lam_Ho");
+    vi.stubEnv("NEXT_PUBLIC_DEFAULT_DISCOURSE_CATEGORY_ID", "4");
+    vi.resetModules();
+
+    try {
+      const freshModule = await import("./credential-config");
+      const config = freshModule.credentialConnectorConfigs.discourse!;
+      expect(freshModule.getInitialCredentialValues(config)).toEqual({
+        baseUrl: "https://vpsttt.discourse.diy",
+        apiUsername: "Lam_Ho",
+        apiKey: "",
+        categoryId: "4",
+        defaultTags: "",
+      });
+    } finally {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    }
   });
 
   it("sends an empty optional setting on update so saved Discourse tags can be cleared", () => {

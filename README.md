@@ -43,8 +43,11 @@ corepack pnpm api:generate
 | `NEXT_PUBLIC_API_URL` | Yes | Public origin of the NestJS backend, without `/api/v1` |
 | `NEXT_PUBLIC_APP_NAME` | No | Display name; defaults to `Social Publisher` |
 | `NEXT_PUBLIC_POLL_INTERVAL_MS` | No | Default polling hint; defaults to `10000` |
+| `NEXT_PUBLIC_DEFAULT_DISCOURSE_URL` | No | Public HTTPS forum URL prefilled only for new Discourse accounts |
+| `NEXT_PUBLIC_DEFAULT_DISCOURSE_USERNAME` | No | Public API username prefilled only for new Discourse accounts |
+| `NEXT_PUBLIC_DEFAULT_DISCOURSE_CATEGORY_ID` | No | Public numeric category ID prefilled only for new Discourse accounts |
 
-Never place OpenAI keys, social tokens, database URLs, or storage secrets in frontend environment variables.
+Never place OpenAI keys, social/API tokens (including a Discourse API key), database URLs, or storage secrets in frontend environment variables.
 
 Social credentials entered on `/accounts` are sent directly to the backend write-only credential endpoints, encrypted there, and never returned to the browser. Studio media uploads use the authenticated multipart `/media` endpoint and attach the asset to the selected content variant.
 
