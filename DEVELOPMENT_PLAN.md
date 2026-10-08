@@ -60,11 +60,11 @@ Status legend: `[ ] TODO`, `[-] IN PROGRESS`, `[x] DONE`, `[!] BLOCKED`.
   - Files: `Dockerfile`, `docker-compose.yml`, `.dockerignore`
   - Test command: `docker build --build-arg NEXT_PUBLIC_API_URL=http://localhost:3001 .`
   - Notes: artifact is included; Next standalone output builds successfully.
-- [!] Local Docker image validation
-  - Dependencies: running Docker Desktop/Linux engine
+- [x] Local Docker image validation
+  - Dependencies: Docker Desktop/Linux engine
   - Files: `Dockerfile`
-  - Test command: `docker build --build-arg NEXT_PUBLIC_API_URL=http://localhost:3001 .`
-  - Notes: blocked in the current host because the Docker daemon is stopped and the service requires elevation; CI performs this check.
+  - Test command: `docker build --pull --build-arg NEXT_PUBLIC_API_URL=https://api.example.com -t social-publisher-frontend:validation .`, then run the image and request `/api/health`.
+  - Notes: validated locally; the standalone container became Docker `healthy` and returned `{"status":"ok","service":"social-publisher-frontend"}`. `NEXT_PUBLIC_API_URL` is compiled into the browser bundle, so production must supply the real HTTPS API URL at build time.
 - [x] Independent CI pipeline
   - Files: `.github/workflows/ci.yml`
   - Test command: workflow runs lint, typecheck, test, Next build and Docker build.
