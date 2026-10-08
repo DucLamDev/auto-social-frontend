@@ -313,7 +313,7 @@ export interface paths {
         };
         get: operations["ContentVariants_list"];
         put?: never;
-        post?: never;
+        post: operations["ContentVariants_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1040,6 +1040,15 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        CreateContentVariantDto: {
+            /** Format: uuid */
+            contentId: string;
+            /** @example devto */
+            platformSlug: string;
+            title?: string;
+            body: string;
+            hashtags?: string[];
         };
         UpdateVariantDto: {
             title?: string;
@@ -2583,6 +2592,56 @@ export interface operations {
                         /** @example true */
                         success: boolean;
                         data: components["schemas"]["ContentVariantContractDto"][];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ContentVariants_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateContentVariantDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["ContentVariantContractDto"];
                         meta: components["schemas"]["ApiMetaContractDto"];
                     };
                 };

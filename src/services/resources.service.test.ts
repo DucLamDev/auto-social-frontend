@@ -156,6 +156,79 @@ describe("resourcesService contract adapters", () => {
     }));
   });
 
+  it("creates a manual content variant through the dedicated endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(apiResponse({
+      id: "variant-1",
+      contentId: "content-1",
+      platformId: "platform-devto",
+      title: "Manual DEV article",
+      body: "Markdown body",
+      hashtags: ["nodejs"],
+      status: "GENERATED",
+      platform: { slug: "devto", name: "dev.to" },
+      updatedAt: "2026-10-08T00:00:00.000Z",
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await resourcesService.createVariant({
+      contentId: "content-1",
+      platformSlug: "devto",
+      title: "Manual DEV article",
+      body: "Markdown body",
+      hashtags: ["nodejs"],
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3001/api/v1/content-variants",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          contentId: "content-1",
+          platformSlug: "devto",
+          title: "Manual DEV article",
+          body: "Markdown body",
+          hashtags: ["nodejs"],
+        }),
+      }),
+    );
+    expect(result).toEqual(expect.objectContaining({ id: "variant-1", platformSlug: "devto" }));
+  });
+
+  it("generates AI variants only for unique connected accounts on enabled platforms", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(apiResponse([
+        { id: "platform-devto", slug: "devto", name: "dev.to", mode: "OFFICIAL_API", availability: "CREDENTIAL_REQUIRED", enabled: true },
+        { id: "platform-discourse", slug: "discourse", name: "Discourse", mode: "COMPATIBLE_API", availability: "CREDENTIAL_REQUIRED", enabled: true },
+        { id: "platform-x", slug: "x", name: "X", mode: "OFFICIAL_API", availability: "CREDENTIAL_REQUIRED", enabled: false },
+      ]))
+      .mockResolvedValueOnce(apiResponse([
+        { id: "account-1", platformId: "platform-devto", name: "DEV one", enabled: true, status: "CONNECTED", platform: { slug: "devto", name: "dev.to", mode: "OFFICIAL_API", availability: "CREDENTIAL_REQUIRED" } },
+        { id: "account-2", platformId: "platform-devto", name: "DEV two", enabled: true, status: "CONNECTED", platform: { slug: "devto", name: "dev.to", mode: "OFFICIAL_API", availability: "CREDENTIAL_REQUIRED" } },
+        { id: "account-3", platformId: "platform-discourse", name: "Forum", enabled: true, status: "RECONNECT_REQUIRED", platform: { slug: "discourse", name: "Discourse", mode: "COMPATIBLE_API", availability: "CREDENTIAL_REQUIRED" } },
+        { id: "account-4", platformId: "platform-x", name: "Disabled X", enabled: true, status: "CONNECTED", platform: { slug: "x", name: "X", mode: "OFFICIAL_API", availability: "CREDENTIAL_REQUIRED" } },
+      ]))
+      .mockResolvedValueOnce(apiResponse([{
+        id: "variant-1",
+        contentId: "content-1",
+        platformId: "platform-devto",
+        title: "AI article",
+        body: "Body",
+        hashtags: [],
+        status: "GENERATED",
+        platform: { slug: "devto", name: "dev.to" },
+        updatedAt: "2026-10-08T00:00:00.000Z",
+      }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await resourcesService.generateVariants("content-1");
+
+    expect(fetchMock.mock.calls[2]?.[0]).toBe("http://localhost:3001/api/v1/contents/content-1/generate");
+    expect(fetchMock.mock.calls[2]?.[1]).toEqual(expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ platforms: ["devto"] }),
+    }));
+  });
+
   it("distinguishes an already-submitted moderation job from manual publishing", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(apiResponse([{
       id: "job-1",

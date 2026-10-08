@@ -98,7 +98,26 @@ export const resourcesService = {
   async contents(params?: ListParams) { const raw = await apiList<RawContent>("/contents", { query: { page: params?.page, limit: params?.limit, search: params?.search, status: params?.status, sourceId: params?.sourceId, from: params?.from, to: params?.to } }); return result(raw, raw.items.map(mapContent)); },
   async content(id: string) { return mapContent(await apiRequest<RawContent>(`/contents/${id}`)); },
   async variants(contentId: string) { const raw = await apiList<RawVariant>("/content-variants", { query: { contentId } }); return result(raw, raw.items.map(mapVariant)); },
-  async generateVariants(contentId: string, platforms?: string[]) { const slugs = platforms?.length ? platforms : (await resourcesService.platforms()).items.filter((item) => item.enabled).map((item) => item.slug); const variants = await apiRequest<RawVariant[]>(`/contents/${contentId}/generate`, { method: "POST", body: { platforms: slugs } }); return variants.map(mapVariant); },
+  async createVariant(input: { contentId: string; platformSlug: string; title?: string; body: string; hashtags?: string[] }) { return mapVariant(await apiRequest<RawVariant>("/content-variants", { method: "POST", body: input })); },
+  async generateVariants(contentId: string, platforms?: string[]) {
+    let requested = platforms;
+    if (requested === undefined) {
+      const [platformResult, accountResult] = await Promise.all([
+        resourcesService.platforms(),
+        resourcesService.accounts({ status: "CONNECTED" }),
+      ]);
+      const enabledPlatformIds = new Set(platformResult.items.filter((item) => item.enabled).map((item) => item.id));
+      requested = accountResult.items
+        .filter((account) => account.enabled && account.status === "CONNECTED" && enabledPlatformIds.has(account.platformId))
+        .map((account) => account.platform?.slug)
+        .filter((slug): slug is string => Boolean(slug));
+    }
+    const slugs = [...new Set(requested.map((slug) => slug.trim().toLowerCase()).filter(Boolean))];
+    if (!slugs.length) throw new Error("Chưa có tài khoản đích đã kết nối và đang bật để tạo biến thể AI.");
+    if (slugs.length > 12) throw new Error("Mỗi lần chỉ có thể tạo tối đa 12 biến thể AI. Hãy tắt bớt tài khoản đích và thử lại.");
+    const variants = await apiRequest<RawVariant[]>(`/contents/${contentId}/generate`, { method: "POST", body: { platforms: slugs } });
+    return variants.map(mapVariant);
+  },
   async updateVariant(id: string, input: Partial<ContentVariant>) { return mapVariant(await apiRequest<RawVariant>(`/content-variants/${id}`, { method: "PATCH", body: input })); },
   async approveVariant(id: string) { return mapVariant(await apiRequest<RawVariant>(`/content-variants/${id}/status`, { method: "PATCH", body: { status: "APPROVED" } })); },
   async campaigns(params?: ListParams) { const raw = await apiList<RawCampaign>("/campaigns"); return result(raw, filterItems(raw.items.map(mapCampaign), params, (item) => `${item.name} ${item.content?.title ?? ""}`, (item) => item.status)); },
