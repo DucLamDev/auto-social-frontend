@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ContentVariant, PlatformAccount } from "@/types/domain";
-import { getApprovedVariantForAccount, getEligibleAccounts, isCampaignReadyContent } from "./campaign-utils";
+import { getApprovedVariantForAccount, getEligibleAccounts, isCampaignReadyContent, normalizeAutomationAccountIds } from "./campaign-utils";
 
 const account: PlatformAccount = { id: "a1", platformId: "p1", platform: { id: "p1", name: "LinkedIn", slug: "linkedin" }, name: "Company", enabled: true, status: "CONNECTED" };
 const variants: ContentVariant[] = [
@@ -20,5 +20,9 @@ describe("campaign eligibility", () => {
   it("excludes accounts without a matching approved variant", () => {
     const xAccount: PlatformAccount = { ...account, id: "a2", platform: { id: "p2", name: "X", slug: "x" }, status: "DISABLED" };
     expect(getEligibleAccounts([account, xAccount], variants).map((item) => item.id)).toEqual(["a1"]);
+  });
+  it("canonicalizes automation destinations for a stable idempotency fingerprint", () => {
+    expect(normalizeAutomationAccountIds(["account-b", "account-a", "account-b"]))
+      .toEqual(["account-a", "account-b"]);
   });
 });

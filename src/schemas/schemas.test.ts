@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { loginSchema } from "./auth";
-import { campaignSchema } from "./campaign";
+import { automationCampaignSchema, campaignSchema } from "./campaign";
 import { sourceSchema } from "./source";
 
 describe("form schemas", () => {
@@ -15,5 +15,27 @@ describe("form schemas", () => {
   it("requires a campaign destination", () => {
     expect(campaignSchema.safeParse({ name: "Launch", contentId: "content", accountIds: [] }).success).toBe(false);
     expect(campaignSchema.safeParse({ name: "Launch", contentId: "content", accountIds: ["account"] }).success).toBe(true);
+  });
+  it("requires explicit publishing consent and a future timestamp for scheduled automation", () => {
+    const base = {
+      name: "Launch automation",
+      brief: "Mô tả sản phẩm đủ chi tiết để AI tạo nội dung quảng bá.",
+      accountIds: ["account"],
+      runMode: "NOW",
+      scheduledAt: "",
+      confirmAutoPublish: true,
+    };
+    expect(automationCampaignSchema.safeParse(base).success).toBe(true);
+    expect(automationCampaignSchema.safeParse({ ...base, confirmAutoPublish: false }).success).toBe(false);
+    expect(automationCampaignSchema.safeParse({
+      ...base,
+      runMode: "SCHEDULED",
+      scheduledAt: "2020-01-01T00:00",
+    }).success).toBe(false);
+    expect(automationCampaignSchema.safeParse({
+      ...base,
+      runMode: "SCHEDULED",
+      scheduledAt: "2099-01-01T00:00",
+    }).success).toBe(true);
   });
 });

@@ -400,6 +400,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/campaigns/automate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Campaigns_automate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/campaigns/{id}/publish": {
         parameters: {
             query?: never;
@@ -1149,6 +1165,36 @@ export interface components {
              */
             timezone: string;
             targets: components["schemas"]["CampaignTargetDto"][];
+        };
+        AutomatedCampaignContractDto: {
+            campaign: components["schemas"]["CampaignContractDto"];
+            content: components["schemas"]["ContentContractDto"];
+            generatedVariants: number;
+            jobsCreated: number;
+            /** @description Whether the campaign was activated for immediate or scheduled delivery. */
+            activated: boolean;
+        };
+        AutomateCampaignDto: {
+            /** @example Ra mắt sản phẩm VPS mới */
+            name: string;
+            /**
+             * @description Thông tin nguồn để AI viết các biến thể riêng cho từng nền tảng.
+             * @example Quảng bá gói VPS hiệu năng cao cho lập trình viên, tập trung vào backup và hỗ trợ 24/7.
+             */
+            brief: string;
+            platformAccountIds: string[];
+            /** @description ISO-8601 timestamp with Z or an explicit UTC offset. */
+            scheduledAt?: string;
+            /**
+             * @default UTC
+             * @example Asia/Ho_Chi_Minh
+             */
+            timezone: string;
+            /**
+             * @description Activate the generated campaign automatically. A future scheduledAt is still queued for that time.
+             * @default true
+             */
+            publishImmediately: boolean;
         };
         PublishJobContractDto: {
             /** Format: uuid */
@@ -2986,6 +3032,59 @@ export interface operations {
                         /** @example true */
                         success: boolean;
                         data: components["schemas"]["CampaignContractDto"];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    Campaigns_automate: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description A UUID or another unique 8-128 character key. Reuse it only when retrying the same request. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutomateCampaignDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["AutomatedCampaignContractDto"];
                         meta: components["schemas"]["ApiMetaContractDto"];
                     };
                 };

@@ -23,6 +23,23 @@ type RawPublishLog = Omit<Contract["PublishAttemptLogContractDto"], "job"> & { j
 type RawAuditLog = Omit<Contract["AuditLogContractDto"], "actor"> & { actor?: { displayName?: string; email?: string } | null };
 type RawMedia = Contract["MediaAssetContractDto"];
 
+export type AutomateCampaignInput = {
+  name: string;
+  brief: string;
+  platformAccountIds: string[];
+  scheduledAt?: string;
+  timezone: string;
+  publishImmediately: boolean;
+};
+
+type RawAutomateCampaignResult = {
+  campaign: RawCampaign;
+  content: RawContent;
+  generatedVariants: number;
+  jobsCreated: number;
+  activated: boolean;
+};
+
 const defaultCapability: Capability = { text: false, image: false, video: false, article: false, delete: false, schedule: false, analytics: false };
 const mapPlatform = (item: RawPlatform): Platform => ({ id: item.id, name: item.name, slug: item.slug, mode: item.mode, enabled: item.enabled, connectorStatus: item.availability as Platform["connectorStatus"], capabilities: { ...defaultCapability, ...item.capability }, accountCount: item._count?.accounts ?? 0 });
 const mapAccount = (item: RawAccount): PlatformAccount => ({ id: item.id, platformId: item.platformId, platform: item.platform ? { id: item.platformId, name: item.platform.name, slug: item.platform.slug, mode: item.platform.mode, connectorStatus: item.platform.availability as Platform["connectorStatus"] } : undefined, name: item.name, username: item.username, externalId: item.externalId, settings: item.settings ?? undefined, enabled: item.enabled, status: item.status, lastCheckedAt: item.lastTestedAt, credential: item.credential, oauthConfigured: Boolean(item.oauthToken), oauthToken: item.oauthToken });
@@ -122,6 +139,18 @@ export const resourcesService = {
   async approveVariant(id: string) { return mapVariant(await apiRequest<RawVariant>(`/content-variants/${id}/status`, { method: "PATCH", body: { status: "APPROVED" } })); },
   async campaigns(params?: ListParams) { const raw = await apiList<RawCampaign>("/campaigns"); return result(raw, filterItems(raw.items.map(mapCampaign), params, (item) => `${item.name} ${item.content?.title ?? ""}`, (item) => item.status)); },
   async createCampaign(input: { name: string; contentId: string; targets: Array<{ platformAccountId: string; contentVariantId: string }>; scheduledAt?: string; timezone: string }) { return mapCampaign(await apiRequest<RawCampaign>("/campaigns", { method: "POST", body: input })); },
+  async automateCampaign(input: AutomateCampaignInput, idempotencyKey: string) {
+    const raw = await apiRequest<RawAutomateCampaignResult>("/campaigns/automate", {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: input,
+    });
+    return {
+      ...raw,
+      campaign: mapCampaign(raw.campaign),
+      content: mapContent(raw.content),
+    };
+  },
   async publishCampaign(id: string) { const campaign = await apiRequest<RawCampaign>(`/campaigns/${id}/publish`, { method: "POST" }); return { campaign: mapCampaign(campaign), jobsCreated: campaign.targets?.flatMap((target) => target.publishJobs ?? []).length ?? 0 }; },
   async publishJobs(params?: ListParams) { const raw = await apiList<RawJob>("/publish-jobs", { query: { page: params?.page, limit: params?.limit, search: params?.search, status: params?.status, from: params?.from, to: params?.to } }); return result(raw, raw.items.map(mapJob)); },
   publishJobMetrics: (todayFrom: string, todayTo: string) => apiRequest<{ publishedToday: number; scheduled: number; processing: number; failed: number }>("/publish-jobs/metrics", { query: { todayFrom, todayTo } }),

@@ -13,3 +13,7 @@ export function getApprovedVariantForAccount(account: PlatformAccount, variants:
 export function getEligibleAccounts(accounts: PlatformAccount[], variants: ContentVariant[]) {
   return accounts.filter((account) => account.enabled && account.status === "CONNECTED" && Boolean(getApprovedVariantForAccount(account, variants)));
 }
+
+export function normalizeAutomationAccountIds(accountIds: string[]) {
+  return [...new Set(accountIds)].sort();
+}

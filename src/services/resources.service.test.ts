@@ -456,4 +456,48 @@ describe("resourcesService contract adapters", () => {
     expect(response.meta).toMatchObject({ page: 2, total: 41, totalPages: 3 });
     expect(response.items[0]?.id).toBe("content-21");
   });
+
+  it("starts an AI automation with an idempotency key", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(apiResponse({
+      campaign: {
+        id: "campaign-auto",
+        name: "VPS launch",
+        status: "RUNNING",
+        createdAt: "2026-10-08T00:00:00.000Z",
+        progress: { total: 2, active: 2 },
+      },
+      content: {
+        id: "content-auto",
+        title: "VPS launch",
+        body: "Generated source brief",
+        status: "APPROVED",
+        createdAt: "2026-10-08T00:00:00.000Z",
+      },
+      generatedVariants: 2,
+      jobsCreated: 2,
+      activated: true,
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const input = {
+      name: "VPS launch",
+      brief: "Promote the new VPS plan to developers.",
+      platformAccountIds: ["account-devto", "account-discourse"],
+      timezone: "Asia/Ho_Chi_Minh",
+      publishImmediately: true,
+    };
+    const result = await resourcesService.automateCampaign(input, "automation-request-1");
+
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("http://localhost:3001/api/v1/campaigns/automate");
+    expect(request).toEqual(expect.objectContaining({ method: "POST", body: JSON.stringify(input) }));
+    expect(new Headers(request.headers).get("Idempotency-Key")).toBe("automation-request-1");
+    expect(result).toEqual(expect.objectContaining({
+      generatedVariants: 2,
+      jobsCreated: 2,
+      activated: true,
+      campaign: expect.objectContaining({ id: "campaign-auto", targetsCount: 2 }),
+      content: expect.objectContaining({ id: "content-auto" }),
+    }));
+  });
 });
