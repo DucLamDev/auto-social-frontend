@@ -4,6 +4,7 @@ import { resourcesService, type ListParams } from "@/services/resources.service"
 import { env } from "@/config/env";
 
 export const resourceKeys = {
+  aiProviders: ["ai-providers"] as const,
   platforms: (params?: ListParams) => ["platforms", params ?? {}] as const,
   accounts: (params?: ListParams) => ["accounts", params ?? {}] as const,
   sources: (params?: ListParams) => ["sources", params ?? {}] as const,
@@ -19,6 +20,7 @@ export const resourceKeys = {
   oauthProviders: ["oauth-providers"] as const,
   media: (params?: ListParams) => ["media", params ?? {}] as const,
 };
+export function useAiProviders() { return useQuery({ queryKey: resourceKeys.aiProviders, queryFn: resourcesService.aiProviders, staleTime: 300_000 }); }
 export function usePlatforms(params?: ListParams) { return useQuery({ queryKey: resourceKeys.platforms(params), queryFn: () => resourcesService.platforms(params) }); }
 export function useAccounts(params?: ListParams) { return useQuery({ queryKey: resourceKeys.accounts(params), queryFn: () => resourcesService.accounts(params) }); }
 export function useOAuthProviders() { return useQuery({ queryKey: resourceKeys.oauthProviders, queryFn: resourcesService.oauthProviders, staleTime: 300_000 }); }

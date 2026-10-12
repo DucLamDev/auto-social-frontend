@@ -19,6 +19,105 @@ afterEach(() => {
 });
 
 describe("resourcesService contract adapters", () => {
+  it("forwards platform pagination and catalog filters to the backend", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      success: true,
+      data: [{
+        id: "platform-approved-editor",
+        slug: "approved-editor",
+        name: "Approved Editor",
+        mode: "BROWSER_ASSISTED",
+        availability: "CREDENTIAL_REQUIRED",
+        connectorKey: "browser-assisted",
+        groupKey: "BLOGGING",
+        defaultSettings: { publishMode: "draft" },
+        enabled: true,
+        capability: { text: true, article: true },
+        _count: { accounts: 1 },
+      }],
+      meta: {
+        requestId: "req-platform-page",
+        timestamp: "2026-10-09T00:00:00.000Z",
+        page: 2,
+        limit: 12,
+        total: 22,
+        totalPages: 2,
+      },
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await resourcesService.platforms({
+      page: 2,
+      limit: 12,
+      search: "approved",
+      group: "BLOGGING",
+      mode: "BROWSER_ASSISTED",
+      availability: "CREDENTIAL_REQUIRED",
+      enabled: false,
+    });
+
+    const requested = new URL(String(fetchMock.mock.calls[0]?.[0]));
+    expect(Object.fromEntries(requested.searchParams)).toEqual({
+      page: "2",
+      limit: "12",
+      search: "approved",
+      group: "BLOGGING",
+      mode: "BROWSER_ASSISTED",
+      availability: "CREDENTIAL_REQUIRED",
+      enabled: "false",
+    });
+    expect(response.meta).toMatchObject({ page: 2, limit: 12, total: 22, totalPages: 2 });
+    expect(response.items[0]).toEqual(expect.objectContaining({
+      slug: "approved-editor",
+      groupKey: "BLOGGING",
+      connectorKey: "browser-assisted",
+      defaultSettings: { publishMode: "draft" },
+      accountCount: 1,
+    }));
+  });
+
+  it("loads the public AI provider catalog without requiring browser-side secrets", async () => {
+    const providers = [
+      { id: "openai", label: "OpenAI", model: "gpt-5-mini", configured: false, isDefault: false },
+      { id: "deepseek", label: "DeepSeek", model: "deepseek-flash", configured: true, isDefault: true },
+      { id: "gemini", label: "Google Gemini", model: "gemini-3.8-flash", configured: false, isDefault: false },
+    ];
+    const fetchMock = vi.fn().mockResolvedValue(apiResponse(providers));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(resourcesService.aiProviders()).resolves.toEqual(providers);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3001/api/v1/ai/providers",
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
+    expect(JSON.stringify(providers)).not.toMatch(/api[_-]?key|secret/i);
+  });
+
+  it("maps the explicit encrypted browser-session readiness flag without exposing storage state", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(apiResponse([{
+      id: "account-browser",
+      platformId: "platform-voz",
+      name: "VOZ",
+      enabled: true,
+      status: "CONNECTED",
+      browserSessionConfigured: true,
+      settings: { browserAutoSubmit: true },
+      platform: {
+        slug: "voz-forums",
+        name: "Voz Forums",
+        mode: "BROWSER_ASSISTED",
+        availability: "READY",
+        connectorKey: "browser-assisted",
+      },
+      credential: { status: "ACTIVE" },
+    }])));
+
+    const response = await resourcesService.accounts();
+    expect(response.items[0]?.browserSessionConfigured).toBe(true);
+    expect(response.items[0]).not.toHaveProperty("storageState");
+    expect(response.items[0]?.credential).toEqual({ status: "ACTIVE" });
+  });
+
   it("maps the campaign progress fields returned by the backend", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(apiResponse([{
       id: "campaign-1",
@@ -156,6 +255,104 @@ describe("resourcesService contract adapters", () => {
     }));
   });
 
+  it("creates and tests a manual destination without sending a fake credential", async () => {
+    const account = {
+      id: "account-medium",
+      platformId: "platform-medium",
+      name: "Medium handoff",
+      enabled: true,
+      status: "CONNECTED",
+      settings: { manualUrl: "https://medium.com/new-story" },
+      platform: { slug: "medium", name: "Medium", mode: "MANUAL", connectorKey: "manual", availability: "MANUAL_ONLY" },
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(apiResponse(account))
+      .mockResolvedValueOnce(apiResponse({ ok: true, manual: true, ready: true, message: "Manual handoff ready" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await resourcesService.createAccount({
+      platformSlug: "medium",
+      name: "Medium handoff",
+      settings: { manualUrl: "https://medium.com/new-story" },
+      enabled: true,
+    });
+    await expect(resourcesService.testAccount("account-medium")).resolves.toEqual(expect.objectContaining({
+      ok: true,
+      manual: true,
+      ready: true,
+    }));
+
+    const createBody = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body));
+    expect(createBody).not.toHaveProperty("credential");
+    expect(createBody.settings).toEqual({ manualUrl: "https://medium.com/new-story" });
+  });
+
+  it("updates Playwright settings without sending or replacing encrypted browser state", async () => {
+    const account = {
+      id: "account-browser",
+      platformId: "platform-voz",
+      name: "VOZ",
+      enabled: true,
+      status: "CONNECTED",
+      settings: { forumPath: "/f/cong-nghe.10", browserAutoSubmit: true },
+      platform: { slug: "voz-forums", name: "Voz Forums", mode: "BROWSER_ASSISTED", connectorKey: "browser-assisted" },
+      credential: { status: "ACTIVE" },
+    };
+    const fetchMock = vi.fn().mockResolvedValue(apiResponse(account));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await resourcesService.updateAccountSettings("account-browser", {
+      forumPath: "/f/cong-nghe.10",
+      browserAutoSubmit: true,
+      automationPermissionAttested: true,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3001/api/v1/platform-accounts/account-browser/settings",
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({
+          settings: {
+            forumPath: "/f/cong-nghe.10",
+            browserAutoSubmit: true,
+            automationPermissionAttested: true,
+          },
+        }),
+      }),
+    );
+    expect(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body)).not.toContain("storageState");
+  });
+
+  it("revokes a Playwright session through DELETE and maps the returned safe account", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(apiResponse({
+      id: "account-browser",
+      platformId: "platform-voz",
+      name: "VOZ",
+      enabled: true,
+      status: "RECONNECT_REQUIRED",
+      lastTestedAt: null,
+      browserSessionConfigured: false,
+      settings: { forumPath: "/f/cong-nghe.10", browserAutoSubmit: true },
+      platform: { slug: "voz-forums", name: "Voz Forums", mode: "BROWSER_ASSISTED", connectorKey: "browser-assisted" },
+      credential: { status: "ACTIVE" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await resourcesService.revokeBrowserSession("account-browser");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3001/api/v1/platform-accounts/account-browser/browser-session",
+      expect.objectContaining({ method: "DELETE", body: undefined }),
+    );
+    expect(result).toEqual(expect.objectContaining({
+      id: "account-browser",
+      status: "RECONNECT_REQUIRED",
+      browserSessionConfigured: false,
+      settings: { forumPath: "/f/cong-nghe.10", browserAutoSubmit: true },
+    }));
+    expect(result).not.toHaveProperty("storageState");
+  });
+
   it("creates a manual content variant through the dedicated endpoint", async () => {
     const fetchMock = vi.fn().mockResolvedValue(apiResponse({
       id: "variant-1",
@@ -220,13 +417,43 @@ describe("resourcesService contract adapters", () => {
       }]));
     vi.stubGlobal("fetch", fetchMock);
 
-    await resourcesService.generateVariants("content-1");
+    await resourcesService.generateVariants("content-1", undefined, "deepseek");
 
     expect(fetchMock.mock.calls[2]?.[0]).toBe("http://localhost:3001/api/v1/contents/content-1/generate");
     expect(fetchMock.mock.calls[2]?.[1]).toEqual(expect.objectContaining({
       method: "POST",
-      body: JSON.stringify({ platforms: ["devto"] }),
+      body: JSON.stringify({ platforms: ["devto"], aiProvider: "deepseek" }),
     }));
+  });
+
+  it("keeps complete manual handoff content including CTA, canonical URL and media alt text", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(apiResponse({
+      title: "VPS guide",
+      summary: "A practical guide",
+      body: "Full article body",
+      hashtags: ["vps", "linux"],
+      cta: "Read the benchmark",
+      canonicalUrl: "https://example.com/vps-guide",
+      media: [{
+        type: "image",
+        url: "https://cdn.example.com/dashboard.webp",
+        altText: "VPS dashboard",
+        mimeType: "image/webp",
+      }],
+      openUrl: "https://medium.com/new-story",
+    })));
+
+    const payload = await resourcesService.manualPayload("job-manual");
+
+    expect(payload.platformUrl).toBe("https://medium.com/new-story");
+    expect(payload.media).toEqual([expect.objectContaining({
+      url: "https://cdn.example.com/dashboard.webp",
+      altText: "VPS dashboard",
+    })]);
+    expect(payload.content).toContain("Read the benchmark");
+    expect(payload.content).toContain("Nguồn: https://example.com/vps-guide");
+    expect(payload.content).toContain("Ảnh 1: https://cdn.example.com/dashboard.webp");
+    expect(payload.content).toContain("Alt text: VPS dashboard");
   });
 
   it("distinguishes an already-submitted moderation job from manual publishing", async () => {
@@ -371,6 +598,82 @@ describe("resourcesService contract adapters", () => {
     });
   });
 
+  it("maps a Playwright login challenge to a reconnect action with a safe CLI account id", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(apiResponse([{
+      id: "job-browser-login",
+      status: "NEEDS_ACTION",
+      attemptCount: 1,
+      maxAttempts: 3,
+      platformAccount: {
+        id: "account-browser",
+        name: "VOZ",
+        enabled: true,
+        status: "RECONNECT_REQUIRED",
+        platform: { slug: "voz-forums", name: "Voz Forums" },
+      },
+      target: { campaign: { id: "campaign-1", name: "VOZ post" } },
+      attempts: [{
+        id: "attempt-browser",
+        attemptNumber: 1,
+        status: "SUCCEEDED",
+        startedAt: "2026-10-08T00:00:00.000Z",
+        responseMetadata: {
+          browserAssisted: true,
+          accountReconnectRequired: true,
+          reason: "LOGIN_REQUIRED",
+          challengeKind: "LOGIN_REQUIRED",
+          message: "The platform requires a new login",
+          actionUrl: "https://voz.vn/login",
+        },
+      }],
+    }])));
+
+    const response = await resourcesService.publishJobs();
+    expect(response.items[0]?.needsAction).toEqual({
+      kind: "BROWSER_LOGIN",
+      accountId: "account-browser",
+      reason: "LOGIN_REQUIRED",
+      challengeKind: "LOGIN_REQUIRED",
+      message: "The platform requires a new login",
+      url: "https://voz.vn/login",
+      canResumeBrowser: true,
+    });
+    expect(response.items[0]).toEqual(expect.objectContaining({
+      accountStatus: "RECONNECT_REQUIRED",
+      accountEnabled: true,
+    }));
+  });
+
+  it("maps a known pre-submit browser stop as safely resumable", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(apiResponse([{
+      id: "job-browser-editor",
+      status: "NEEDS_ACTION",
+      attemptCount: 1,
+      maxAttempts: 3,
+      platformAccount: { id: "account-browser", name: "VOZ", platform: { slug: "voz-forums", name: "Voz Forums" } },
+      target: { campaign: { id: "campaign-1", name: "VOZ post" } },
+      attempts: [{
+        id: "attempt-browser",
+        attemptNumber: 1,
+        status: "SUCCEEDED",
+        startedAt: "2026-10-08T00:00:00.000Z",
+        responseMetadata: {
+          browserAssisted: true,
+          reason: "EDITOR_NOT_FOUND",
+          message: "Editor changed before anything was submitted",
+        },
+      }],
+    }])));
+
+    const response = await resourcesService.publishJobs();
+    expect(response.items[0]?.needsAction).toEqual(expect.objectContaining({
+      kind: "BROWSER_REVIEW",
+      accountId: "account-browser",
+      reason: "EDITOR_NOT_FOUND",
+      canResumeBrowser: true,
+    }));
+  });
+
   it("sends explicit operator confirmation when retrying an absent reconciled topic", async () => {
     const fetchMock = vi.fn().mockResolvedValue(apiResponse({ queued: true }));
     vi.stubGlobal("fetch", fetchMock);
@@ -387,6 +690,19 @@ describe("resourcesService contract adapters", () => {
     );
   });
 
+  it("uses the guarded browser resume endpoint after an operator resolves a pre-submit stop", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(apiResponse({ queued: true }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(resourcesService.resumeBrowserJob("job-browser"))
+      .resolves.toEqual({ queued: true });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:3001/api/v1/publish-jobs/job-browser/resume-browser",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
   it("uploads multipart media attached to the selected variant", async () => {
     const fetchMock = vi.fn().mockResolvedValue(apiResponse({
       id: "media-1",
@@ -396,11 +712,12 @@ describe("resourcesService contract adapters", () => {
       publicUrl: "https://cdn.example.com/photo.webp",
       mimeType: "image/webp",
       sizeBytes: "5",
+      metadata: { altText: "Ảnh dashboard VPS" },
       createdAt: "2026-10-08T00:00:00.000Z",
     }));
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await resourcesService.uploadMedia(new File(["image"], "photo.webp", { type: "image/webp" }), { variantId: "variant-1" });
+    const result = await resourcesService.uploadMedia(new File(["image"], "photo.webp", { type: "image/webp" }), { variantId: "variant-1", altText: "Ảnh dashboard VPS" });
 
     const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
     expect(fetchMock.mock.calls[0]?.[0]).toBe("http://localhost:3001/api/v1/media");
@@ -408,8 +725,9 @@ describe("resourcesService contract adapters", () => {
     expect(new Headers(request.headers).has("Content-Type")).toBe(false);
     expect(request.body).toBeInstanceOf(FormData);
     expect((request.body as FormData).get("variantId")).toBe("variant-1");
+    expect((request.body as FormData).get("altText")).toBe("Ảnh dashboard VPS");
     expect((request.body as FormData).get("file")).toBeInstanceOf(File);
-    expect(result).toEqual(expect.objectContaining({ id: "media-1", sizeBytes: 5 }));
+    expect(result).toEqual(expect.objectContaining({ id: "media-1", sizeBytes: 5, altText: "Ảnh dashboard VPS" }));
   });
 
   it("forwards content pagination and filters to the backend", async () => {
@@ -483,6 +801,8 @@ describe("resourcesService contract adapters", () => {
       name: "VPS launch",
       brief: "Promote the new VPS plan to developers.",
       platformAccountIds: ["account-devto", "account-discourse"],
+      mediaAssetIds: ["media-1"],
+      aiProvider: "deepseek" as const,
       timezone: "Asia/Ho_Chi_Minh",
       publishImmediately: true,
     };

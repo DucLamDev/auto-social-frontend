@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { loginSchema } from "./auth";
-import { automationCampaignSchema, campaignSchema } from "./campaign";
+import { AUTOMATION_IMAGE_MAX_BYTES, automationCampaignSchema, campaignSchema } from "./campaign";
 import { sourceSchema } from "./source";
 
 describe("form schemas", () => {
@@ -21,11 +21,14 @@ describe("form schemas", () => {
       name: "Launch automation",
       brief: "Mô tả sản phẩm đủ chi tiết để AI tạo nội dung quảng bá.",
       accountIds: ["account"],
+      aiProvider: "deepseek",
       runMode: "NOW",
       scheduledAt: "",
       confirmAutoPublish: true,
     };
     expect(automationCampaignSchema.safeParse(base).success).toBe(true);
+    expect(automationCampaignSchema.safeParse({ ...base, name: "" }).success).toBe(true);
+    expect(automationCampaignSchema.safeParse({ ...base, aiProvider: "unknown" }).success).toBe(false);
     expect(automationCampaignSchema.safeParse({ ...base, confirmAutoPublish: false }).success).toBe(false);
     expect(automationCampaignSchema.safeParse({
       ...base,
@@ -37,5 +40,17 @@ describe("form schemas", () => {
       runMode: "SCHEDULED",
       scheduledAt: "2099-01-01T00:00",
     }).success).toBe(true);
+    expect(automationCampaignSchema.safeParse({
+      ...base,
+      image: new File(["image"], "post.png", { type: "image/png" }),
+      imageAltText: "Ảnh minh hoạ",
+    }).success).toBe(true);
+    expect(automationCampaignSchema.safeParse({
+      ...base,
+      image: new File(["not-an-image"], "post.svg", { type: "image/svg+xml" }),
+    }).success).toBe(false);
+    const oversized = new File(["image"], "large.webp", { type: "image/webp" });
+    Object.defineProperty(oversized, "size", { value: AUTOMATION_IMAGE_MAX_BYTES + 1 });
+    expect(automationCampaignSchema.safeParse({ ...base, image: oversized }).success).toBe(false);
   });
 });

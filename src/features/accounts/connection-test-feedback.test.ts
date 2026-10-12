@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { getTagPolicyWarning } from "./connection-test-feedback";
+import { ApiError } from "@/services/api/errors";
+import { getBrowserConnectionErrorMessage, getTagPolicyWarning } from "./connection-test-feedback";
 
 describe("getTagPolicyWarning", () => {
   it("does not warn for an ordinary successful connection test", () => {
@@ -68,5 +69,28 @@ describe("getTagPolicyWarning", () => {
       ok: false,
       details: { tagPolicyRequiresStagingVerification: true },
     })).toBeUndefined();
+  });
+});
+
+describe("getBrowserConnectionErrorMessage", () => {
+  it("turns an authentication challenge into a reconnect instruction without exposing details", () => {
+    const message = getBrowserConnectionErrorMessage(new ApiError(
+      "The login page is visible",
+      "CONNECTOR_NEEDS_ACTION",
+      409,
+      { reason: "LOGIN_REQUIRED" },
+      "request-42",
+    ));
+    expect(message).toContain("helper đăng nhập");
+    expect(message).toContain("request-42");
+  });
+
+  it("distinguishes a changed editor from an expired session", () => {
+    expect(getBrowserConnectionErrorMessage(new ApiError(
+      "Expected editor missing",
+      "CONNECTOR_NEEDS_ACTION",
+      409,
+      { reason: "EDITOR_NOT_FOUND" },
+    ))).toContain("box/đường dẫn");
   });
 });

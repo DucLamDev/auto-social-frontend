@@ -1,32 +1,40 @@
 import { apiList, apiRequest } from "@/services/api/client";
 import type { ListResult } from "@/services/api/types";
-import type { AuditLog, Campaign, Capability, Content, ContentSource, ContentVariant, MediaAsset, Platform, PlatformAccount, PromptTemplate, PublishJob, SourceArticle, Status, SystemSettings } from "@/types/domain";
+import type { AiProviderId, AiProviderOption, AuditLog, Campaign, Capability, ConnectorMode, Content, ContentSource, ContentVariant, MediaAsset, Platform, PlatformAccount, PlatformAvailability, PlatformGroup, PromptTemplate, PublishJob, SourceArticle, Status, SystemSettings } from "@/types/domain";
 import type { components } from "@/generated/api/schema";
 
 export type AccountConnectionTestResult = components["schemas"]["ConnectionTestContractDto"];
 
 type QueryValue = string | number | boolean | null | undefined;
-export type ListParams = { [key: string]: QueryValue; page?: number; limit?: number; search?: string; status?: string; sourceId?: string; platformId?: string; contentId?: string; variantId?: string; from?: string; to?: string };
+export type ListParams = { [key: string]: QueryValue; page?: number; limit?: number; search?: string; status?: string; sourceId?: string; platformId?: string; contentId?: string; variantId?: string; from?: string; to?: string; group?: PlatformGroup; mode?: ConnectorMode; availability?: PlatformAvailability; enabled?: boolean };
 type Contract = components["schemas"];
-type RawPlatform = Contract["PlatformContractDto"];
-type RawAccount = Contract["PlatformAccountContractDto"];
+type RawPlatform = Contract["PlatformContractDto"] & { connectorKey?: string; groupKey?: PlatformGroup; defaultSettings?: Record<string, unknown> };
+type RawAccount = Omit<Contract["PlatformAccountContractDto"], "platform"> & {
+  browserSessionConfigured?: boolean;
+  platform?: NonNullable<Contract["PlatformAccountContractDto"]["platform"]> & {
+    connectorKey?: string;
+    defaultSettings?: Record<string, unknown>;
+  };
+};
 type RawSource = Contract["ContentSourceContractDto"];
 type RawSourceArticle = Omit<Contract["SourceArticleContractDto"], "content"> & { content?: SourceArticle["content"] };
 type RawVariant = Contract["ContentVariantContractDto"];
 type RawContent = Contract["ContentContractDto"] & { variants?: RawVariant[] };
 type RawCampaign = { id: string; name: string; status: Status; scheduledAt?: string | null; createdAt: string; content?: { id: string; title: string }; _count?: { targets?: number }; targets?: Array<{ publishJobs?: RawJob[] }>; progress?: { total?: number; published?: number; failed?: number; needsAction?: number; active?: number; scheduled?: number; cancelled?: number } };
 type RawAttempt = Contract["PublishAttemptLogContractDto"] & { responseMetadata?: unknown };
-type RawJob = { id: string; status: Status; scheduledAt?: string | null; attemptCount: number; maxAttempts: number; lastErrorCode?: string | null; lastErrorMessage?: string | null; platformAccount?: { name: string; platform?: { slug: string; name: string } }; target?: { campaign?: { id: string; name: string }; contentVariant?: { id?: string; title?: string | null } }; publishedPost?: { url?: string | null } | null; attempts?: RawAttempt[] };
+type RawJob = { id: string; status: Status; scheduledAt?: string | null; attemptCount: number; maxAttempts: number; lastErrorCode?: string | null; lastErrorMessage?: string | null; platformAccount?: { id?: string; name: string; enabled?: boolean; status?: PlatformAccount["status"]; platform?: { slug: string; name: string } }; target?: { campaign?: { id: string; name: string }; contentVariant?: { id?: string; title?: string | null } }; publishedPost?: { url?: string | null } | null; attempts?: RawAttempt[] };
 type RawPrompt = Omit<Contract["PromptTemplateContractDto"], "platform"> & { platform?: { slug: string; name: string } | null };
 type RawSetting = Contract["SystemSettingContractDto"];
 type RawPublishLog = Omit<Contract["PublishAttemptLogContractDto"], "job"> & { job: RawJob };
 type RawAuditLog = Omit<Contract["AuditLogContractDto"], "actor"> & { actor?: { displayName?: string; email?: string } | null };
-type RawMedia = Contract["MediaAssetContractDto"];
+type RawMedia = Contract["MediaAssetContractDto"] & { metadata?: unknown };
 
 export type AutomateCampaignInput = {
   name: string;
   brief: string;
   platformAccountIds: string[];
+  mediaAssetIds?: string[];
+  aiProvider: AiProviderId;
   scheduledAt?: string;
   timezone: string;
   publishImmediately: boolean;
@@ -41,12 +49,21 @@ type RawAutomateCampaignResult = {
 };
 
 const defaultCapability: Capability = { text: false, image: false, video: false, article: false, delete: false, schedule: false, analytics: false };
-const mapPlatform = (item: RawPlatform): Platform => ({ id: item.id, name: item.name, slug: item.slug, mode: item.mode, enabled: item.enabled, connectorStatus: item.availability as Platform["connectorStatus"], capabilities: { ...defaultCapability, ...item.capability }, accountCount: item._count?.accounts ?? 0 });
-const mapAccount = (item: RawAccount): PlatformAccount => ({ id: item.id, platformId: item.platformId, platform: item.platform ? { id: item.platformId, name: item.platform.name, slug: item.platform.slug, mode: item.platform.mode, connectorStatus: item.platform.availability as Platform["connectorStatus"] } : undefined, name: item.name, username: item.username, externalId: item.externalId, settings: item.settings ?? undefined, enabled: item.enabled, status: item.status, lastCheckedAt: item.lastTestedAt, credential: item.credential, oauthConfigured: Boolean(item.oauthToken), oauthToken: item.oauthToken });
+const mapPlatform = (item: RawPlatform): Platform => ({ id: item.id, name: item.name, slug: item.slug, mode: item.mode, groupKey: item.groupKey, connectorKey: item.connectorKey, enabled: item.enabled, connectorStatus: item.availability as Platform["connectorStatus"], docsUrl: item.docsUrl, defaultSettings: item.defaultSettings, capabilities: { ...defaultCapability, ...item.capability }, accountCount: item._count?.accounts ?? 0 });
+const mapAccount = (item: RawAccount): PlatformAccount => ({ id: item.id, platformId: item.platformId, platform: item.platform ? { id: item.platformId, name: item.platform.name, slug: item.platform.slug, mode: item.platform.mode, connectorStatus: item.platform.availability as Platform["connectorStatus"], connectorKey: item.platform.connectorKey, defaultSettings: item.platform.defaultSettings } : undefined, name: item.name, username: item.username, externalId: item.externalId, settings: item.settings ?? undefined, enabled: item.enabled, status: item.status, lastCheckedAt: item.lastTestedAt, browserSessionConfigured: item.browserSessionConfigured, credential: item.credential, oauthConfigured: Boolean(item.oauthToken), oauthToken: item.oauthToken });
 const mapSource = (item: RawSource): ContentSource => ({ id: item.id, name: item.name, type: item.type, url: item.url, enabled: item.enabled, status: item.enabled ? "ACTIVE" : "PAUSED", articleCount: item._count?.articles ?? 0, lastFetchedAt: item.lastFetchedAt });
 const mapVariant = (item: RawVariant): ContentVariant => ({ id: item.id, contentId: item.contentId, platform: item.platform?.name ?? item.platform?.slug ?? "Platform", platformSlug: item.platform?.slug ?? "unknown", title: item.title, body: item.body, summary: item.summary, hashtags: item.hashtags, cta: item.cta, status: item.status, recommended: item.recommended, reason: item.reason, updatedAt: item.updatedAt });
 const mapContent = (item: RawContent): Content => ({ id: item.id, title: item.title, body: item.body, description: item.summary, canonicalUrl: item.canonicalUrl, status: item.status, source: item.sourceArticle?.source ?? null, variantsCount: item._count?.variants ?? item.variants?.length ?? 0, createdAt: item.createdAt, updatedAt: item.updatedAt });
-const mapMedia = (item: RawMedia): MediaAsset => ({ ...item, sizeBytes: Number(item.sizeBytes) });
+const mapMedia = (item: RawMedia): MediaAsset => {
+  const metadata = item.metadata && typeof item.metadata === "object" && !Array.isArray(item.metadata)
+    ? item.metadata as Record<string, unknown>
+    : {};
+  return {
+    ...item,
+    sizeBytes: Number(item.sizeBytes),
+    ...(typeof metadata.altText === "string" ? { altText: metadata.altText } : {}),
+  };
+};
 const mapCampaign = (item: RawCampaign): Campaign => { const jobs = item.targets?.flatMap((target) => target.publishJobs ?? []) ?? []; return { id: item.id, name: item.name, content: item.content, status: item.status, targetsCount: item.progress?.total ?? item._count?.targets ?? item.targets?.length ?? 0, publishedCount: item.progress?.published ?? jobs.filter((job) => job.status === "PUBLISHED").length, failedCount: item.progress?.failed ?? jobs.filter((job) => ["FAILED", "POSSIBLE_DUPLICATE"].includes(job.status)).length, needsActionCount: item.progress?.needsAction ?? jobs.filter((job) => job.status === "NEEDS_ACTION").length, activeCount: item.progress?.active ?? jobs.filter((job) => ["QUEUED", "PUBLISHING", "PROCESSING", "RETRY"].includes(job.status)).length, scheduledCount: item.progress?.scheduled ?? jobs.filter((job) => job.status === "SCHEDULED").length, scheduledAt: item.scheduledAt, createdAt: item.createdAt }; };
 const mapJob = (item: RawJob): PublishJob => {
   const latest = item.attempts?.[0];
@@ -58,6 +75,13 @@ const mapJob = (item: RawJob): PublishJob => {
   const commonProviderFields = {
     ...(typeof metadata.externalPostId === "string" ? { externalPostId: metadata.externalPostId } : {}),
     ...(typeof metadata.url === "string" ? { url: metadata.url } : {}),
+  };
+  const browserFields = {
+    ...(item.platformAccount?.id ? { accountId: item.platformAccount.id } : {}),
+    ...(typeof metadata.reason === "string" ? { reason: metadata.reason } : {}),
+    ...(typeof metadata.message === "string" ? { message: metadata.message } : {}),
+    ...(typeof metadata.challengeKind === "string" ? { challengeKind: metadata.challengeKind } : {}),
+    ...(typeof metadata.actionUrl === "string" ? { url: metadata.actionUrl } : commonProviderFields),
   };
   const workerCrashUncertain = item.lastErrorCode === "WORKER_CRASH_UNCERTAIN_RESULT";
   const providerAction = metadata.moderationQueue === true
@@ -71,12 +95,30 @@ const mapJob = (item: RawJob): PublishJob => {
               && metadata.providerAccepted !== true
               && metadata.persistenceRecoveryRequired !== true),
         }
+      : metadata.policyBlocked === true
+        ? { kind: "POLICY_BLOCKED" as const, ...browserFields }
+        : metadata.browserAssisted === true && metadata.accountReconnectRequired === true
+          ? { kind: "BROWSER_LOGIN" as const, ...browserFields, canResumeBrowser: true }
+          : metadata.browserAssisted === true
+            ? {
+                kind: "BROWSER_REVIEW" as const,
+                ...browserFields,
+                canResumeBrowser: [
+                  "AUTOMATION_BUSY",
+                  "AUTOMATION_DISABLED",
+                  "AUTOMATION_FAILED",
+                  "EDITOR_NOT_FOUND",
+                  "SUBMISSION_CONFIRMATION_REQUIRED",
+                ].includes(String(metadata.reason ?? "")),
+              }
       : undefined;
   return {
     id: item.id,
     campaignId: item.target?.campaign?.id,
     platform: item.platformAccount?.platform?.name ?? "Platform",
     account: item.platformAccount?.name ?? "—",
+    accountStatus: item.platformAccount?.status,
+    accountEnabled: item.platformAccount?.enabled,
     contentTitle: item.target?.contentVariant?.title || item.target?.campaign?.name || "Nội dung không có tiêu đề",
     status: item.status,
     attempt: item.attemptCount,
@@ -98,11 +140,14 @@ const filterItems = <T>(items: T[], params: ListParams | undefined, text: (item:
 const result = <T, U>(raw: ListResult<T>, items: U[]): ListResult<U> => ({ items, meta: raw.meta });
 
 export const resourcesService = {
-  async platforms(params?: ListParams) { const raw = await apiList<RawPlatform>("/platforms"); return result(raw, filterItems(raw.items.map(mapPlatform), params, (item) => `${item.name} ${item.slug}`, (item) => item.enabled ? "ACTIVE" : "INACTIVE")); },
-  async updatePlatform(idOrSlug: string, input: Pick<Platform, "enabled">) { const platforms = await resourcesService.platforms(); const slug = platforms.items.find((item) => item.id === idOrSlug)?.slug ?? idOrSlug; return mapPlatform(await apiRequest<RawPlatform>(`/platforms/${slug}`, { method: "PATCH", body: input })); },
+  aiProviders: () => apiRequest<AiProviderOption[]>("/ai/providers"),
+  async platforms(params?: ListParams) { const raw = await apiList<RawPlatform>("/platforms", { query: { page: params?.page, limit: params?.limit, search: params?.search, group: params?.group, mode: params?.mode, availability: params?.availability, enabled: params?.enabled } }); return result(raw, raw.items.map(mapPlatform)); },
+  async updatePlatform(slug: string, input: Pick<Platform, "enabled">) { return mapPlatform(await apiRequest<RawPlatform>(`/platforms/${slug}`, { method: "PATCH", body: input })); },
   async accounts(params?: ListParams) { const raw = await apiList<RawAccount>("/platform-accounts"); let items = raw.items.map(mapAccount); if (params?.platformId) items = items.filter((item) => item.platformId === params.platformId); return result(raw, filterItems(items, params, (item) => `${item.name} ${item.username ?? ""} ${item.platform?.name ?? ""}`, (item) => item.status)); },
-  async createAccount(input: { platformSlug: string; name: string; username?: string; externalId?: string; settings?: Record<string, unknown>; credential: Record<string, unknown>; enabled?: boolean }) { return mapAccount(await apiRequest<RawAccount>("/platform-accounts", { method: "POST", body: input })); },
+  async createAccount(input: { platformSlug: string; name: string; username?: string; externalId?: string; settings?: Record<string, unknown>; credential?: Record<string, unknown>; enabled?: boolean }) { return mapAccount(await apiRequest<RawAccount>("/platform-accounts", { method: "POST", body: input })); },
   async updateAccountCredential(id: string, input: { credential: Record<string, unknown>; settings?: Record<string, unknown> }) { return mapAccount(await apiRequest<RawAccount>(`/platform-accounts/${id}/credential`, { method: "PUT", body: input })); },
+  async updateAccountSettings(id: string, settings: Record<string, unknown>) { return mapAccount(await apiRequest<RawAccount>(`/platform-accounts/${id}/settings`, { method: "PUT", body: { settings } })); },
+  async revokeBrowserSession(id: string) { return mapAccount(await apiRequest<RawAccount>(`/platform-accounts/${id}/browser-session`, { method: "DELETE" })); },
   async updateAccount(id: string, input: Pick<PlatformAccount, "enabled">) { return mapAccount(await apiRequest<RawAccount>(`/platform-accounts/${id}`, { method: "PATCH", body: input })); },
   testAccount: (id: string) => apiRequest<AccountConnectionTestResult>(`/platform-accounts/${id}/test`, { method: "POST" }),
   oauthProviders: () => apiRequest<Array<{ provider: string; platform?: string; status: string; callback?: string }>>("/oauth/providers"),
@@ -116,11 +161,11 @@ export const resourcesService = {
   async content(id: string) { return mapContent(await apiRequest<RawContent>(`/contents/${id}`)); },
   async variants(contentId: string) { const raw = await apiList<RawVariant>("/content-variants", { query: { contentId } }); return result(raw, raw.items.map(mapVariant)); },
   async createVariant(input: { contentId: string; platformSlug: string; title?: string; body: string; hashtags?: string[] }) { return mapVariant(await apiRequest<RawVariant>("/content-variants", { method: "POST", body: input })); },
-  async generateVariants(contentId: string, platforms?: string[]) {
+  async generateVariants(contentId: string, platforms?: string[], aiProvider?: AiProviderId) {
     let requested = platforms;
     if (requested === undefined) {
       const [platformResult, accountResult] = await Promise.all([
-        resourcesService.platforms(),
+        resourcesService.platforms({ limit: 100 }),
         resourcesService.accounts({ status: "CONNECTED" }),
       ]);
       const enabledPlatformIds = new Set(platformResult.items.filter((item) => item.enabled).map((item) => item.id));
@@ -132,7 +177,7 @@ export const resourcesService = {
     const slugs = [...new Set(requested.map((slug) => slug.trim().toLowerCase()).filter(Boolean))];
     if (!slugs.length) throw new Error("Chưa có tài khoản đích đã kết nối và đang bật để tạo biến thể AI.");
     if (slugs.length > 12) throw new Error("Mỗi lần chỉ có thể tạo tối đa 12 biến thể AI. Hãy tắt bớt tài khoản đích và thử lại.");
-    const variants = await apiRequest<RawVariant[]>(`/contents/${contentId}/generate`, { method: "POST", body: { platforms: slugs } });
+    const variants = await apiRequest<RawVariant[]>(`/contents/${contentId}/generate`, { method: "POST", body: { platforms: slugs, aiProvider } });
     return variants.map(mapVariant);
   },
   async updateVariant(id: string, input: Partial<ContentVariant>) { return mapVariant(await apiRequest<RawVariant>(`/content-variants/${id}`, { method: "PATCH", body: input })); },
@@ -155,15 +200,45 @@ export const resourcesService = {
   async publishJobs(params?: ListParams) { const raw = await apiList<RawJob>("/publish-jobs", { query: { page: params?.page, limit: params?.limit, search: params?.search, status: params?.status, from: params?.from, to: params?.to } }); return result(raw, raw.items.map(mapJob)); },
   publishJobMetrics: (todayFrom: string, todayTo: string) => apiRequest<{ publishedToday: number; scheduled: number; processing: number; failed: number }>("/publish-jobs/metrics", { query: { todayFrom, todayTo } }),
   retryJob: (id: string) => apiRequest<{ queued: boolean }>(`/publish-jobs/${id}/retry`, { method: "POST" }),
+  resumeBrowserJob: (id: string) => apiRequest<{ queued: boolean }>(`/publish-jobs/${id}/resume-browser`, { method: "POST" }),
   reconcileNotFound: (id: string) => apiRequest<{ queued: boolean }>(`/publish-jobs/${id}/reconcile-not-found`, { method: "POST", body: { confirmedNotFound: true } }),
-  async manualPayload(id: string) { const value = await apiRequest<{ title?: string | null; body: string; hashtags?: string[]; openUrl?: string }>(`/publish-jobs/${id}/manual-payload`); return { content: [value.title, value.body, value.hashtags?.map((tag) => `#${tag.replace(/^#/, "")}`).join(" ")].filter(Boolean).join("\n\n"), platformUrl: value.openUrl }; },
+  async manualPayload(id: string) {
+    const value = await apiRequest<{
+      title?: string | null;
+      body: string;
+      summary?: string | null;
+      hashtags?: string[];
+      cta?: string | null;
+      canonicalUrl?: string | null;
+      media?: Array<{ type: string; url: string; altText?: string; mimeType?: string }>;
+      openUrl?: string;
+    }>(`/publish-jobs/${id}/manual-payload`);
+    const media = value.media ?? [];
+    const mediaText = media.map((item, index) => [
+      `${item.type === "image" ? "Ảnh" : "Media"} ${index + 1}: ${item.url}`,
+      item.altText ? `Alt text: ${item.altText}` : undefined,
+    ].filter(Boolean).join("\n")).join("\n\n");
+    return {
+      content: [
+        value.title,
+        value.summary,
+        value.body,
+        value.hashtags?.map((tag) => `#${tag.replace(/^#/, "")}`).join(" "),
+        value.cta,
+        value.canonicalUrl ? `Nguồn: ${value.canonicalUrl}` : undefined,
+        mediaText,
+      ].filter(Boolean).join("\n\n"),
+      platformUrl: value.openUrl,
+      media,
+    };
+  },
   markPublished: (id: string, input: { externalPostId: string; url?: string }) => apiRequest<{ published: boolean }>(`/publish-jobs/${id}/mark-published`, { method: "POST", body: input }),
   async prompts(params?: ListParams) { const raw = await apiList<RawPrompt>("/prompts"); return result(raw, filterItems(raw.items.map((item): PromptTemplate => ({ id: item.id, platform: item.platform?.name ?? item.platform?.slug ?? "Global", platformSlug: item.platform?.slug ?? "global", name: item.name, systemPrompt: item.systemPrompt, userPrompt: item.userTemplate, version: item.version, active: item.active, updatedAt: item.updatedAt })), params, (item) => `${item.platform} ${item.name}`)); },
   async updatePrompt(id: string, input: Pick<PromptTemplate, "systemPrompt" | "userPrompt" | "active">) { const current = (await resourcesService.prompts()).items.find((item) => item.id === id); if (!current) throw new Error("Không tìm thấy prompt template."); const raw = await apiRequest<RawPrompt>("/prompts", { method: "POST", body: { platformSlug: current.platformSlug, name: current.name, systemPrompt: input.systemPrompt, userTemplate: input.userPrompt ?? "{{body}}", active: input.active } }); return { ...current, ...input, id: raw.id, version: raw.version, updatedAt: raw.updatedAt }; },
   async logs(params?: ListParams) { const raw = await apiList<RawAuditLog>("/logs/audit"); const items = raw.items.map((item): AuditLog => ({ id: item.id, action: item.action, resource: item.entityType, resourceId: item.entityId, actor: item.actor ? { name: item.actor.displayName ?? item.actor.email ?? "System", email: item.actor.email } : item.actorId ? { name: `User ${item.actorId.slice(0, 8)}` } : { name: "System" }, requestId: item.requestId ?? undefined, metadata: item.after ?? undefined, createdAt: item.createdAt })); return result(raw, filterItems(items, params, (item) => `${item.action} ${item.resource} ${item.resourceId ?? ""} ${item.actor?.name ?? ""}`, (item) => item.status ?? "")); },
   async publishLogs(params?: ListParams) { const raw = await apiList<RawPublishLog>("/logs/publish"); const items = raw.items.map((entry): PublishJob => ({ ...mapJob(entry.job), id: entry.id, attempt: entry.attemptNumber, status: entry.job.status, startedAt: entry.startedAt, finishedAt: entry.finishedAt, error: entry.errorCode ? { code: entry.errorCode, message: entry.errorMessage || "Publish attempt failed" } : null })); return result(raw, filterItems(items, params, (item) => `${item.platform} ${item.account} ${item.contentTitle}`, (item) => item.status)); },
   async media(params?: ListParams) { const raw = await apiList<RawMedia>("/media", { query: { page: params?.page, limit: params?.limit, contentId: params?.contentId, variantId: params?.variantId } }); return result(raw, raw.items.map(mapMedia)); },
-  async uploadMedia(file: File, target: { contentId?: string; variantId?: string }) { const body = new FormData(); body.set("file", file); if (target.contentId) body.set("contentId", target.contentId); if (target.variantId) body.set("variantId", target.variantId); return mapMedia(await apiRequest<RawMedia>("/media", { method: "POST", body })); },
+  async uploadMedia(file: File, target: { contentId?: string; variantId?: string; altText?: string } = {}) { const body = new FormData(); body.set("file", file); if (target.contentId) body.set("contentId", target.contentId); if (target.variantId) body.set("variantId", target.variantId); if (target.altText?.trim()) body.set("altText", target.altText.trim()); return mapMedia(await apiRequest<RawMedia>("/media", { method: "POST", body })); },
   async settings() { const raw = await apiList<RawSetting>("/settings"); const byKey = new Map(raw.items.map((item) => [item.key, item.value])); const object = (value: unknown) => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}; return { ai: object(byKey.get("ai")), storage: object(byKey.get("storage")), system: object(byKey.get("system")) } as SystemSettings; },
   async updateSettings(input: Partial<SystemSettings>) { await Promise.all(Object.entries(input).map(([key, value]) => apiRequest<RawSetting>(`/settings/${key}`, { method: "PUT", body: { value } }))); return resourcesService.settings(); },
 };

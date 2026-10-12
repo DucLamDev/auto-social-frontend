@@ -11,7 +11,7 @@ import { compactNumber, formatDate } from "@/lib/utils";
 const statusIcon = { PUBLISHED: CheckCircle2, FAILED: AlertCircle, PUBLISHING: RadioTower, PROCESSING: Clock3, QUEUED: Clock3, SCHEDULED: CalendarClock } as const;
 export function DashboardView() {
   const now = new Date(); const todayFrom = new Date(now); todayFrom.setHours(0, 0, 0, 0); const todayTo = new Date(now); todayTo.setHours(23, 59, 59, 999); const trendFrom = new Date(todayFrom); trendFrom.setDate(trendFrom.getDate() - 6);
-  const platforms = usePlatforms({ limit: 1000 }); const accounts = useAccounts({ limit: 1000 }); const jobs = usePublishJobs({ limit: 1000, from: trendFrom.toISOString(), to: todayTo.toISOString() }); const metrics = usePublishJobMetrics(todayFrom.toISOString(), todayTo.toISOString());
+  const platforms = usePlatforms({ limit: 100 }); const accounts = useAccounts({ limit: 1000 }); const jobs = usePublishJobs({ limit: 1000, from: trendFrom.toISOString(), to: todayTo.toISOString() }); const metrics = usePublishJobMetrics(todayFrom.toISOString(), todayTo.toISOString());
   const pending = platforms.isPending || accounts.isPending || jobs.isPending || metrics.isPending; const error = platforms.error || accounts.error || jobs.error || metrics.error;
   if (error && !pending) return <><PageHeader title="Dashboard" description="Tổng quan hoạt động xuất bản." /><Card><ErrorState error={error} onRetry={() => { void platforms.refetch(); void accounts.refetch(); void jobs.refetch(); void metrics.refetch(); }} /></Card></>;
   const jobItems = jobs.data?.items ?? [];

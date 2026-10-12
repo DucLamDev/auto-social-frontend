@@ -1,4 +1,5 @@
 import type { AccountConnectionTestResult } from "@/services/resources.service";
+import { ApiError, getErrorMessage } from "@/services/api/errors";
 
 function nonNegativeInteger(value: unknown): number | undefined {
   return typeof value === "number" && Number.isInteger(value) && value >= 0
@@ -40,4 +41,23 @@ export function getTagPolicyWarning(result: AccountConnectionTestResult): string
     ? `Đã cấu hình ${configuredCount} defaultTags.`
     : "Đã cấu hình defaultTags.";
   return `${configuredSummary} Hãy đăng thử trên staging để xác minh từng tag tồn tại và tài khoản/category được phép sử dụng; kiểm tra kết nối chỉ xác nhận quyền API.`;
+}
+
+export function getBrowserConnectionErrorMessage(error: unknown): string {
+  if (!(error instanceof ApiError)) return getErrorMessage(error);
+  const reason = typeof error.details?.reason === "string" ? error.details.reason : "";
+  const normalized = `${reason} ${error.message}`.toLowerCase();
+  const requestId = error.requestId ? ` Mã yêu cầu: ${error.requestId}.` : "";
+
+  if (["login", "auth", "session", "captcha", "turnstile", "cloudflare", "otp", "2fa"]
+    .some((keyword) => normalized.includes(keyword))) {
+    return `Session trình duyệt cần được đăng nhập hoặc xác minh lại. Chạy helper đăng nhập rồi kiểm tra session lần nữa.${requestId}`;
+  }
+  if (reason === "EDITOR_NOT_FOUND" || normalized.includes("editor")) {
+    return `Không tìm thấy trình soạn thảo đã kiểm thử. Kiểm tra lại box/đường dẫn đã cấu hình; nếu giao diện nền tảng vừa thay đổi, adapter cần được cập nhật.${requestId}`;
+  }
+  if (reason === "AUTOMATION_DISABLED" || normalized.includes("automation is disabled")) {
+    return `Playwright đang bị tắt trên backend. Bật BROWSER_AUTOMATION_ENABLED và khởi động lại worker trước khi kiểm tra.${requestId}`;
+  }
+  return `${error.message}${requestId}`;
 }

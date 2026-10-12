@@ -176,6 +176,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform-accounts/{id}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["PlatformAccounts_updateSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-accounts/{id}/browser-session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["PlatformAccounts_revokeBrowserSession"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform-accounts/{id}/test": {
         parameters: {
             query?: never;
@@ -266,6 +298,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["Contents_generate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Ai_providers"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -490,6 +538,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["PublishJobs_retry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/publish-jobs/{id}/resume-browser": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PublishJobs_resumeBrowser"];
         delete?: never;
         options?: never;
         head?: never;
@@ -800,6 +864,11 @@ export interface components {
             id: string;
             slug: string;
             name: string;
+            connectorKey: string;
+            groupKey: string;
+            defaultSettings: {
+                [key: string]: unknown;
+            };
             /** @enum {string} */
             mode: "OFFICIAL_API" | "COMPATIBLE_API" | "BROWSER_ASSISTED" | "MANUAL";
             /** @enum {string} */
@@ -830,6 +899,11 @@ export interface components {
         PlatformSummaryContractDto: {
             slug: string;
             name: string;
+            connectorKey: string;
+            groupKey: string;
+            defaultSettings: {
+                [key: string]: unknown;
+            };
             /** @enum {string} */
             mode: "OFFICIAL_API" | "COMPATIBLE_API" | "BROWSER_ASSISTED" | "MANUAL";
             /** @enum {string} */
@@ -869,6 +943,8 @@ export interface components {
             lastTestedAt?: string | null;
             credential?: components["schemas"]["CredentialSummaryContractDto"] | null;
             oauthToken?: components["schemas"]["OAuthTokenSummaryContractDto"] | null;
+            /** @description True only when an encrypted Playwright storage state is configured; the state itself is never returned. */
+            browserSessionConfigured?: boolean;
             /** Format: date-time */
             createdAt?: string;
             /** Format: date-time */
@@ -899,6 +975,12 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        UpdatePlatformAccountSettingsDto: {
+            /** @description Non-secret connector settings to merge. Credentials and encrypted browser session state are left unchanged. */
+            settings: {
+                [key: string]: unknown;
+            };
+        };
         UpdatePlatformAccountDto: {
             enabled: boolean;
         };
@@ -906,6 +988,7 @@ export interface components {
             ok: boolean;
             accountName?: string;
             manual?: boolean;
+            ready?: boolean;
             message?: string;
             details?: {
                 [key: string]: unknown;
@@ -1026,6 +1109,19 @@ export interface components {
              *     ]
              */
             platforms: string[];
+            /**
+             * @description AI provider for this generation run. Uses the backend default when omitted.
+             * @enum {string}
+             */
+            aiProvider?: "openai" | "deepseek" | "gemini";
+        };
+        AiProviderContractDto: {
+            /** @enum {string} */
+            id: "openai" | "deepseek" | "gemini";
+            label: string;
+            model: string;
+            configured: boolean;
+            isDefault: boolean;
         };
         SourceArticleContractDto: {
             /** Format: uuid */
@@ -1183,6 +1279,13 @@ export interface components {
              */
             brief: string;
             platformAccountIds: string[];
+            /** @description Previously uploaded, unattached media assets to attach to the generated source content. */
+            mediaAssetIds?: string[];
+            /**
+             * @description AI provider for this automation run. Uses the backend default when omitted.
+             * @enum {string}
+             */
+            aiProvider?: "openai" | "deepseek" | "gemini";
             /** @description ISO-8601 timestamp with Z or an explicit UTC offset. */
             scheduledAt?: string;
             /**
@@ -1243,7 +1346,19 @@ export interface components {
             accountName: string;
             title?: string | null;
             body: string;
+            summary?: string | null;
             hashtags: string[];
+            cta?: string | null;
+            /** Format: uri */
+            canonicalUrl?: string | null;
+            media: {
+                /** @enum {string} */
+                type: "image" | "video" | "document";
+                /** Format: uri */
+                url: string;
+                altText?: string;
+                mimeType?: string;
+            }[];
             suggestedExternalPostId?: string;
             /** Format: uri */
             openUrl?: string;
@@ -1294,6 +1409,15 @@ export interface components {
             /** @description Decimal byte count serialized as a string */
             sizeBytes: string;
             checksum: string;
+            /**
+             * @description Media metadata. Uploaded accessible descriptions are returned as altText.
+             * @example {
+             *       "altText": "A dashboard showing campaign performance."
+             *     }
+             */
+            metadata: {
+                [key: string]: unknown;
+            };
             /** Format: date-time */
             createdAt: string;
         };
@@ -1684,7 +1808,15 @@ export interface operations {
     };
     Platforms_list: {
         parameters: {
-            query?: never;
+            query?: {
+                page?: number;
+                limit?: number;
+                search?: string;
+                group?: "SOCIAL" | "BLOGGING" | "COMMUNITY" | "FORUM" | "DEVELOPER" | "MEDIA" | "COMMERCE" | "EVENT";
+                mode?: "OFFICIAL_API" | "COMPATIBLE_API" | "BROWSER_ASSISTED" | "MANUAL";
+                availability?: "READY" | "API_REVIEW_REQUIRED" | "API_RESEARCH_REQUIRED" | "CREDENTIAL_REQUIRED" | "MANUAL_ONLY";
+                enabled?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2122,6 +2254,106 @@ export interface operations {
             };
         };
     };
+    PlatformAccounts_updateSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePlatformAccountSettingsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["PlatformAccountContractDto"];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    PlatformAccounts_revokeBrowserSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["PlatformAccountContractDto"];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
     PlatformAccounts_testConnection: {
         parameters: {
             query?: never;
@@ -2490,6 +2722,52 @@ export interface operations {
                         /** @example true */
                         success: boolean;
                         data: components["schemas"]["ContentVariantContractDto"][];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    Ai_providers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["AiProviderContractDto"][];
                         meta: components["schemas"]["ApiMetaContractDto"];
                     };
                 };
@@ -3361,6 +3639,54 @@ export interface operations {
             };
         };
     };
+    PublishJobs_resumeBrowser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["MutationResultContractDto"];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
     PublishJobs_reconcileNotFound: {
         parameters: {
             query?: never;
@@ -3578,6 +3904,8 @@ export interface operations {
                     contentId?: string;
                     /** Format: uuid */
                     variantId?: string;
+                    /** @description Accessible description stored with the media asset metadata. */
+                    altText?: string;
                 };
             };
         };

@@ -1,4 +1,5 @@
 import { env } from "@/config/env";
+import type { ConnectorMode, Platform } from "@/types/domain";
 
 export type CredentialValue = string | boolean;
 
@@ -18,8 +19,18 @@ export interface CredentialConnectorConfig {
   slug: string;
   title: string;
   description: string;
+  requiresCredential?: boolean;
+  browserAssisted?: boolean;
   fields: CredentialField[];
 }
+
+type CredentialConfigTarget = {
+  slug: string;
+  name?: string;
+  connectorKey?: string;
+  mode?: ConnectorMode;
+  defaultSettings?: Record<string, unknown>;
+};
 
 interface BuildCredentialPayloadOptions {
   includeSettings?: boolean;
@@ -51,8 +62,14 @@ export const credentialConnectorConfigs: Record<string, CredentialConnectorConfi
   discord: {
     slug: "discord",
     title: "Discord",
-    description: "Webhook URL chính thức của channel. URL được lưu mã hóa và không được đọc lại.",
-    fields: [{ key: "webhookUrl", label: "Webhook URL", storage: "credential", type: "password", required: true, placeholder: "https://discord.com/api/webhooks/…" }],
+    description: "Incoming Webhook của channel Discord. Tạo tại Server Settings → Integrations → Webhooks; URL được lưu mã hóa.",
+    fields: [
+      { key: "webhookUrl", label: "Webhook URL", storage: "credential", type: "password", required: true, placeholder: "https://discord.com/api/webhooks/…", help: "Dán URL từ nút Copy Webhook URL. Trang tài liệu Discord không chứa URL/token của server của bạn." },
+      { key: "webhookUsername", label: "Tên webhook khi đăng", storage: "setting", type: "text", placeholder: "Social Publisher", help: "Tùy chọn; ghi đè tên hiển thị của webhook cho các bài từ destination này." },
+      { key: "webhookAvatarUrl", label: "Avatar URL", storage: "setting", type: "url", placeholder: "https://cdn.example.com/bot-avatar.png", help: "Tùy chọn; phải là URL HTTPS công khai." },
+      { key: "threadId", label: "Thread ID có sẵn", storage: "setting", type: "text", placeholder: "123456789012345678", help: "Tùy chọn. Dùng cho webhook gửi vào một thread có sẵn; bật Developer Mode rồi Copy ID của thread." },
+      { key: "createForumThread", label: "Tự tạo thread cho Forum/Media channel", storage: "setting", type: "checkbox", defaultValue: false, help: "Dùng tiêu đề bài làm tên thread. Không bật cùng lúc với Thread ID có sẵn." },
+    ],
   },
   discourse: {
     slug: "discourse",
@@ -112,10 +129,62 @@ export const credentialConnectorConfigs: Record<string, CredentialConnectorConfi
     description: "User access token có quyền đọc người dùng và tạo/xóa post.",
     fields: [{ key: "accessToken", label: "User access token", storage: "credential", type: "password", required: true }],
   },
+  "voz-forums": {
+    slug: "voz-forums",
+    title: "Voz Forums · Playwright",
+    description: "Adapter XenForo cố định cho voz.vn. Hệ thống không nhận mật khẩu; bạn đăng nhập trong Chromium helper và session được lưu mã hóa.",
+    requiresCredential: false,
+    browserAssisted: true,
+    fields: [
+      { key: "forumPath", label: "Đường dẫn box VOZ", storage: "setting", type: "text", required: true, placeholder: "/f/ten-box.123", help: "Chỉ nhập pathname của box lấy từ URL voz.vn; không có box mặc định vì mỗi box có nội quy riêng. Adapter khóa hostname và tự thêm /post-thread." },
+      { key: "threadPrefixId", label: "Thread Prefix ID", storage: "setting", type: "text", placeholder: "1", help: "Chỉ cần khi box bắt buộc chọn tiền tố. Nếu bỏ trống mà giao diện yêu cầu prefix, worker sẽ dừng an toàn." },
+      { key: "automationPermissionAttested", label: "Tôi xác nhận tài khoản và quản trị viên/điều khoản VOZ cho phép automation", storage: "setting", type: "checkbox", defaultValue: false, help: "Bắt buộc trước khi worker được phép bấm nút đăng. Không thay thế nội quy riêng của từng box." },
+      { key: "browserAutoSubmit", label: "Cho phép tự bấm nút đăng cuối cùng", storage: "setting", type: "checkbox", defaultValue: false, help: "Nếu tắt, hệ thống chỉ chuẩn bị nội dung rồi trả về NEEDS_ACTION." },
+    ],
+  },
+  "browser-assisted": {
+    slug: "browser-assisted",
+    title: "Playwright browser automation",
+    description: "Tạo account trước, sau đó chạy helper đăng nhập cục bộ. Hệ thống chỉ lưu session đã mã hóa; không nhận hoặc lưu mật khẩu, mã OTP hay CAPTCHA.",
+    requiresCredential: false,
+    browserAssisted: true,
+    fields: [
+      { key: "browserAutoSubmit", label: "Tự bấm nút đăng cuối cùng khi nền tảng cho phép", storage: "setting", type: "checkbox", defaultValue: false, help: "Chỉ áp dụng cho adapter đã được duyệt chính sách. Backend vẫn buộc dừng khi nền tảng yêu cầu người dùng xác nhận." },
+    ],
+  },
+  manual: {
+    slug: "manual",
+    title: "Kênh thủ công",
+    description: "Hệ thống tạo sẵn nội dung và ảnh; bạn mở trang đích để kiểm tra, đăng và xác nhận hoàn tất.",
+    requiresCredential: false,
+    fields: [
+      { key: "manualUrl", label: "Trang tạo bài", storage: "setting", type: "url", required: true, placeholder: "https://community.example.com/new-topic", help: "Không phải secret. Hệ thống dùng URL này cho nút mở trang ở bước bàn giao thủ công." },
+    ],
+  },
 };
 
-export function getCredentialConfig(slug?: string | null) {
-  return slug ? credentialConnectorConfigs[slug] : undefined;
+function asDefaultValue(value: unknown): CredentialValue | undefined {
+  if (typeof value === "boolean" || typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  return undefined;
+}
+
+export function getCredentialConfig(target?: string | CredentialConfigTarget | Pick<Platform, "slug" | "name" | "connectorKey" | "mode" | "defaultSettings"> | null) {
+  if (!target) return undefined;
+  const descriptor: CredentialConfigTarget = typeof target === "string" ? { slug: target } : target;
+  const connectorKey = descriptor.connectorKey ?? (descriptor.mode === "MANUAL" ? "manual" : descriptor.slug);
+  const base = credentialConnectorConfigs[descriptor.slug] ?? credentialConnectorConfigs[connectorKey];
+  if (!base) return undefined;
+  const defaults = descriptor.defaultSettings ?? {};
+  return {
+    ...base,
+    slug: descriptor.slug,
+    title: descriptor.name ?? base.title,
+    fields: base.fields.map((field) => ({
+      ...field,
+      defaultValue: asDefaultValue(defaults[field.key]) ?? field.defaultValue,
+    })),
+  };
 }
 
 export function getInitialCredentialValues(config: CredentialConnectorConfig, settings?: Record<string, unknown>) {
@@ -157,6 +226,6 @@ export function buildCredentialPayload(
     }
     (field.storage === "credential" ? credential : settings)[field.key] = value;
   }
-  if (!Object.keys(credential).length) throw new Error("Cần nhập ít nhất một credential.");
+  if (config.requiresCredential !== false && !Object.keys(credential).length) throw new Error("Cần nhập ít nhất một credential.");
   return { credential, settings };
 }

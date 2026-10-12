@@ -18,12 +18,14 @@ import { Modal } from "@/components/ui/modal";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/ui/states";
 import { Table, TableWrap, Td, Th } from "@/components/ui/table";
 import { StatusFilter, Toolbar } from "@/components/ui/toolbar";
-import { useAccounts, useCampaigns, useContents, usePlatforms, useResourceMutation, useVariants } from "@/hooks/use-resources";
+import { useAccounts, useAiProviders, useCampaigns, useContents, usePlatforms, useResourceMutation, useVariants } from "@/hooks/use-resources";
 import { formatDate } from "@/lib/utils";
 import { campaignSchema, type AutomationCampaignInput, type CampaignInput } from "@/schemas/campaign";
+import { getAiGenerationErrorMessage } from "@/services/api/errors";
 import { resourcesService } from "@/services/resources.service";
+import type { MediaAsset } from "@/types/domain";
 import { AutomationCampaignModal } from "./automation-campaign-modal";
-import { getApprovedVariantForAccount, getEligibleAccounts, isCampaignReadyContent, normalizeAutomationAccountIds } from "./campaign-utils";
+import { deriveAutomationCampaignName, getApprovedVariantForAccount, getEligibleAccounts, includeImageAltText, isCampaignReadyContent, normalizeAutomationAccountIds } from "./campaign-utils";
 
 function createAutomationIdempotencyKey() {
   if (typeof globalThis.crypto?.randomUUID === "function") return globalThis.crypto.randomUUID();
@@ -34,13 +36,16 @@ export function CampaignsView() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [automationOpen, setAutomationOpen] = useState(false);
+  const [automationError, setAutomationError] = useState<string | null>(null);
+  const [automationUploadPending, setAutomationUploadPending] = useState(false);
   const [publishTarget, setPublishTarget] = useState<{ id: string; name: string; targets: number } | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const query = useCampaigns({ limit: 100, search: search || undefined, status: status || undefined });
   const contents = useContents({ limit: 100 });
-  const accounts = useAccounts({ limit: 200, status: "CONNECTED" });
-  const platforms = usePlatforms({ limit: 200 });
+  const accounts = useAccounts({ limit: 100 });
+  const platforms = usePlatforms({ limit: 100 });
+  const aiProviders = useAiProviders();
   const create = useResourceMutation((input: Parameters<typeof resourcesService.createCampaign>[0]) => resourcesService.createCampaign(input), ["campaigns", "publish-jobs"]);
   const automate = useResourceMutation(
     ({ input, idempotencyKey }: { input: Parameters<typeof resourcesService.automateCampaign>[0]; idempotencyKey: string }) => resourcesService.automateCampaign(input, idempotencyKey),
@@ -48,6 +53,13 @@ export function CampaignsView() {
   );
   const publish = useResourceMutation((id: string) => resourcesService.publishCampaign(id), ["campaigns", "publish-jobs"]);
   const automationRequest = useRef<{ fingerprint: string; idempotencyKey: string } | null>(null);
+  const automationMedia = useRef<{
+    file: File;
+    altText: string;
+    requestFingerprint: string;
+    asset?: MediaAsset;
+    promise?: Promise<MediaAsset>;
+  } | null>(null);
   const form = useForm<CampaignInput>({ resolver: zodResolver(campaignSchema), defaultValues: { name: "", contentId: "", accountIds: [], scheduledAt: "" } });
   const selectedContentId = useWatch({ control: form.control, name: "contentId" });
   const variants = useVariants(selectedContentId);
@@ -55,18 +67,44 @@ export function CampaignsView() {
   const eligibleAccounts = getEligibleAccounts(accounts.data?.items ?? [], approvedVariants);
   const campaignContents = (contents.data?.items ?? []).filter(isCampaignReadyContent);
   const enabledPlatformIds = new Set((platforms.data?.items ?? [])
-    .filter((platform) => platform.enabled && ["OFFICIAL_API", "COMPATIBLE_API"].includes(platform.mode))
+    .filter((platform) => platform.enabled && ["OFFICIAL_API", "COMPATIBLE_API", "BROWSER_ASSISTED", "MANUAL"].includes(platform.mode))
     .map((platform) => platform.id));
-  const automationAccounts = (accounts.data?.items ?? []).filter((account) => enabledPlatformIds.has(account.platformId));
+  // Manual destinations stay visible only as explicitly blocked candidates so
+  // users understand why an existing account cannot enter one-click publishing.
+  const automationCandidates = (accounts.data?.items ?? []).filter((account) => enabledPlatformIds.has(account.platformId));
 
   const openAutomation = () => {
     automationRequest.current = null;
+    automationMedia.current = null;
+    setAutomationError(null);
     setAutomationOpen(true);
   };
 
   const closeAutomation = () => {
     automationRequest.current = null;
+    automationMedia.current = null;
+    setAutomationError(null);
     setAutomationOpen(false);
+  };
+
+  const uploadAutomationMedia = async (file: File, altText: string, requestFingerprint: string) => {
+    const cached = automationMedia.current;
+    if (cached?.file === file && cached.altText === altText && cached.requestFingerprint === requestFingerprint && cached.asset) return cached.asset;
+    if (cached?.file === file && cached.altText === altText && cached.requestFingerprint === requestFingerprint && cached.promise) return cached.promise;
+
+    const promise = resourcesService.uploadMedia(file, { altText: altText || undefined });
+    automationMedia.current = { file, altText, requestFingerprint, promise };
+    setAutomationUploadPending(true);
+    try {
+      const asset = await promise;
+      if (automationMedia.current?.file === file && automationMedia.current.altText === altText && automationMedia.current.requestFingerprint === requestFingerprint) automationMedia.current = { file, altText, requestFingerprint, asset };
+      return asset;
+    } catch (error) {
+      if (automationMedia.current?.file === file && automationMedia.current.altText === altText && automationMedia.current.requestFingerprint === requestFingerprint) automationMedia.current = null;
+      throw error;
+    } finally {
+      setAutomationUploadPending(false);
+    }
   };
 
   const confirmPublish = async () => {
@@ -102,23 +140,33 @@ export function CampaignsView() {
   });
 
   const submitAutomation = async (values: AutomationCampaignInput) => {
-    const input: Parameters<typeof resourcesService.automateCampaign>[0] = {
-      name: values.name,
-      brief: values.brief,
-      platformAccountIds: normalizeAutomationAccountIds(values.accountIds),
-      scheduledAt: values.runMode === "SCHEDULED" && values.scheduledAt
-        ? new Date(values.scheduledAt).toISOString()
-        : undefined,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      publishImmediately: true,
-    };
-    const fingerprint = JSON.stringify(input);
-    const idempotencyKey = automationRequest.current?.fingerprint === fingerprint
-      ? automationRequest.current.idempotencyKey
-      : createAutomationIdempotencyKey();
-    automationRequest.current = { fingerprint, idempotencyKey };
-
+    setAutomationError(null);
     try {
+      const normalizedAltText = values.imageAltText?.replace(/\s+/g, " ").trim() ?? "";
+      const semanticInput: Omit<Parameters<typeof resourcesService.automateCampaign>[0], "mediaAssetIds"> = {
+        name: deriveAutomationCampaignName(values.name, values.brief),
+        brief: includeImageAltText(values.brief, values.imageAltText),
+        platformAccountIds: normalizeAutomationAccountIds(values.accountIds),
+        aiProvider: values.aiProvider,
+        scheduledAt: values.runMode === "SCHEDULED" && values.scheduledAt
+          ? new Date(values.scheduledAt).toISOString()
+          : undefined,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        publishImmediately: true,
+      };
+      const requestFingerprint = JSON.stringify(semanticInput);
+      const mediaAsset = values.image
+        ? await uploadAutomationMedia(values.image, normalizedAltText, requestFingerprint)
+        : undefined;
+      const input: Parameters<typeof resourcesService.automateCampaign>[0] = {
+        ...semanticInput,
+        ...(mediaAsset ? { mediaAssetIds: [mediaAsset.id] } : {}),
+      };
+      const fingerprint = JSON.stringify(input);
+      const idempotencyKey = automationRequest.current?.fingerprint === fingerprint
+        ? automationRequest.current.idempotencyKey
+        : createAutomationIdempotencyKey();
+      automationRequest.current = { fingerprint, idempotencyKey };
       const result = await automate.mutateAsync({ input, idempotencyKey });
       toast.success(values.runMode === "SCHEDULED"
         ? `AI đã tạo ${result.generatedVariants} biến thể và lên lịch ${result.jobsCreated} bài đăng.`
@@ -126,12 +174,14 @@ export function CampaignsView() {
         action: { label: "Xem tiến độ", onClick: () => router.push("/publishing") },
       });
       automationRequest.current = null;
+      automationMedia.current = null;
       setAutomationOpen(false);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Không thể chạy chiến dịch tự động";
-      toast.error(message.includes("OPENAI_API_KEY")
-        ? "Chưa cấu hình OpenAI API key. Hãy thêm OPENAI_API_KEY vào backend .env rồi khởi động lại API và worker."
-        : message);
+      const message = error instanceof Error && error.message.includes("_API_KEY is not configured")
+        ? "Provider AI đã chọn chưa có API key trong backend. Hãy cấu hình key rồi khởi động lại API."
+        : getAiGenerationErrorMessage(error);
+      setAutomationError(message);
+      toast.error(message);
     }
   };
 
@@ -161,10 +211,14 @@ export function CampaignsView() {
 
     <AutomationCampaignModal
       open={automationOpen}
-      accounts={automationAccounts}
+      accounts={automationCandidates}
       accountsPending={accounts.isPending || platforms.isPending}
       accountsError={accounts.error ?? platforms.error}
-      busy={automate.isPending}
+      aiProviders={aiProviders.data ?? []}
+      aiProvidersPending={aiProviders.isPending}
+      aiProvidersError={aiProviders.error}
+      submitError={automationError}
+      busy={automationUploadPending || automate.isPending}
       onClose={closeAutomation}
       onSubmit={submitAutomation}
     />
