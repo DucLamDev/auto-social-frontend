@@ -106,7 +106,7 @@ export const credentialConnectorConfigs: Record<string, CredentialConnectorConfi
   instagram: {
     slug: "instagram",
     title: "Instagram",
-    description: "Instagram Login access token và Instagram User ID; MVP hỗ trợ một ảnh.",
+    description: "Nên dùng nút Kết nối Instagram ở mục Đăng nhập một lần để token tự gia hạn. Form này chỉ cho token dán tay (hết hạn sau 60 ngày, không tự gia hạn); hỗ trợ một ảnh mỗi bài.",
     fields: [
       { key: "accessToken", label: "Access token", storage: "credential", type: "password", required: true },
       { key: "userId", label: "Instagram User ID", storage: "credential", type: "text", required: true },
@@ -116,7 +116,7 @@ export const credentialConnectorConfigs: Record<string, CredentialConnectorConfi
   threads: {
     slug: "threads",
     title: "Threads",
-    description: "Threads access token và Threads User ID.",
+    description: "Nên dùng nút Kết nối Threads ở mục Đăng nhập một lần để token tự gia hạn. Form này chỉ cho token dán tay (hết hạn sau 60 ngày, không tự gia hạn).",
     fields: [
       { key: "accessToken", label: "Access token", storage: "credential", type: "password", required: true },
       { key: "userId", label: "Threads User ID", storage: "credential", type: "text", required: true },

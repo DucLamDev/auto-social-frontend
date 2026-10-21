@@ -15,6 +15,9 @@ const mocks = vi.hoisted(() => ({
   testAccount: vi.fn(),
   refetchAccounts: vi.fn(),
   invalidate: vi.fn(),
+  oauthStart: vi.fn(),
+  runAccountCheck: vi.fn(),
+  providers: [] as Array<{ provider: string; platform?: string; status: string }>,
   role: "ADMIN",
 }));
 
@@ -37,7 +40,7 @@ vi.mock("@/hooks/use-resources", () => ({
     error: null,
     refetch: vi.fn(),
   }),
-  useOAuthProviders: () => ({ data: [], isPending: false, isError: false, error: null, refetch: vi.fn() }),
+  useOAuthProviders: () => ({ data: mocks.providers, isPending: false, isError: false, error: null, refetch: vi.fn() }),
   useInvalidate: () => mocks.invalidate,
   useResourceMutation: (mutation: (value: never) => Promise<unknown>) => ({
     isPending: false,
@@ -53,7 +56,8 @@ vi.mock("@/services/resources.service", () => ({
     updateAccount: mocks.updateAccount,
     revokeBrowserSession: mocks.revokeBrowserSession,
     testAccount: mocks.testAccount,
-    oauthStart: vi.fn(),
+    oauthStart: mocks.oauthStart,
+    runAccountCheck: mocks.runAccountCheck,
   },
 }));
 
@@ -217,5 +221,50 @@ describe("AccountsView Playwright flow", () => {
     await waitFor(() => expect(mocks.revokeBrowserSession).toHaveBeenCalledWith(browserAccount.id));
     expect(screen.getByRole("dialog", { name: "Thu hồi session Playwright đã mã hóa" })).toBeInTheDocument();
     expect(mocks.refetchAccounts).not.toHaveBeenCalled();
+  });
+});
+
+const threadsAccount: PlatformAccount = {
+  id: "0d9b1c55-0b47-4c6f-9a55-2c1f0f7c8e11",
+  platformId: "platform-threads",
+  platform: { id: "platform-threads", slug: "threads", name: "Threads", mode: "OFFICIAL_API", connectorKey: "threads" },
+  name: "@vpsttt",
+  enabled: true,
+  status: "RECONNECT_REQUIRED",
+  oauthConfigured: true,
+  oauthToken: { expiresAt: "2026-12-20T00:00:00.000Z" },
+};
+
+describe("AccountsView Meta OAuth", () => {
+  beforeEach(() => {
+    mocks.accounts = [threadsAccount];
+    mocks.platforms = [];
+    mocks.providers = [{ provider: "threads", platform: "threads", status: "READY" }, { provider: "instagram", platform: "instagram", status: "CREDENTIAL_REQUIRED" }];
+    mocks.oauthStart.mockReset().mockRejectedValue(new Error("stop before redirect"));
+    mocks.runAccountCheck.mockReset();
+    mocks.role = "ADMIN";
+    window.history.replaceState({}, "", "/accounts");
+  });
+
+  it("reconnects an OAuth account in one click and labels the auto-renewed token", async () => {
+    render(<AccountsView />);
+    expect(screen.getByText("Token tự gia hạn")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Kết nối lại/ }));
+    await waitFor(() => expect(mocks.oauthStart).toHaveBeenCalledWith("threads"));
+  });
+
+  it("offers a Kết nối button only for providers the backend has configured", () => {
+    render(<AccountsView />);
+    fireEvent.click(screen.getByRole("button", { name: /Kết nối \/ cấu hình/ }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getAllByRole("button", { name: /^Kết nối$/ })).toHaveLength(1);
+    expect(within(dialog).getByText("Backend chưa cấu hình App ID/Secret")).toBeInTheDocument();
+  });
+
+  it("runs the account check on demand", async () => {
+    mocks.runAccountCheck.mockResolvedValue({ tokens: { refreshed: 1, failed: 0, skipped: 0 }, connections: { checked: 1, failed: 0 } });
+    render(<AccountsView />);
+    fireEvent.click(screen.getByRole("button", { name: /Kiểm tra tất cả/ }));
+    await waitFor(() => expect(mocks.runAccountCheck).toHaveBeenCalled());
   });
 });

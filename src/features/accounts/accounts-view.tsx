@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, KeyRound, Link2, LockKeyhole, LogIn, MonitorPlay, PlugZap, RefreshCw, Settings2, ShieldCheck, ShieldOff, TestTube2 } from "lucide-react";
+import { ExternalLink, HeartPulse, KeyRound, Link2, LockKeyhole, LogIn, MonitorPlay, PlugZap, RefreshCw, Settings2, ShieldCheck, ShieldOff, TestTube2 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/auth/permission-gate";
@@ -25,6 +25,7 @@ import { BrowserLoginGuide } from "./browser-login-guide";
 import { getPlatformAutomationLabel } from "./automation-status";
 import { getBrowserConnectionErrorMessage, getTagPolicyWarning } from "./connection-test-feedback";
 import { buildCredentialPayload, getCredentialConfig, getInitialCredentialValues, type CredentialValue } from "./credential-config";
+import { isAutoRefreshPlatform, oauthProviderForPlatform, oauthProviderLabel, oauthProviderNote, readOAuthResult } from "./oauth";
 
 interface CredentialTarget { platform: Pick<Platform, "id" | "slug" | "name"> & Partial<Pick<Platform, "connectorKey" | "mode" | "defaultSettings">>; account?: PlatformAccount }
 
@@ -137,6 +138,8 @@ export function AccountsView() {
   const update = useResourceMutation(({ id, enabled }: { id: string; enabled: boolean }) => resourcesService.updateAccount(id, { enabled }), ["accounts"]);
   const test = useResourceMutation((id: string) => resourcesService.testAccount(id), ["accounts"]);
   const revokeBrowserSession = useResourceMutation((id: string) => resourcesService.revokeBrowserSession(id), ["accounts"]);
+  const checkAll = useResourceMutation(() => resourcesService.runAccountCheck(), ["accounts", "account-health"]);
+  const readyProviders = new Set((providers.data ?? []).filter((provider) => provider.status === "READY").map((provider) => provider.provider));
   const items = (query.data?.items ?? []).filter((item) => `${item.name} ${item.username ?? ""} ${item.platform?.name ?? ""}`.toLowerCase().includes(search.toLowerCase()));
   const catalogPlatforms = useMemo(() => platforms.data?.items ?? [], [platforms.data?.items]);
   const configurablePlatforms = useMemo(() => catalogPlatforms.filter((platform) => platform.enabled && getCredentialConfig(platform)), [catalogPlatforms]);
@@ -154,11 +157,11 @@ export function AccountsView() {
   const visibleManualPlatforms = manualPlatforms.slice((manualPage - 1) * DESTINATION_PAGE_SIZE, manualPage * DESTINATION_PAGE_SIZE);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("oauth") === "success") {
-      toast.success(`Đã kết nối ${params.get("provider") || "tài khoản"} thành công`);
-      window.history.replaceState({}, "", window.location.pathname);
-    }
+    const outcome = readOAuthResult(window.location.search);
+    if (!outcome) return;
+    if (outcome.ok) toast.success(outcome.message);
+    else toast.error(outcome.message, { duration: 15_000 });
+    window.history.replaceState({}, "", window.location.pathname);
   }, []);
 
   const testConnection = async (account: PlatformAccount) => {
@@ -186,6 +189,17 @@ export function AccountsView() {
       window.location.assign(authorizationUrl);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Không thể bắt đầu OAuth");
+    }
+  };
+  const runCheckAll = async () => {
+    try {
+      const { tokens, connections } = await checkAll.mutateAsync(undefined);
+      const failed = (tokens.failed ?? 0) + (connections.failed ?? 0);
+      const summary = `Đã kiểm tra ${connections.checked ?? 0} tài khoản, gia hạn ${tokens.refreshed ?? 0} token.`;
+      if (failed) toast.warning(`${summary} ${failed} mục lỗi — xem cột Trạng thái.`);
+      else toast.success(summary);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không thể chạy kiểm tra");
     }
   };
   const confirmBrowserSessionRevoke = async () => {
@@ -229,16 +243,19 @@ export function AccountsView() {
   return <div className="animate-enter">
     <PageHeader eyebrow="Destinations" title="Tài khoản" description="Kết nối API hoặc đăng nhập một lần bằng Playwright để hệ thống tự đăng; mật khẩu social không đi qua ứng dụng." action={<PermissionGate allow={["ADMIN"]}><Button onClick={() => setConnectOpen(true)}><Link2 className="size-4" />Kết nối / cấu hình</Button></PermissionGate>} />
     <Card className="overflow-hidden">
-      <Toolbar search={search} onSearch={setSearch} searchPlaceholder="Tìm tài khoản…" filters={<Select aria-label="Lọc nền tảng" className="w-44" value={platformId} onChange={(event) => setPlatformId(event.target.value)}><option value="">Mọi nền tảng</option>{catalogPlatforms.map((platform) => <option value={platform.id} key={platform.id}>{platform.name}</option>)}</Select>} end={<Button variant="ghost" size="sm" onClick={() => void query.refetch()}><RefreshCw className="size-4" />Refresh</Button>} />
+      <Toolbar search={search} onSearch={setSearch} searchPlaceholder="Tìm tài khoản…" filters={<Select aria-label="Lọc nền tảng" className="w-44" value={platformId} onChange={(event) => setPlatformId(event.target.value)}><option value="">Mọi nền tảng</option>{catalogPlatforms.map((platform) => <option value={platform.id} key={platform.id}>{platform.name}</option>)}</Select>} end={<div className="flex gap-1"><PermissionGate allow={["ADMIN"]}><Button variant="ghost" size="sm" loading={checkAll.isPending} onClick={() => void runCheckAll()} title="Gia hạn token đến hạn và kiểm tra kết nối mọi tài khoản ngay"><HeartPulse className="size-4" />Kiểm tra tất cả</Button></PermissionGate><Button variant="ghost" size="sm" onClick={() => void query.refetch()}><RefreshCw className="size-4" />Refresh</Button></div>} />
       {query.isPending ? <div className="p-5"><TableSkeleton /></div> : query.isError ? <ErrorState error={query.error} onRetry={() => void query.refetch()} /> : items.length === 0 ? <EmptyState title="Chưa có tài khoản" description="Kết nối API hoặc thêm điểm đến bàn giao thủ công đầu tiên." action={<PermissionGate allow={["ADMIN"]}><Button onClick={() => setConnectOpen(true)}><PlugZap className="size-4" />Cấu hình ngay</Button></PermissionGate>} /> : <TableWrap><Table><thead><tr><Th>Nền tảng / tài khoản</Th><Th>Trạng thái</Th><Th>Kiểu kết nối</Th><Th>Kiểm tra gần nhất</Th><Th>Đang bật</Th><Th className="text-right">Thao tác</Th></tr></thead><tbody>{items.map((account) => {
         const platform = catalogPlatforms.find((item) => item.id === account.platformId) ?? account.platform;
         const config = getCredentialConfig(platform);
         const manual = platform?.mode === "MANUAL";
         const browserAssisted = platform?.mode === "BROWSER_ASSISTED";
+        const oauthProvider = oauthProviderForPlatform(account.platform?.slug);
+        const canReconnectOAuth = Boolean(oauthProvider && readyProviders.has(oauthProvider));
+        const autoRefresh = account.oauthConfigured && isAutoRefreshPlatform(account.platform?.slug);
         return <tr key={account.id} className="group hover:bg-slate-50/70">
           <Td><div className="flex items-center gap-3"><PlatformMark slug={account.platform?.slug} name={account.platform?.name ?? "Platform"} /><div><p className="font-bold text-foreground">{account.name}</p><p className="mt-0.5 text-xs text-muted">{account.platform?.name ?? "—"}{account.username ? ` · @${account.username}` : ""}</p></div></div></Td>
           <Td><Badge value={account.status} />{browserAssisted && <p className="mt-1 max-w-40 text-[10px] leading-4 text-muted">{account.status === "CONNECTED" ? "Session sẵn sàng cho worker" : account.browserSessionConfigured ? "Cần làm mới và kiểm tra session" : "Chưa lưu session đăng nhập"}</p>}</Td>
-          <Td><span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">{manual ? <ExternalLink className="size-3.5 text-violet-600" /> : browserAssisted ? <MonitorPlay className="size-3.5 text-indigo-600" /> : account.oauthConfigured ? <Link2 className="size-3.5 text-sky-600" /> : <KeyRound className="size-3.5 text-amber-600" />}{manual ? "Bàn giao thủ công" : browserAssisted ? "Playwright" : account.oauthConfigured ? "OAuth" : account.credential ? "Credential" : "Chưa cấu hình"}</span><p className="mt-1 text-[10px] text-muted">{manual ? "Không lưu API key/token" : browserAssisted ? account.credential ? "Session đã mã hóa" : "Chưa đăng nhập trình duyệt" : account.oauthToken?.expiresAt ? `Hết hạn ${fromNow(account.oauthToken.expiresAt)}` : account.credential?.expiresAt ? `Hết hạn ${fromNow(account.credential.expiresAt)}` : account.credential?.status ?? (account.oauthConfigured ? "Token đã mã hóa" : "—")}</p></Td>
+          <Td><span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">{manual ? <ExternalLink className="size-3.5 text-violet-600" /> : browserAssisted ? <MonitorPlay className="size-3.5 text-indigo-600" /> : account.oauthConfigured ? <Link2 className="size-3.5 text-sky-600" /> : <KeyRound className="size-3.5 text-amber-600" />}{manual ? "Bàn giao thủ công" : browserAssisted ? "Playwright" : account.oauthConfigured ? "OAuth" : account.credential ? "Credential" : "Chưa cấu hình"}</span><p className="mt-1 text-[10px] text-muted">{manual ? "Không lưu API key/token" : browserAssisted ? account.credential ? "Session đã mã hóa" : "Chưa đăng nhập trình duyệt" : autoRefresh ? "Token tự gia hạn" : account.oauthToken?.expiresAt ? `Hết hạn ${fromNow(account.oauthToken.expiresAt)}` : account.credential?.expiresAt ? `Hết hạn ${fromNow(account.credential.expiresAt)}` : account.credential?.status ?? (account.oauthConfigured ? "Token đã mã hóa" : "—")}</p></Td>
           <Td className="text-xs">{fromNow(account.lastCheckedAt)}</Td>
           <Td><PermissionGate allow={["ADMIN"]} fallback={<Badge value={account.enabled ? "ACTIVE" : "INACTIVE"} />}><Switch checked={account.enabled} disabled={update.isPending} label={`Bật ${account.name}`} onChange={(enabled) => void update.mutateAsync({ id: account.id, enabled }).then(() => toast.success("Đã cập nhật")).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Có lỗi"))} /></PermissionGate></Td>
           <Td><div className="flex flex-wrap justify-end gap-1">
@@ -247,7 +264,7 @@ export function AccountsView() {
               {config && platform && <Button variant="ghost" size="sm" onClick={() => openCredential({ platform, account })}><Settings2 className="size-4" />Cấu hình</Button>}
               <Button variant="secondary" size="sm" onClick={() => setBrowserLoginAccount(account)}><LogIn className="size-4" />{account.status === "CONNECTED" ? "Đăng nhập lại" : account.browserSessionConfigured ? "Kết nối lại" : "Đăng nhập"}</Button>
               {account.browserSessionConfigured === true && <Button variant="danger" size="sm" onClick={() => setBrowserSessionRevokeTarget(account)}><ShieldOff className="size-4" />Thu hồi session</Button>}
-            </> : config && !manual && platform ? <Button variant="secondary" size="sm" onClick={() => openCredential({ platform, account })}><KeyRound className="size-4" />Credential</Button> : account.status !== "CONNECTED" ? <Button variant="secondary" size="sm" onClick={() => setConnectOpen(true)}><ExternalLink className="size-4" />Reconnect</Button> : null}</PermissionGate>
+            </> : canReconnectOAuth && oauthProvider ? <Button variant={account.status === "CONNECTED" ? "ghost" : "secondary"} size="sm" onClick={() => void connect(oauthProvider)}><Link2 className="size-4" />Kết nối lại</Button> : config && !manual && platform ? <Button variant="secondary" size="sm" onClick={() => openCredential({ platform, account })}><KeyRound className="size-4" />Credential</Button> : account.status !== "CONNECTED" ? <Button variant="secondary" size="sm" onClick={() => setConnectOpen(true)}><ExternalLink className="size-4" />Reconnect</Button> : null}</PermissionGate>
           </div></Td>
         </tr>;
       })}</tbody></Table></TableWrap>}
@@ -256,7 +273,7 @@ export function AccountsView() {
     <Modal open={connectOpen} onClose={() => setConnectOpen(false)} title="Kết nối / cấu hình điểm đến" description="Chọn kênh tự động qua API hoặc kênh bàn giao thủ công." className="max-w-3xl">
       <div className="space-y-7">
         <div><Label htmlFor="destination-search">Tìm điểm đến</Label><Input id="destination-search" value={destinationSearch} onChange={(event) => { setDestinationSearch(event.target.value); setAutomaticPage(1); setBrowserPage(1); setManualPage(1); }} placeholder="Medium, Discourse, Mastodon…" /></div>
-        <section><h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">OAuth chính thức</h3>{providers.isPending ? <TableSkeleton rows={2} /> : providers.isError ? <ErrorState compact error={providers.error} onRetry={() => void providers.refetch()} /> : <div className="grid gap-3 sm:grid-cols-2">{providers.data.map((provider) => { const providerPlatform = provider.platform || provider.provider; const ready = provider.status === "READY"; return <div key={provider.provider} className="flex items-center gap-3 rounded-xl border border-border p-4"><PlatformMark slug={providerPlatform} name={providerPlatform} /><div className="min-w-0 flex-1"><p className="text-sm font-bold capitalize">{provider.provider === "google" ? "Google · Blogger" : provider.provider}</p><p className="mt-1 text-[11px] text-muted">{ready ? "Backend OAuth đã sẵn sàng" : "Thiếu OAuth app env"}</p></div><Badge value={provider.status} />{ready && <Button size="sm" onClick={() => void connect(provider.provider)}>OAuth</Button>}</div>; })}</div>}</section>
+        <section><h3 className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">Đăng nhập một lần (OAuth chính thức)</h3><p className="mb-3 text-xs leading-5 text-muted">Bấm Kết nối, đăng nhập trên trang của nền tảng và cấp quyền. Hệ thống lưu token đã mã hoá; không cần dán token thủ công.</p>{providers.isPending ? <TableSkeleton rows={2} /> : providers.isError ? <ErrorState compact error={providers.error} onRetry={() => void providers.refetch()} /> : <div className="grid gap-3 sm:grid-cols-2">{providers.data.map((provider) => { const providerPlatform = provider.platform || provider.provider; const ready = provider.status === "READY"; return <div key={provider.provider} className="flex items-center gap-3 rounded-xl border border-border p-4"><PlatformMark slug={providerPlatform} name={providerPlatform} /><div className="min-w-0 flex-1"><p className="text-sm font-bold">{oauthProviderLabel(provider.provider)}</p><p className="mt-1 text-[11px] text-muted">{oauthProviderNote(provider.provider, provider.status)}</p>{!ready && <Badge value={provider.status} className="mt-2" />}</div>{ready && <Button size="sm" className="shrink-0" onClick={() => void connect(provider.provider)}><Link2 className="size-4" />Kết nối</Button>}</div>; })}</div>}</section>
         <section>
           <h3 className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">Kênh tự động qua API</h3>
           <p className="mb-3 text-xs leading-5 text-muted">Các nền tảng dùng chung connector (ví dụ Discourse hoặc Mastodon) tự nhận đúng form và URL mặc định của cộng đồng.</p>

@@ -784,6 +784,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/account-health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Accounts needing reconnection, tokens expiring soon and publish jobs needing an operator */
+        get: operations["AccountHealth_attention"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account-health/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh due Meta tokens and test every connected account of the current user now */
+        post: operations["AccountHealth_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1504,6 +1538,55 @@ export interface components {
             rabbitmq: "up" | "down";
             /** Format: date-time */
             timestamp: string;
+        };
+        AttentionAccountContractDto: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @enum {string} */
+            status: "CONNECTED" | "EXPIRED" | "RECONNECT_REQUIRED" | "DISABLED" | "ERROR";
+            platform: string;
+            platformName: string;
+            /** Format: date-time */
+            expiresAt: string | null;
+            /** @description The system renews this token without the user signing in again */
+            autoRefresh: boolean;
+        };
+        AttentionAccountsContractDto: {
+            problems: components["schemas"]["AttentionAccountContractDto"][];
+            expiringSoon: components["schemas"]["AttentionAccountContractDto"][];
+        };
+        AttentionJobsContractDto: {
+            needsAction: number;
+            failed: number;
+            possibleDuplicate: number;
+            retrying: number;
+        };
+        AccountHealthContractDto: {
+            /** @description Items an operator should act on */
+            total: number;
+            accounts: components["schemas"]["AttentionAccountsContractDto"];
+            jobs: components["schemas"]["AttentionJobsContractDto"];
+            alertsEnabled: boolean;
+            /** Format: date-time */
+            generatedAt: string;
+        };
+        MaintenanceRunContractDto: {
+            /**
+             * @example {
+             *       "refreshed": 1,
+             *       "failed": 0,
+             *       "skipped": 2
+             *     }
+             */
+            tokens: Record<string, never>;
+            /**
+             * @example {
+             *       "checked": 3,
+             *       "failed": 0
+             *     }
+             */
+            connections: Record<string, never>;
         };
     };
     responses: never;
@@ -4291,7 +4374,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OAuth completed; redirects to the frontend accounts page */
+            /** @description OAuth finished; redirects to the frontend accounts page with oauth=success or oauth=error */
             303: {
                 headers: {
                     [name: string]: unknown;
@@ -4386,6 +4469,98 @@ export interface operations {
                         /** @example true */
                         success: boolean;
                         data: components["schemas"]["ReadinessContractDto"];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    AccountHealth_attention: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["AccountHealthContractDto"];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    AccountHealth_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["MaintenanceRunContractDto"];
                         meta: components["schemas"]["ApiMetaContractDto"];
                     };
                 };

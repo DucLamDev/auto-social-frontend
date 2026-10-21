@@ -18,12 +18,15 @@ export const resourceKeys = {
   prompts: ["prompts"] as const, logs: (params?: ListParams) => ["logs", params ?? {}] as const, settings: ["settings"] as const,
   publishLogs: (params?: ListParams) => ["publish-logs", params ?? {}] as const,
   oauthProviders: ["oauth-providers"] as const,
+  accountHealth: ["account-health"] as const,
   media: (params?: ListParams) => ["media", params ?? {}] as const,
 };
 export function useAiProviders() { return useQuery({ queryKey: resourceKeys.aiProviders, queryFn: resourcesService.aiProviders, staleTime: 300_000 }); }
 export function usePlatforms(params?: ListParams) { return useQuery({ queryKey: resourceKeys.platforms(params), queryFn: () => resourcesService.platforms(params) }); }
 export function useAccounts(params?: ListParams) { return useQuery({ queryKey: resourceKeys.accounts(params), queryFn: () => resourcesService.accounts(params) }); }
 export function useOAuthProviders() { return useQuery({ queryKey: resourceKeys.oauthProviders, queryFn: resourcesService.oauthProviders, staleTime: 300_000 }); }
+/** Polled app-wide (top bar badge), so it refreshes less often than the job list. */
+export function useAccountHealth() { return useQuery({ queryKey: resourceKeys.accountHealth, queryFn: resourcesService.accountHealth, refetchInterval: Math.max(env.pollIntervalMs * 3, 30_000) }); }
 export function useSources(params?: ListParams) { return useQuery({ queryKey: resourceKeys.sources(params), queryFn: () => resourcesService.sources(params) }); }
 export function useSourceArticles(params?: ListParams) { return useQuery({ queryKey: resourceKeys.sourceArticles(params), queryFn: () => resourcesService.sourceArticles(params) }); }
 export function useContents(params?: ListParams) { return useQuery({ queryKey: resourceKeys.contents(params), queryFn: () => resourcesService.contents(params) }); }

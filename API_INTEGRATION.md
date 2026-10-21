@@ -51,7 +51,11 @@ Never log or persist the refresh token in JavaScript.
 
 ## OAuth
 
-Accounts reads `GET /oauth/providers`, enables only providers reported as `READY`, calls `GET /oauth/:provider/start`, and navigates to its authorization URL. The backend owns state, expiry, token exchange, encryption and callback redirect.
+Accounts reads `GET /oauth/providers`, enables only providers reported as `READY` (LinkedIn, Google/Blogger, Instagram, Threads when the backend has their app settings), calls `GET /oauth/:provider/start`, and navigates to its authorization URL. The backend owns state, expiry, token exchange, encryption, automatic refresh and callback redirect. The callback returns to `/accounts?oauth=success&provider=…&accounts=N` or `/accounts?oauth=error&provider=…&reason=<code>`; `features/accounts/oauth.ts` turns both into a toast and clears the query. OAuth accounts get a per-row **Kết nối lại** button that restarts the provider flow.
+
+## Account health
+
+`GET /account-health` (`useAccountHealth`, polled every `max(3 × pollInterval, 30s)`) returns accounts needing reconnection, tokens expiring within 7 days that the system cannot renew, and counts of `NEEDS_ACTION`/`FAILED`/`POSSIBLE_DUPLICATE`/`RETRY` jobs. It feeds the Dashboard **Cần xử lý** panel and the top bar bell badge. ADMIN can run `POST /account-health/check` (**Kiểm tra tất cả** on Accounts) to refresh due Meta tokens and test every connection immediately.
 
 OAuth and credential connectors are deliberately separate flows. WordPress, dev.to, Discord, Bluesky, Mastodon, Instagram, Threads and X use the generic platform-account contract:
 

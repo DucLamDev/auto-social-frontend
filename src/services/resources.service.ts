@@ -4,6 +4,9 @@ import type { AiProviderId, AiProviderOption, AuditLog, Campaign, Capability, Co
 import type { components } from "@/generated/api/schema";
 
 export type AccountConnectionTestResult = components["schemas"]["ConnectionTestContractDto"];
+export type AccountHealth = components["schemas"]["AccountHealthContractDto"];
+export type AttentionAccount = components["schemas"]["AttentionAccountContractDto"];
+export type MaintenanceRun = components["schemas"]["MaintenanceRunContractDto"];
 
 type QueryValue = string | number | boolean | null | undefined;
 export type ListParams = { [key: string]: QueryValue; page?: number; limit?: number; search?: string; status?: string; sourceId?: string; platformId?: string; contentId?: string; variantId?: string; from?: string; to?: string; group?: PlatformGroup; mode?: ConnectorMode; availability?: PlatformAvailability; enabled?: boolean };
@@ -152,6 +155,8 @@ export const resourcesService = {
   testAccount: (id: string) => apiRequest<AccountConnectionTestResult>(`/platform-accounts/${id}/test`, { method: "POST" }),
   oauthProviders: () => apiRequest<Array<{ provider: string; platform?: string; status: string; callback?: string }>>("/oauth/providers"),
   async oauthStart(provider: string) { return apiRequest<{ authorizationUrl: string }>(`/oauth/${provider}/start`); },
+  accountHealth: () => apiRequest<AccountHealth>("/account-health"),
+  runAccountCheck: () => apiRequest<MaintenanceRun>("/account-health/check", { method: "POST" }),
   async sources(params?: ListParams) { const raw = await apiList<RawSource>("/content-sources"); return result(raw, filterItems(raw.items.map(mapSource), params, (item) => `${item.name} ${item.url ?? ""}`, (item) => item.status)); },
   async createSource(input: { name: string; type: string; url?: string; content?: string }) { if (input.type === "MANUAL") return apiRequest<RawContent>("/contents", { method: "POST", body: { title: input.name, body: input.content, language: "vi" } }).then(mapContent); return apiRequest<RawSource>("/content-sources", { method: "POST", body: { name: input.name, type: input.type, url: input.url } }).then(mapSource); },
   syncSource: (id: string) => apiRequest<{ discovered: number; inserted: number; duplicates: number }>(`/content-sources/${id}/fetch`, { method: "POST" }),
