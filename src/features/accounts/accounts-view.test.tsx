@@ -268,3 +268,30 @@ describe("AccountsView Meta OAuth", () => {
     await waitFor(() => expect(mocks.runAccountCheck).toHaveBeenCalled());
   });
 });
+
+describe("AccountsView publish mode", () => {
+  beforeEach(() => {
+    mocks.platforms = [];
+    mocks.providers = [];
+    mocks.updateAccountSettings.mockReset().mockResolvedValue({});
+    mocks.role = "ADMIN";
+    mocks.accounts = [{
+      id: "b1d6d0c4-6a8e-4b8a-9d8e-1f0a0b0c0d0e",
+      platformId: "platform-blogger",
+      platform: { id: "platform-blogger", slug: "blogger", name: "Blogger", mode: "OFFICIAL_API", connectorKey: "blogger" },
+      name: "Blog VPSTTT",
+      enabled: true,
+      status: "CONNECTED",
+      settings: { publishImmediately: false },
+      oauthConfigured: true,
+      oauthToken: { expiresAt: null },
+    }];
+  });
+
+  it("switches a Blogger account from drafts to immediate publishing", async () => {
+    render(<AccountsView />);
+    expect(screen.getByText("Lưu nháp")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("switch", { name: /Đăng ngay trên Blog VPSTTT/ }));
+    await waitFor(() => expect(mocks.updateAccountSettings).toHaveBeenCalledWith("b1d6d0c4-6a8e-4b8a-9d8e-1f0a0b0c0d0e", { publishImmediately: true }));
+  });
+});

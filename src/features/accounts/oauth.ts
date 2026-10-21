@@ -1,15 +1,16 @@
 /** OAuth provider that links accounts of a platform; Blogger signs in through Google. */
-const PLATFORM_PROVIDER: Record<string, string> = { instagram: "instagram", threads: "threads", linkedin: "linkedin", blogger: "google" };
+const PLATFORM_PROVIDER: Record<string, string> = { instagram: "instagram", threads: "threads", linkedin: "linkedin", blogger: "google", tumblr: "tumblr" };
 
 /** Platforms whose token the backend renews on its own (no repeated sign-in). */
-const AUTO_REFRESH_PLATFORMS = new Set(["instagram", "threads", "blogger"]);
+const AUTO_REFRESH_PLATFORMS = new Set(["instagram", "threads", "blogger", "tumblr"]);
 
-const PROVIDER_LABELS: Record<string, string> = { google: "Google · Blogger", instagram: "Instagram", threads: "Threads", linkedin: "LinkedIn", x: "X", reddit: "Reddit", tiktok: "TikTok" };
+const PROVIDER_LABELS: Record<string, string> = { google: "Google · Blogger", instagram: "Instagram", threads: "Threads", tumblr: "Tumblr", linkedin: "LinkedIn", x: "X", reddit: "Reddit", tiktok: "TikTok" };
 
 const PROVIDER_NOTES: Record<string, string> = {
   instagram: "Tài khoản Business/Creator. Đăng nhập một lần, token tự gia hạn.",
   threads: "Đăng nhập một lần, token tự gia hạn.",
   google: "Đăng nhập Google một lần, token tự gia hạn.",
+  tumblr: "Nối mọi blog của tài khoản, token tự gia hạn.",
   linkedin: "Token 60 ngày, hệ thống nhắc trước khi hết hạn.",
 };
 

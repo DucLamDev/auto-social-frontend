@@ -10,6 +10,8 @@ danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số k�
 - Bảng "Cần xử lý" trên Dashboard và chuông có đếm số
   Hiện tài khoản cần kết nối lại, token sắp hết hạn, bài cần thao tác / thất bại / có thể trùng.
 - Nút "Kiểm tra tất cả" trên trang Tài khoản: gia hạn token đến hạn và kiểm tra kết nối ngay.
+- Nút Kết nối Tumblr; công tắc Đăng ngay / Lưu nháp cho tài khoản Blogger và Tumblr.
+- Form Bluesky nhận Handle + App Password (không hết hạn) thay cho Access JWT 2 giờ.
 ### Sửa lỗi
 - Sửa cảnh báo hydration của Dashboard (thẻ div nằm trong thẻ p).
 

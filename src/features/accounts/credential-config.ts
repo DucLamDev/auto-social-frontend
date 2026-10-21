@@ -86,10 +86,10 @@ export const credentialConnectorConfigs: Record<string, CredentialConnectorConfi
   bluesky: {
     slug: "bluesky",
     title: "Bluesky",
-    description: "Dùng access JWT và DID của tài khoản AT Protocol.",
+    description: "Handle và App Password (Bluesky → Settings → Privacy and security → App passwords). App Password không hết hạn; hệ thống tự tạo phiên mỗi lần đăng.",
     fields: [
-      { key: "accessJwt", label: "Access JWT", storage: "credential", type: "password", required: true },
-      { key: "did", label: "DID", storage: "credential", type: "text", required: true, placeholder: "did:plc:…" },
+      { key: "identifier", label: "Handle", storage: "credential", type: "text", required: true, placeholder: "ten.bsky.social" },
+      { key: "appPassword", label: "App Password", storage: "credential", type: "password", required: true, placeholder: "xxxx-xxxx-xxxx-xxxx" },
       { key: "serviceUrl", label: "PDS service URL", storage: "credential", type: "url", defaultValue: "https://bsky.social", required: true },
     ],
   },

@@ -5,6 +5,7 @@ describe("OAuth helpers", () => {
   it("maps platforms to the provider that links them", () => {
     expect(oauthProviderForPlatform("blogger")).toBe("google");
     expect(oauthProviderForPlatform("threads")).toBe("threads");
+    expect(oauthProviderForPlatform("tumblr")).toBe("tumblr");
     expect(oauthProviderForPlatform("medium")).toBeUndefined();
     expect(isAutoRefreshPlatform("instagram")).toBe(true);
     expect(isAutoRefreshPlatform("linkedin")).toBe(false);

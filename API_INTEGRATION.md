@@ -51,7 +51,7 @@ Never log or persist the refresh token in JavaScript.
 
 ## OAuth
 
-Accounts reads `GET /oauth/providers`, enables only providers reported as `READY` (LinkedIn, Google/Blogger, Instagram, Threads when the backend has their app settings), calls `GET /oauth/:provider/start`, and navigates to its authorization URL. The backend owns state, expiry, token exchange, encryption, automatic refresh and callback redirect. The callback returns to `/accounts?oauth=success&provider=…&accounts=N` or `/accounts?oauth=error&provider=…&reason=<code>`; `features/accounts/oauth.ts` turns both into a toast and clears the query. OAuth accounts get a per-row **Kết nối lại** button that restarts the provider flow.
+Accounts reads `GET /oauth/providers`, enables only providers reported as `READY` (LinkedIn, Google/Blogger, Instagram, Threads, Tumblr when the backend has their app settings), calls `GET /oauth/:provider/start`, and navigates to its authorization URL. The backend owns state, expiry, token exchange, encryption, automatic refresh and callback redirect. The callback returns to `/accounts?oauth=success&provider=…&accounts=N` or `/accounts?oauth=error&provider=…&reason=<code>`; `features/accounts/oauth.ts` turns both into a toast and clears the query. OAuth accounts get a per-row **Kết nối lại** button that restarts the provider flow. Blogger and Tumblr rows have a **Đăng ngay / Lưu nháp** switch that sends `PUT /platform-accounts/:id/settings` with `{ publishImmediately }` (API accounts accept only `publishImmediately`, `rateLimit`, `rateWindowSeconds` there).
 
 ## Account health
 
