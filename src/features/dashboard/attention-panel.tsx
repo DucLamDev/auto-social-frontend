@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { AlertTriangle, BellRing, CheckCircle2, Clock3, Copy, KeyRound, RotateCcw } from "lucide-react";
+import { AlertTriangle, BellRing, CheckCircle2, Clock3, Puzzle, Copy, KeyRound, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorState, Skeleton } from "@/components/ui/states";
@@ -31,6 +31,7 @@ export function AttentionPanel() {
     { label: "Bài thất bại", hint: "Đã hết lượt thử lại", value: data.jobs.failed, icon: AlertTriangle, status: "FAILED" },
     { label: "Có thể đăng trùng", hint: "Cần kiểm tra trên nền tảng", value: data.jobs.possibleDuplicate, icon: Copy, status: "POSSIBLE_DUPLICATE" },
     { label: "Đang thử lại", hint: "Hệ thống tự xử lý", value: data.jobs.retrying, icon: RotateCcw, status: "RETRY" },
+    { label: "Chờ tiện ích Chrome", hint: data.extension.offline ? "Không có Chrome nào đang chạy tiện ích" : "Tiện ích sẽ tự đăng", value: data.jobs.waitingExtension, icon: Puzzle, status: data.extension.offline ? "EXTENSION_OFFLINE" : "WAITING_EXTENSION" },
   ].filter((row) => row.value > 0) : [];
   const accountCount = (data?.accounts.problems.length ?? 0) + (data?.accounts.expiringSoon.length ?? 0);
 
@@ -42,7 +43,7 @@ export function AttentionPanel() {
       </div>
       {data && <span className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold ${data.total ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>{data.total ? `${data.total} việc` : "Ổn định"}</span>}
     </CardHeader>
-    {health.isPending ? <CardContent><div className="space-y-3"><Skeleton /><Skeleton /></div></CardContent> : data && data.total === 0 && data.jobs.retrying === 0 ? <CardContent>
+    {health.isPending ? <CardContent><div className="space-y-3"><Skeleton /><Skeleton /></div></CardContent> : data && data.total === 0 && data.jobs.retrying === 0 && data.jobs.waitingExtension === 0 ? <CardContent>
       <div className="flex items-center gap-3 rounded-xl bg-emerald-50 p-4 text-xs text-emerald-800"><CheckCircle2 className="size-5 shrink-0" /><p>Mọi tài khoản đang kết nối tốt và không có bài nào bị kẹt. Token Instagram/Threads/Blogger được hệ thống tự gia hạn.</p></div>
     </CardContent> : data && <div className="grid border-t border-border lg:grid-cols-2">
       <div className="border-border lg:border-r">

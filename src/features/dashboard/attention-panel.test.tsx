@@ -12,7 +12,8 @@ vi.mock("@/hooks/use-resources", () => ({
 const empty: AccountHealth = {
   total: 0,
   accounts: { problems: [], expiringSoon: [] },
-  jobs: { needsAction: 0, failed: 0, possibleDuplicate: 0, retrying: 0 },
+  jobs: { needsAction: 0, failed: 0, possibleDuplicate: 0, retrying: 0, waitingExtension: 0 },
+  extension: { devicesOnline: 0, offline: false },
   alertsEnabled: false,
   generatedAt: "2026-10-21T00:00:00.000Z",
 };
@@ -36,7 +37,7 @@ describe("AttentionPanel", () => {
         problems: [{ id: "a", name: "@shop", status: "RECONNECT_REQUIRED", platform: "instagram", platformName: "Instagram", expiresAt: null, autoRefresh: true }],
         expiringSoon: [],
       },
-      jobs: { needsAction: 2, failed: 0, possibleDuplicate: 0, retrying: 0 },
+      jobs: { needsAction: 2, failed: 0, possibleDuplicate: 0, retrying: 0, waitingExtension: 0 },
     };
     render(<AttentionPanel />);
     expect(screen.getByText("3 việc")).toBeInTheDocument();

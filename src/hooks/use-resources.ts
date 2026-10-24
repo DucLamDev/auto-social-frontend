@@ -19,6 +19,7 @@ export const resourceKeys = {
   publishLogs: (params?: ListParams) => ["publish-logs", params ?? {}] as const,
   oauthProviders: ["oauth-providers"] as const,
   accountHealth: ["account-health"] as const,
+  extensionDevices: ["extension-devices"] as const,
   media: (params?: ListParams) => ["media", params ?? {}] as const,
 };
 export function useAiProviders() { return useQuery({ queryKey: resourceKeys.aiProviders, queryFn: resourcesService.aiProviders, staleTime: 300_000 }); }
@@ -27,6 +28,7 @@ export function useAccounts(params?: ListParams) { return useQuery({ queryKey: r
 export function useOAuthProviders() { return useQuery({ queryKey: resourceKeys.oauthProviders, queryFn: resourcesService.oauthProviders, staleTime: 300_000 }); }
 /** Polled app-wide (top bar badge), so it refreshes less often than the job list. */
 export function useAccountHealth() { return useQuery({ queryKey: resourceKeys.accountHealth, queryFn: resourcesService.accountHealth, refetchInterval: Math.max(env.pollIntervalMs * 3, 30_000) }); }
+export function useExtensionDevices() { return useQuery({ queryKey: resourceKeys.extensionDevices, queryFn: resourcesService.extensionDevices, refetchInterval: 30_000 }); }
 export function useSources(params?: ListParams) { return useQuery({ queryKey: resourceKeys.sources(params), queryFn: () => resourcesService.sources(params) }); }
 export function useSourceArticles(params?: ListParams) { return useQuery({ queryKey: resourceKeys.sourceArticles(params), queryFn: () => resourcesService.sourceArticles(params) }); }
 export function useContents(params?: ListParams) { return useQuery({ queryKey: resourceKeys.contents(params), queryFn: () => resourcesService.contents(params) }); }

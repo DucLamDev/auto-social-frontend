@@ -1,5 +1,5 @@
 "use client";
-import { AlertTriangle, Clock3, Copy, ExternalLink, LogIn, Play, RefreshCw, RotateCcw, Settings2 } from "lucide-react";
+import { AlertTriangle, Clock3, Copy, ExternalLink, LogIn, Play, Puzzle, RefreshCw, RotateCcw, Settings2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/auth/permission-gate";
@@ -41,11 +41,13 @@ export function PublishingView() {
   const [retryTarget, setRetryTarget] = useState<{ id: string; contentTitle: string; account: string } | null>(null);
   const [reconcileRetryTarget, setReconcileRetryTarget] = useState<PublishJob | null>(null);
   const [browserResumeTarget, setBrowserResumeTarget] = useState<PublishJob | null>(null);
+  const [extensionRequeueTarget, setExtensionRequeueTarget] = useState<PublishJob | null>(null);
   const query = usePublishJobs({ page, limit: 50, status: status || undefined, search: search || undefined });
   const confirmationJob = query.data?.items.find((job) => job.id === manualJobId);
   const retry = useResourceMutation((id: string) => resourcesService.retryJob(id), ["publish-jobs"]);
   const reconcileRetry = useResourceMutation((id: string) => resourcesService.reconcileNotFound(id), ["publish-jobs"]);
   const resumeBrowser = useResourceMutation((id: string) => resourcesService.resumeBrowserJob(id), ["publish-jobs"]);
+  const requeueExtension = useResourceMutation((id: string) => resourcesService.requeueExtensionJob(id), ["publish-jobs", "account-health"]);
   const mark = useResourceMutation((input: { id: string; externalPostId: string; url?: string }) => resourcesService.markPublished(input.id, { externalPostId: input.externalPostId, url: input.url }), ["publish-jobs"]);
 
   const copyAndOpen = async (id: string, openUrl?: string) => {
@@ -123,10 +125,12 @@ export function PublishingView() {
       <Toolbar search={search} onSearch={(value) => { setSearch(value); setPage(1); }} searchPlaceholder="Tìm theo nội dung, tài khoản…" end={<Button variant="ghost" size="sm" onClick={() => void query.refetch()}><RefreshCw className={cn("size-4", query.isFetching && "animate-spin")} />Làm mới</Button>} />
       {query.isPending ? <div className="p-5"><TableSkeleton /></div> : query.isError ? <ErrorState error={query.error} onRetry={() => void query.refetch()} /> : !query.data.items.length ? <EmptyState title="Không có publish job" description="Các tác vụ từ campaign sẽ xuất hiện tại đây." /> : <><TableWrap><Table><thead><tr><Th>Nền tảng / tài khoản</Th><Th>Nội dung</Th><Th>Trạng thái</Th><Th>Lần thử</Th><Th>Thời gian</Th><Th className="text-right">Kết quả</Th></tr></thead><tbody>{query.data.items.map((job) => <tr key={job.id} className="hover:bg-slate-50/70">
         <Td><div className="flex items-center gap-3"><PlatformMark slug={job.platform.toLowerCase()} name={job.platform} /><div><p className="text-xs font-bold capitalize text-foreground">{job.platform}</p><p className="mt-0.5 text-[11px] text-muted">{job.account}</p></div></div></Td>
-        <Td className="max-w-xs"><p className="truncate font-semibold text-foreground">{job.contentTitle}</p>{job.error && <p title={job.error.message} className="mt-1 truncate text-[10px] text-danger">{job.error.code}: {job.error.message}</p>}{getNeedsActionMessage(job.needsAction) && <p title={job.needsAction?.message} className="mt-1 line-clamp-2 text-[10px] leading-4 text-amber-700">{getNeedsActionMessage(job.needsAction)}</p>}</Td>
-        <Td><Badge value={job.status} /></Td><Td><span className="text-xs font-semibold">{job.attempt}/{job.maxAttempts ?? 3}</span></Td>
+        <Td className="max-w-xs"><p className="truncate font-semibold text-foreground">{job.contentTitle}</p>{job.error && <p title={job.error.message} className="mt-1 truncate text-[10px] text-danger">{job.error.code}: {job.error.message}</p>}{getNeedsActionMessage(job.needsAction) && <p title={job.needsAction?.message} className={cn("mt-1 line-clamp-2 text-[10px] leading-4", job.needsAction?.kind === "EXTENSION_PENDING" ? "text-indigo-700" : "text-amber-700")}>{getNeedsActionMessage(job.needsAction)}</p>}</Td>
+        <Td><Badge value={job.needsAction?.kind === "EXTENSION_PENDING" ? "WAITING_EXTENSION" : job.status} /></Td><Td><span className="text-xs font-semibold">{job.attempt}/{job.maxAttempts ?? 3}</span></Td>
         <Td className="text-xs"><p>{formatDate(job.startedAt || job.scheduledAt)}</p>{job.finishedAt && <p className="mt-0.5 text-[10px] text-muted">Xong {formatDate(job.finishedAt)}</p>}</Td>
         <Td><div className="flex flex-wrap justify-end gap-1">{job.publishedUrl && <a href={job.publishedUrl} target="_blank" rel="noreferrer" className="grid size-9 place-items-center rounded-lg text-primary hover:bg-indigo-50" aria-label="Mở bài đã đăng"><ExternalLink className="size-4" /></a>}<PermissionGate allow={["ADMIN", "EDITOR"]}>{job.status === "FAILED" && <Button variant="ghost" size="sm" onClick={() => setRetryTarget({ id: job.id, contentTitle: job.contentTitle, account: job.account })}><RotateCcw className="size-4" />Retry</Button>}{job.status === "NEEDS_ACTION" && (job.needsAction ? <>
+          {job.needsAction.kind === "EXTENSION_PENDING" && <span className="inline-flex items-center gap-1 px-2 text-[11px] font-semibold text-indigo-700" title="Tiện ích Chrome sẽ nhận bài này trong vòng 30 giây khi Chrome đang mở."><Puzzle className="size-3.5" />Chờ tiện ích Chrome</span>}
+          {job.needsAction.kind === "EXTENSION_ACTION" && <><span className="inline-flex items-center gap-1 px-2 text-[11px] font-semibold text-amber-700"><Puzzle className="size-3.5" />Tiện ích cần bạn</span><Button variant="secondary" size="sm" onClick={() => openPublishedConfirmation(job)}>Đã đăng</Button><Button variant="ghost" size="sm" onClick={() => setExtensionRequeueTarget(job)}><RotateCcw className="size-4" />Giao lại cho tiện ích</Button></>}
           {job.needsAction.kind === "MODERATION" && <><span className="inline-flex items-center gap-1 px-2 text-[11px] font-semibold text-amber-700" title="Topic đã được gửi một lần và có thể đang chờ duyệt."><Clock3 className="size-3.5" />Chờ forum duyệt</span>{job.needsAction.url && <a href={job.needsAction.url} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-primary hover:bg-indigo-50"><ExternalLink className="size-4" />Kiểm tra</a>}<Button variant="secondary" size="sm" onClick={() => openPublishedConfirmation(job)}>Đã được duyệt</Button></>}
           {job.needsAction.kind === "RECONCILIATION" && <><span className="inline-flex items-center gap-1 px-2 text-[11px] font-semibold text-amber-700" title="Topic có thể đã được gửi; phải đối soát trước khi tạo bài khác."><Clock3 className="size-3.5" />Cần đối soát</span>{job.needsAction.url && <a href={job.needsAction.url} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-primary hover:bg-indigo-50"><ExternalLink className="size-4" />Kiểm tra</a>}<Button variant="secondary" size="sm" onClick={() => openPublishedConfirmation(job)}>Đã tìm thấy bài</Button>{job.needsAction.canRetryAfterNotFound && <Button variant="ghost" size="sm" onClick={() => setReconcileRetryTarget(job)}><RotateCcw className="size-4" />Không tìm thấy</Button>}</>}
           {job.needsAction.kind === "BROWSER_LOGIN" && <><span className="inline-flex items-center gap-1 px-2 text-[11px] font-semibold text-amber-700"><LogIn className="size-3.5" />Cần đăng nhập lại</span>{job.needsAction.accountId && <Button variant="ghost" size="sm" onClick={() => void copyBrowserLoginCommand(job.needsAction!.accountId!)}><Copy className="size-4" />Lệnh đăng nhập</Button>}<a href="/accounts" className="inline-flex h-9 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-primary hover:bg-indigo-50"><Settings2 className="size-4" />Tài khoản</a>{canResumeBrowserJob(job) ? <Button variant="secondary" size="sm" onClick={() => setBrowserResumeTarget(job)}><Play className="size-4" />Tiếp tục sau đăng nhập</Button> : <Button variant="secondary" size="sm" disabled><Play className="size-4" />Hoàn tất kết nối trước</Button>}</>}
@@ -157,6 +161,20 @@ export function PublishingView() {
       danger
       onClose={() => setReconcileRetryTarget(null)}
       onConfirm={confirmReconciliationRetry}
+    />
+    <ConfirmDialog
+      open={Boolean(extensionRequeueTarget)}
+      title="Giao lại cho tiện ích Chrome"
+      description={`Chỉ giao lại khi chắc chắn bài “${extensionRequeueTarget?.contentTitle ?? ""}” chưa xuất hiện trên ${extensionRequeueTarget?.platform ?? "diễn đàn"}. Tiện ích sẽ mở form và đăng lại bài này.`}
+      confirmLabel="Chưa có bài, giao lại"
+      busy={requeueExtension.isPending}
+      danger
+      onClose={() => setExtensionRequeueTarget(null)}
+      onConfirm={async () => {
+        if (!extensionRequeueTarget) return;
+        try { await requeueExtension.mutateAsync(extensionRequeueTarget.id); toast.success("Đã giao lại cho tiện ích"); setExtensionRequeueTarget(null); }
+        catch (error) { toast.error(error instanceof Error ? error.message : "Không giao lại được"); }
+      }}
     />
     <ConfirmDialog
       open={Boolean(browserResumeTarget)}

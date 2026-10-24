@@ -7,6 +7,9 @@ export type AccountConnectionTestResult = components["schemas"]["ConnectionTestC
 export type AccountHealth = components["schemas"]["AccountHealthContractDto"];
 export type AttentionAccount = components["schemas"]["AttentionAccountContractDto"];
 export type MaintenanceRun = components["schemas"]["MaintenanceRunContractDto"];
+export type ExtensionDevice = { id: string; name: string; lastSeenAt?: string | null; createdAt: string };
+export type ExtensionEngine = "xenforo" | "discourse" | "phpbb";
+export type ExtensionDeliveryInput = { enabled: boolean; engine?: ExtensionEngine; targetUrl?: string; autoSubmit?: boolean };
 
 type QueryValue = string | number | boolean | null | undefined;
 export type ListParams = { [key: string]: QueryValue; page?: number; limit?: number; search?: string; status?: string; sourceId?: string; platformId?: string; contentId?: string; variantId?: string; from?: string; to?: string; group?: PlatformGroup; mode?: ConnectorMode; availability?: PlatformAvailability; enabled?: boolean };
@@ -87,7 +90,12 @@ const mapJob = (item: RawJob): PublishJob => {
     ...(typeof metadata.actionUrl === "string" ? { url: metadata.actionUrl } : commonProviderFields),
   };
   const workerCrashUncertain = item.lastErrorCode === "WORKER_CRASH_UNCERTAIN_RESULT";
-  const providerAction = metadata.moderationQueue === true
+  const extensionCode = item.lastErrorCode?.startsWith("EXTENSION_") ? item.lastErrorCode.slice("EXTENSION_".length) : undefined;
+  const providerAction = metadata.extensionQueued === true && item.status === "NEEDS_ACTION"
+    ? extensionCode
+      ? { kind: "EXTENSION_ACTION" as const, reason: extensionCode, ...(item.lastErrorMessage ? { message: item.lastErrorMessage } : {}) }
+      : { kind: "EXTENSION_PENDING" as const }
+    : metadata.moderationQueue === true
     ? { kind: "MODERATION" as const, ...commonProviderFields }
     : metadata.reconciliationRequired === true || workerCrashUncertain
       ? {
@@ -130,7 +138,8 @@ const mapJob = (item: RawJob): PublishJob => {
     startedAt: latest?.startedAt,
     finishedAt: latest?.finishedAt,
     publishedUrl: item.publishedPost?.url,
-    error: item.lastErrorCode || latest?.errorCode
+    // Extension states are explained by needsAction, not shown as a red error.
+    error: (item.lastErrorCode || latest?.errorCode) && !(metadata.extensionQueued === true && item.status === "NEEDS_ACTION")
       ? {
           code: item.lastErrorCode || latest?.errorCode || "PUBLISH_ERROR",
           message: item.lastErrorMessage || latest?.errorMessage || "Xuất bản thất bại",
@@ -157,6 +166,11 @@ export const resourcesService = {
   async oauthStart(provider: string) { return apiRequest<{ authorizationUrl: string }>(`/oauth/${provider}/start`); },
   accountHealth: () => apiRequest<AccountHealth>("/account-health"),
   runAccountCheck: () => apiRequest<MaintenanceRun>("/account-health/check", { method: "POST" }),
+  extensionDevices: () => apiRequest<ExtensionDevice[]>("/extension/devices"),
+  createExtensionDevice: (name: string) => apiRequest<ExtensionDevice & { token: string }>("/extension/devices", { method: "POST", body: { name } }),
+  revokeExtensionDevice: (id: string) => apiRequest<{ revoked: boolean }>(`/extension/devices/${id}`, { method: "DELETE" }),
+  configureExtensionDelivery: (accountId: string, input: ExtensionDeliveryInput) => apiRequest<{ enabled: boolean }>(`/extension/accounts/${accountId}`, { method: "PUT", body: input }),
+  requeueExtensionJob: (id: string) => apiRequest<{ queued: boolean }>(`/extension/jobs/${id}/requeue`, { method: "POST" }),
   async sources(params?: ListParams) { const raw = await apiList<RawSource>("/content-sources"); return result(raw, filterItems(raw.items.map(mapSource), params, (item) => `${item.name} ${item.url ?? ""}`, (item) => item.status)); },
   async createSource(input: { name: string; type: string; url?: string; content?: string }) { if (input.type === "MANUAL") return apiRequest<RawContent>("/contents", { method: "POST", body: { title: input.name, body: input.content, language: "vi" } }).then(mapContent); return apiRequest<RawSource>("/content-sources", { method: "POST", body: { name: input.name, type: input.type, url: input.url } }).then(mapSource); },
   syncSource: (id: string) => apiRequest<{ discovered: number; inserted: number; duplicates: number }>(`/content-sources/${id}/fetch`, { method: "POST" }),

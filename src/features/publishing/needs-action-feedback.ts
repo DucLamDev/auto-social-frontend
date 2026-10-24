@@ -12,8 +12,18 @@ const browserMessages: Record<string, string> = {
   SUBMISSION_CONFIRMATION_REQUIRED: "Adapter đã dừng trước nút đăng cuối cùng. Bật auto-submit và xác nhận quyền automation trong cấu hình trước khi chạy lại.",
 };
 
+const extensionMessages: Record<string, string> = {
+  CAPTCHA_REQUIRED: "Diễn đàn đòi CAPTCHA. Tiện ích đã điền sẵn và mở tab trong Chrome; giải CAPTCHA rồi bấm Đăng, hệ thống tự ghi nhận.",
+  WAITING_USER: "Tiện ích đã điền sẵn bài trong Chrome và chờ bạn kiểm tra, bấm Đăng.",
+  SUBMIT_REJECTED: "Diễn đàn từ chối bài sau khi bấm Đăng. Xem tab diễn đàn, sửa rồi bấm Đăng lại hoặc Giao lại cho tiện ích.",
+  SUBMIT_UNCONFIRMED: "Đã bấm Đăng nhưng chưa thấy bài mới. Kiểm tra diễn đàn: có bài thì bấm Đã đăng, chưa có thì Giao lại cho tiện ích.",
+  RESULT_UNKNOWN: "Tiện ích không báo kết quả. Kiểm tra diễn đàn: có bài thì bấm Đã đăng, chưa có thì Giao lại cho tiện ích.",
+};
+
 export function getNeedsActionMessage(action?: PublishNeedsAction) {
   if (!action) return undefined;
+  if (action.kind === "EXTENSION_PENDING") return "Đang chờ tiện ích Chrome đăng (Chrome cần mở và đã đăng nhập diễn đàn).";
+  if (action.kind === "EXTENSION_ACTION") return (action.reason && extensionMessages[action.reason]) || action.message;
   if (action.kind === "POLICY_BLOCKED") {
     return "Automation bị vô hiệu hóa theo chính sách của nền tảng. Dùng luồng bàn giao an toàn thay vì cố chạy Playwright.";
   }

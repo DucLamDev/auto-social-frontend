@@ -19,7 +19,7 @@ export interface ContentVariant { id: string; contentId: string; platform: strin
 export interface MediaAsset { id: string; contentId?: string | null; variantId?: string | null; type: "IMAGE" | "VIDEO" | "DOCUMENT"; storageKey: string; publicUrl?: string | null; mimeType: string; sizeBytes: number; altText?: string | null; createdAt: string; }
 export interface Campaign { id: string; name: string; content?: Pick<Content, "id" | "title">; status: Status; targetsCount?: number; publishedCount?: number; failedCount?: number; needsActionCount?: number; activeCount?: number; scheduledCount?: number; scheduledAt?: string | null; createdAt: string; }
 export type PublishNeedsAction = {
-  kind: "MODERATION" | "RECONCILIATION" | "BROWSER_LOGIN" | "BROWSER_REVIEW" | "POLICY_BLOCKED";
+  kind: "MODERATION" | "RECONCILIATION" | "BROWSER_LOGIN" | "BROWSER_REVIEW" | "POLICY_BLOCKED" | "EXTENSION_PENDING" | "EXTENSION_ACTION";
   externalPostId?: string;
   url?: string;
   canRetryAfterNotFound?: boolean;

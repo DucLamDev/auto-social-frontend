@@ -11,6 +11,9 @@ danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số k�
   Hiện tài khoản cần kết nối lại, token sắp hết hạn, bài cần thao tác / thất bại / có thể trùng.
 - Nút "Kiểm tra tất cả" trên trang Tài khoản: gia hạn token đến hạn và kiểm tra kết nối ngay.
 - Nút Kết nối Tumblr; công tắc Đăng ngay / Lưu nháp cho tài khoản Blogger và Tumblr.
+- Tiện ích Chrome: khung ghép nối Chrome trên trang Tài khoản (tạo mã, xem Chrome nào đang chạy, thu hồi), nút
+  Tiện ích trên từng dòng diễn đàn để bật đăng bằng Chrome, trạng thái "Chờ tiện ích Chrome" / "Tiện ích cần bạn" và
+  nút Giao lại cho tiện ích trên trang Publishing; Dashboard báo khi có bài chờ mà Chrome chưa chạy.
 - Form Bluesky nhận Handle + App Password (không hết hạn) thay cho Access JWT 2 giờ.
 ### Sửa lỗi
 - Sửa cảnh báo hydration của Dashboard (thẻ div nằm trong thẻ p).

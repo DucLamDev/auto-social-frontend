@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, HeartPulse, KeyRound, Link2, LockKeyhole, LogIn, MonitorPlay, PlugZap, RefreshCw, Settings2, ShieldCheck, ShieldOff, TestTube2 } from "lucide-react";
+import { ExternalLink, HeartPulse, Puzzle, KeyRound, Link2, LockKeyhole, LogIn, MonitorPlay, PlugZap, RefreshCw, Settings2, ShieldCheck, ShieldOff, TestTube2 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/auth/permission-gate";
@@ -26,10 +26,15 @@ import { getPlatformAutomationLabel } from "./automation-status";
 import { getBrowserConnectionErrorMessage, getTagPolicyWarning } from "./connection-test-feedback";
 import { buildCredentialPayload, getCredentialConfig, getInitialCredentialValues, type CredentialValue } from "./credential-config";
 import { isAutoRefreshPlatform, oauthProviderForPlatform, oauthProviderLabel, oauthProviderNote, readOAuthResult } from "./oauth";
+import { canUseExtension, ExtensionDeliveryForm, ExtensionPanel, isExtensionAccount } from "./extension-panel";
 
 interface CredentialTarget { platform: Pick<Platform, "id" | "slug" | "name"> & Partial<Pick<Platform, "connectorKey" | "mode" | "defaultSettings">>; account?: PlatformAccount }
 
 const DESTINATION_PAGE_SIZE = 8;
+
+function hostOf(value: unknown) {
+  try { return new URL(String(value)).host; } catch { return "—"; }
+}
 
 function showSuccessfulConnectionTest(result: AccountConnectionTestResult, message: string) {
   toast.success(message);
@@ -132,6 +137,7 @@ export function AccountsView() {
   const [credentialTarget, setCredentialTarget] = useState<CredentialTarget | null>(null);
   const [browserLoginAccount, setBrowserLoginAccount] = useState<PlatformAccount | null>(null);
   const [browserSessionRevokeTarget, setBrowserSessionRevokeTarget] = useState<PlatformAccount | null>(null);
+  const [extensionTarget, setExtensionTarget] = useState<PlatformAccount | null>(null);
   const query = useAccounts({ limit: 100, platformId: platformId || undefined });
   const platforms = usePlatforms({ limit: 100 });
   const providers = useOAuthProviders();
@@ -243,13 +249,15 @@ export function AccountsView() {
 
   return <div className="animate-enter">
     <PageHeader eyebrow="Destinations" title="Tài khoản" description="Kết nối API hoặc đăng nhập một lần bằng Playwright để hệ thống tự đăng; mật khẩu social không đi qua ứng dụng." action={<PermissionGate allow={["ADMIN"]}><Button onClick={() => setConnectOpen(true)}><Link2 className="size-4" />Kết nối / cấu hình</Button></PermissionGate>} />
+    <ExtensionPanel />
     <Card className="overflow-hidden">
       <Toolbar search={search} onSearch={setSearch} searchPlaceholder="Tìm tài khoản…" filters={<Select aria-label="Lọc nền tảng" className="w-44" value={platformId} onChange={(event) => setPlatformId(event.target.value)}><option value="">Mọi nền tảng</option>{catalogPlatforms.map((platform) => <option value={platform.id} key={platform.id}>{platform.name}</option>)}</Select>} end={<div className="flex gap-1"><PermissionGate allow={["ADMIN"]}><Button variant="ghost" size="sm" loading={checkAll.isPending} onClick={() => void runCheckAll()} title="Gia hạn token đến hạn và kiểm tra kết nối mọi tài khoản ngay"><HeartPulse className="size-4" />Kiểm tra tất cả</Button></PermissionGate><Button variant="ghost" size="sm" onClick={() => void query.refetch()}><RefreshCw className="size-4" />Refresh</Button></div>} />
       {query.isPending ? <div className="p-5"><TableSkeleton /></div> : query.isError ? <ErrorState error={query.error} onRetry={() => void query.refetch()} /> : items.length === 0 ? <EmptyState title="Chưa có tài khoản" description="Kết nối API hoặc thêm điểm đến bàn giao thủ công đầu tiên." action={<PermissionGate allow={["ADMIN"]}><Button onClick={() => setConnectOpen(true)}><PlugZap className="size-4" />Cấu hình ngay</Button></PermissionGate>} /> : <TableWrap><Table><thead><tr><Th>Nền tảng / tài khoản</Th><Th>Trạng thái</Th><Th>Kiểu kết nối</Th><Th>Kiểm tra gần nhất</Th><Th>Đang bật</Th><Th className="text-right">Thao tác</Th></tr></thead><tbody>{items.map((account) => {
         const platform = catalogPlatforms.find((item) => item.id === account.platformId) ?? account.platform;
         const config = getCredentialConfig(platform);
-        const manual = platform?.mode === "MANUAL";
-        const browserAssisted = platform?.mode === "BROWSER_ASSISTED";
+        const viaExtension = isExtensionAccount(account);
+        const manual = platform?.mode === "MANUAL" && !viaExtension;
+        const browserAssisted = platform?.mode === "BROWSER_ASSISTED" && !viaExtension;
         const oauthProvider = oauthProviderForPlatform(account.platform?.slug);
         const canReconnectOAuth = Boolean(oauthProvider && readyProviders.has(oauthProvider));
         const autoRefresh = account.oauthConfigured && isAutoRefreshPlatform(account.platform?.slug);
@@ -259,12 +267,13 @@ export function AccountsView() {
         return <tr key={account.id} className="group hover:bg-slate-50/70">
           <Td><div className="flex items-center gap-3"><PlatformMark slug={account.platform?.slug} name={account.platform?.name ?? "Platform"} /><div><p className="font-bold text-foreground">{account.name}</p><p className="mt-0.5 text-xs text-muted">{account.platform?.name ?? "—"}{account.username ? ` · @${account.username}` : ""}</p></div></div></Td>
           <Td><Badge value={account.status} />{browserAssisted && <p className="mt-1 max-w-40 text-[10px] leading-4 text-muted">{account.status === "CONNECTED" ? "Session sẵn sàng cho worker" : account.browserSessionConfigured ? "Cần làm mới và kiểm tra session" : "Chưa lưu session đăng nhập"}</p>}</Td>
-          <Td><span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">{manual ? <ExternalLink className="size-3.5 text-violet-600" /> : browserAssisted ? <MonitorPlay className="size-3.5 text-indigo-600" /> : account.oauthConfigured ? <Link2 className="size-3.5 text-sky-600" /> : <KeyRound className="size-3.5 text-amber-600" />}{manual ? "Bàn giao thủ công" : browserAssisted ? "Playwright" : account.oauthConfigured ? "OAuth" : account.credential ? "Credential" : "Chưa cấu hình"}</span><p className="mt-1 text-[10px] text-muted">{manual ? "Không lưu API key/token" : browserAssisted ? account.credential ? "Session đã mã hóa" : "Chưa đăng nhập trình duyệt" : autoRefresh ? "Token tự gia hạn" : account.oauthToken?.expiresAt ? `Hết hạn ${fromNow(account.oauthToken.expiresAt)}` : account.credential?.expiresAt ? `Hết hạn ${fromNow(account.credential.expiresAt)}` : account.credential?.status ?? (account.oauthConfigured ? "Token đã mã hóa" : "—")}</p>{draftCapable && <PermissionGate allow={["ADMIN"]} fallback={<p className="mt-1 text-[10px] text-muted">{publishImmediately ? "Đăng ngay" : "Lưu nháp"}</p>}><label className="mt-1.5 flex items-center gap-2 text-[10px] font-semibold text-slate-600"><Switch checked={publishImmediately} disabled={setPublishMode.isPending} label={`Đăng ngay trên ${account.name}`} onChange={(value) => void setPublishMode.mutateAsync({ id: account.id, publishImmediately: value }).then(() => toast.success(value ? "Bài mới sẽ được đăng ngay" : "Bài mới sẽ được lưu nháp để bạn duyệt")).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Có lỗi"))} />{publishImmediately ? "Đăng ngay" : "Lưu nháp"}</label></PermissionGate>}</Td>
+          <Td>{viaExtension ? <><span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600"><Puzzle className="size-3.5 text-indigo-600" />Tiện ích Chrome</span><p className="mt-1 max-w-48 truncate text-[10px] text-muted" title={String(account.settings?.extensionTargetUrl ?? "")}>{hostOf(account.settings?.extensionTargetUrl)} · {account.settings?.extensionAutoSubmit === false ? "chờ bạn bấm Đăng" : "tự bấm Đăng"}</p></> : <><span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">{manual ? <ExternalLink className="size-3.5 text-violet-600" /> : browserAssisted ? <MonitorPlay className="size-3.5 text-indigo-600" /> : account.oauthConfigured ? <Link2 className="size-3.5 text-sky-600" /> : <KeyRound className="size-3.5 text-amber-600" />}{manual ? "Bàn giao thủ công" : browserAssisted ? "Playwright" : account.oauthConfigured ? "OAuth" : account.credential ? "Credential" : "Chưa cấu hình"}</span><p className="mt-1 text-[10px] text-muted">{manual ? "Không lưu API key/token" : browserAssisted ? account.credential ? "Session đã mã hóa" : "Chưa đăng nhập trình duyệt" : autoRefresh ? "Token tự gia hạn" : account.oauthToken?.expiresAt ? `Hết hạn ${fromNow(account.oauthToken.expiresAt)}` : account.credential?.expiresAt ? `Hết hạn ${fromNow(account.credential.expiresAt)}` : account.credential?.status ?? (account.oauthConfigured ? "Token đã mã hóa" : "—")}</p>{draftCapable && <PermissionGate allow={["ADMIN"]} fallback={<p className="mt-1 text-[10px] text-muted">{publishImmediately ? "Đăng ngay" : "Lưu nháp"}</p>}><label className="mt-1.5 flex items-center gap-2 text-[10px] font-semibold text-slate-600"><Switch checked={publishImmediately} disabled={setPublishMode.isPending} label={`Đăng ngay trên ${account.name}`} onChange={(value) => void setPublishMode.mutateAsync({ id: account.id, publishImmediately: value }).then(() => toast.success(value ? "Bài mới sẽ được đăng ngay" : "Bài mới sẽ được lưu nháp để bạn duyệt")).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Có lỗi"))} />{publishImmediately ? "Đăng ngay" : "Lưu nháp"}</label></PermissionGate>}</>}</Td>
           <Td className="text-xs">{fromNow(account.lastCheckedAt)}</Td>
           <Td><PermissionGate allow={["ADMIN"]} fallback={<Badge value={account.enabled ? "ACTIVE" : "INACTIVE"} />}><Switch checked={account.enabled} disabled={update.isPending} label={`Bật ${account.name}`} onChange={(enabled) => void update.mutateAsync({ id: account.id, enabled }).then(() => toast.success("Đã cập nhật")).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Có lỗi"))} /></PermissionGate></Td>
           <Td><div className="flex flex-wrap justify-end gap-1">
             <PermissionGate allow={["ADMIN", "EDITOR"]}>{(!browserAssisted || account.browserSessionConfigured === true) && <Button variant="ghost" size="sm" loading={test.isPending} onClick={() => void testConnection(account)}><TestTube2 className="size-4" />Test</Button>}</PermissionGate>
-            <PermissionGate allow={["ADMIN"]}>{browserAssisted ? <>
+            <PermissionGate allow={["ADMIN"]}>{platform && canUseExtension({ platform }) && <Button variant={viaExtension ? "secondary" : "ghost"} size="sm" onClick={() => setExtensionTarget(account)}><Puzzle className="size-4" />Tiện ích</Button>}</PermissionGate>
+            <PermissionGate allow={["ADMIN"]}>{viaExtension ? null : browserAssisted ? <>
               {config && platform && <Button variant="ghost" size="sm" onClick={() => openCredential({ platform, account })}><Settings2 className="size-4" />Cấu hình</Button>}
               <Button variant="secondary" size="sm" onClick={() => setBrowserLoginAccount(account)}><LogIn className="size-4" />{account.status === "CONNECTED" ? "Đăng nhập lại" : account.browserSessionConfigured ? "Kết nối lại" : "Đăng nhập"}</Button>
               {account.browserSessionConfigured === true && <Button variant="danger" size="sm" onClick={() => setBrowserSessionRevokeTarget(account)}><ShieldOff className="size-4" />Thu hồi session</Button>}
@@ -314,6 +323,9 @@ export function AccountsView() {
       className="max-w-2xl"
     >
       {credentialTarget && <CredentialAccountForm key={`${credentialTarget.platform.slug}:${credentialTarget.account?.id ?? "new"}`} target={credentialTarget} onClose={() => setCredentialTarget(null)} onBrowserLogin={setBrowserLoginAccount} />}
+    </Modal>
+    <Modal open={Boolean(extensionTarget)} onClose={() => setExtensionTarget(null)} title={`Tiện ích Chrome · ${extensionTarget?.name ?? ""}`} description="Đăng bài cho tài khoản này bằng Chrome đã đăng nhập diễn đàn, không cần API key hay mật khẩu." className="max-w-xl">
+      {extensionTarget && <ExtensionDeliveryForm key={extensionTarget.id} account={extensionTarget} onClose={() => setExtensionTarget(null)} />}
     </Modal>
     <BrowserLoginGuide
       account={browserLoginAccount}

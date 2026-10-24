@@ -81,3 +81,13 @@ WordPress, dev.to/Forem, Mastodon and Bluesky base URLs must resolve to public H
 5. Add a stable query key/hook.
 6. Implement loading, empty, error, permission and mutation feedback states.
 7. Run the complete quality suite.
+
+## Chrome extension delivery
+
+Accounts shows `ExtensionPanel` (`GET/POST /extension/devices`, `DELETE /extension/devices/:id`; the pairing token is
+displayed once) and, for every non-`OFFICIAL_API` account, a **Tiện ích** dialog that calls
+`PUT /extension/accounts/:id` with `{ enabled, engine, targetUrl, autoSubmit }`. Accounts with
+`settings.delivery === "extension"` are eligible for automated campaigns even on `MANUAL` platforms. Publish jobs whose
+latest attempt has `extensionQueued` map to `needsAction.kind` `EXTENSION_PENDING` (no `lastErrorCode`) or
+`EXTENSION_ACTION` (`lastErrorCode` `EXTENSION_*`); the latter offers **Đã đăng** and
+`POST /extension/jobs/:id/requeue`. The extension itself talks only to `/extension/agent/*` with its device token.

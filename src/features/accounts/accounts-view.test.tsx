@@ -18,6 +18,8 @@ const mocks = vi.hoisted(() => ({
   oauthStart: vi.fn(),
   runAccountCheck: vi.fn(),
   providers: [] as Array<{ provider: string; platform?: string; status: string }>,
+  devices: [] as Array<{ id: string; name: string; lastSeenAt?: string | null; createdAt: string }>,
+  configureExtensionDelivery: vi.fn(),
   role: "ADMIN",
 }));
 
@@ -42,6 +44,7 @@ vi.mock("@/hooks/use-resources", () => ({
   }),
   useOAuthProviders: () => ({ data: mocks.providers, isPending: false, isError: false, error: null, refetch: vi.fn() }),
   useInvalidate: () => mocks.invalidate,
+  useExtensionDevices: () => ({ data: mocks.devices, isPending: false, isError: false, error: null, refetch: vi.fn() }),
   useResourceMutation: (mutation: (value: never) => Promise<unknown>) => ({
     isPending: false,
     mutateAsync: (value: never) => mutation(value),
@@ -58,6 +61,7 @@ vi.mock("@/services/resources.service", () => ({
     testAccount: mocks.testAccount,
     oauthStart: mocks.oauthStart,
     runAccountCheck: mocks.runAccountCheck,
+    configureExtensionDelivery: mocks.configureExtensionDelivery,
   },
 }));
 
@@ -293,5 +297,44 @@ describe("AccountsView publish mode", () => {
     expect(screen.getByText("Lưu nháp")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("switch", { name: /Đăng ngay trên Blog VPSTTT/ }));
     await waitFor(() => expect(mocks.updateAccountSettings).toHaveBeenCalledWith("b1d6d0c4-6a8e-4b8a-9d8e-1f0a0b0c0d0e", { publishImmediately: true }));
+  });
+});
+
+describe("AccountsView Chrome extension delivery", () => {
+  beforeEach(() => {
+    mocks.platforms = [];
+    mocks.providers = [];
+    mocks.role = "ADMIN";
+    mocks.devices = [{ id: "d1", name: "Chrome văn phòng", lastSeenAt: new Date().toISOString(), createdAt: new Date().toISOString() }];
+    mocks.configureExtensionDelivery.mockReset().mockResolvedValue({ enabled: true });
+    mocks.accounts = [{
+      id: "7a1c2f9e-3b4d-4e5f-8a6b-7c8d9e0f1a2b",
+      platformId: "platform-da",
+      platform: { id: "platform-da", slug: "directadmin-forums", name: "DirectAdmin Forums", mode: "MANUAL", connectorKey: "manual" },
+      name: "DirectAdmin",
+      enabled: true,
+      status: "CONNECTED",
+      settings: {},
+    }];
+  });
+
+  it("shows paired Chromes and switches a manual forum to extension delivery", async () => {
+    render(<AccountsView />);
+    expect(screen.getByText("Chrome văn phòng")).toBeInTheDocument();
+    expect(screen.getByText("1/1 đang chạy")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Tiện ích$/ }));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("Trang tạo chủ đề"), { target: { value: "https://forum.directadmin.com/forums/general.5/post-thread" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Lưu" }));
+    await waitFor(() => expect(mocks.configureExtensionDelivery).toHaveBeenCalledWith("7a1c2f9e-3b4d-4e5f-8a6b-7c8d9e0f1a2b", {
+      enabled: true, engine: "xenforo", targetUrl: "https://forum.directadmin.com/forums/general.5/post-thread", autoSubmit: true,
+    }));
+  });
+
+  it("labels accounts already posting through the extension", () => {
+    mocks.accounts = [{ ...mocks.accounts[0]!, settings: { delivery: "extension", extensionEngine: "xenforo", extensionTargetUrl: "https://voz.vn/f/a.17/post-thread", extensionAutoSubmit: false } }];
+    render(<AccountsView />);
+    expect(screen.getByText("Tiện ích Chrome")).toBeInTheDocument();
+    expect(screen.getByText(/voz\.vn · chờ bạn bấm Đăng/)).toBeInTheDocument();
   });
 });
