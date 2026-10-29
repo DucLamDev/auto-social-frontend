@@ -15,6 +15,11 @@ const mocks = vi.hoisted(() => ({
   testAccount: vi.fn(),
   refetchAccounts: vi.fn(),
   invalidate: vi.fn(),
+  oauthStart: vi.fn(),
+  runAccountCheck: vi.fn(),
+  providers: [] as Array<{ provider: string; platform?: string; status: string }>,
+  devices: [] as Array<{ id: string; name: string; lastSeenAt?: string | null; createdAt: string }>,
+  configureExtensionDelivery: vi.fn(),
   role: "ADMIN",
 }));
 
@@ -37,8 +42,9 @@ vi.mock("@/hooks/use-resources", () => ({
     error: null,
     refetch: vi.fn(),
   }),
-  useOAuthProviders: () => ({ data: [], isPending: false, isError: false, error: null, refetch: vi.fn() }),
+  useOAuthProviders: () => ({ data: mocks.providers, isPending: false, isError: false, error: null, refetch: vi.fn() }),
   useInvalidate: () => mocks.invalidate,
+  useExtensionDevices: () => ({ data: mocks.devices, isPending: false, isError: false, error: null, refetch: vi.fn() }),
   useResourceMutation: (mutation: (value: never) => Promise<unknown>) => ({
     isPending: false,
     mutateAsync: (value: never) => mutation(value),
@@ -53,7 +59,9 @@ vi.mock("@/services/resources.service", () => ({
     updateAccount: mocks.updateAccount,
     revokeBrowserSession: mocks.revokeBrowserSession,
     testAccount: mocks.testAccount,
-    oauthStart: vi.fn(),
+    oauthStart: mocks.oauthStart,
+    runAccountCheck: mocks.runAccountCheck,
+    configureExtensionDelivery: mocks.configureExtensionDelivery,
   },
 }));
 
@@ -217,5 +225,116 @@ describe("AccountsView Playwright flow", () => {
     await waitFor(() => expect(mocks.revokeBrowserSession).toHaveBeenCalledWith(browserAccount.id));
     expect(screen.getByRole("dialog", { name: "Thu hồi session Playwright đã mã hóa" })).toBeInTheDocument();
     expect(mocks.refetchAccounts).not.toHaveBeenCalled();
+  });
+});
+
+const threadsAccount: PlatformAccount = {
+  id: "0d9b1c55-0b47-4c6f-9a55-2c1f0f7c8e11",
+  platformId: "platform-threads",
+  platform: { id: "platform-threads", slug: "threads", name: "Threads", mode: "OFFICIAL_API", connectorKey: "threads" },
+  name: "@vpsttt",
+  enabled: true,
+  status: "RECONNECT_REQUIRED",
+  oauthConfigured: true,
+  oauthToken: { expiresAt: "2026-12-20T00:00:00.000Z" },
+};
+
+describe("AccountsView Meta OAuth", () => {
+  beforeEach(() => {
+    mocks.accounts = [threadsAccount];
+    mocks.platforms = [];
+    mocks.providers = [{ provider: "threads", platform: "threads", status: "READY" }, { provider: "instagram", platform: "instagram", status: "CREDENTIAL_REQUIRED" }];
+    mocks.oauthStart.mockReset().mockRejectedValue(new Error("stop before redirect"));
+    mocks.runAccountCheck.mockReset();
+    mocks.role = "ADMIN";
+    window.history.replaceState({}, "", "/accounts");
+  });
+
+  it("reconnects an OAuth account in one click and labels the auto-renewed token", async () => {
+    render(<AccountsView />);
+    expect(screen.getByText("Token tự gia hạn")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Kết nối lại/ }));
+    await waitFor(() => expect(mocks.oauthStart).toHaveBeenCalledWith("threads"));
+  });
+
+  it("offers a Kết nối button only for providers the backend has configured", () => {
+    render(<AccountsView />);
+    fireEvent.click(screen.getByRole("button", { name: /Kết nối \/ cấu hình/ }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getAllByRole("button", { name: /^Kết nối$/ })).toHaveLength(1);
+    expect(within(dialog).getByText("Backend chưa cấu hình App ID/Secret")).toBeInTheDocument();
+  });
+
+  it("runs the account check on demand", async () => {
+    mocks.runAccountCheck.mockResolvedValue({ tokens: { refreshed: 1, failed: 0, skipped: 0 }, connections: { checked: 1, failed: 0 } });
+    render(<AccountsView />);
+    fireEvent.click(screen.getByRole("button", { name: /Kiểm tra tất cả/ }));
+    await waitFor(() => expect(mocks.runAccountCheck).toHaveBeenCalled());
+  });
+});
+
+describe("AccountsView publish mode", () => {
+  beforeEach(() => {
+    mocks.platforms = [];
+    mocks.providers = [];
+    mocks.updateAccountSettings.mockReset().mockResolvedValue({});
+    mocks.role = "ADMIN";
+    mocks.accounts = [{
+      id: "b1d6d0c4-6a8e-4b8a-9d8e-1f0a0b0c0d0e",
+      platformId: "platform-blogger",
+      platform: { id: "platform-blogger", slug: "blogger", name: "Blogger", mode: "OFFICIAL_API", connectorKey: "blogger" },
+      name: "Blog VPSTTT",
+      enabled: true,
+      status: "CONNECTED",
+      settings: { publishImmediately: false },
+      oauthConfigured: true,
+      oauthToken: { expiresAt: null },
+    }];
+  });
+
+  it("switches a Blogger account from drafts to immediate publishing", async () => {
+    render(<AccountsView />);
+    expect(screen.getByText("Lưu nháp")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("switch", { name: /Đăng ngay trên Blog VPSTTT/ }));
+    await waitFor(() => expect(mocks.updateAccountSettings).toHaveBeenCalledWith("b1d6d0c4-6a8e-4b8a-9d8e-1f0a0b0c0d0e", { publishImmediately: true }));
+  });
+});
+
+describe("AccountsView Chrome extension delivery", () => {
+  beforeEach(() => {
+    mocks.platforms = [];
+    mocks.providers = [];
+    mocks.role = "ADMIN";
+    mocks.devices = [{ id: "d1", name: "Chrome văn phòng", lastSeenAt: new Date().toISOString(), createdAt: new Date().toISOString() }];
+    mocks.configureExtensionDelivery.mockReset().mockResolvedValue({ enabled: true });
+    mocks.accounts = [{
+      id: "7a1c2f9e-3b4d-4e5f-8a6b-7c8d9e0f1a2b",
+      platformId: "platform-da",
+      platform: { id: "platform-da", slug: "directadmin-forums", name: "DirectAdmin Forums", mode: "MANUAL", connectorKey: "manual" },
+      name: "DirectAdmin",
+      enabled: true,
+      status: "CONNECTED",
+      settings: {},
+    }];
+  });
+
+  it("shows paired Chromes and switches a manual forum to extension delivery", async () => {
+    render(<AccountsView />);
+    expect(screen.getByText("Chrome văn phòng")).toBeInTheDocument();
+    expect(screen.getByText("1/1 đang chạy")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Tiện ích$/ }));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("Trang tạo chủ đề"), { target: { value: "https://forum.directadmin.com/forums/general.5/post-thread" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Lưu" }));
+    await waitFor(() => expect(mocks.configureExtensionDelivery).toHaveBeenCalledWith("7a1c2f9e-3b4d-4e5f-8a6b-7c8d9e0f1a2b", {
+      enabled: true, engine: "xenforo", targetUrl: "https://forum.directadmin.com/forums/general.5/post-thread", autoSubmit: true,
+    }));
+  });
+
+  it("labels accounts already posting through the extension", () => {
+    mocks.accounts = [{ ...mocks.accounts[0]!, settings: { delivery: "extension", extensionEngine: "xenforo", extensionTargetUrl: "https://voz.vn/f/a.17/post-thread", extensionAutoSubmit: false } }];
+    render(<AccountsView />);
+    expect(screen.getByText("Tiện ích Chrome")).toBeInTheDocument();
+    expect(screen.getByText(/voz\.vn · chờ bạn bấm Đăng/)).toBeInTheDocument();
   });
 });

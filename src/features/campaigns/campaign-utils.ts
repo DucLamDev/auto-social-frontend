@@ -4,6 +4,8 @@ export const MAX_AUTOMATION_PLATFORMS = 12;
 
 export function getAutomationAccountBlocker(account: PlatformAccount): string | undefined {
   if (!account.enabled || account.status === "DISABLED") return "Tài khoản đang tắt.";
+  // The Chrome extension posts for any forum; it only needs the account to be connected.
+  if (account.settings?.delivery === "extension") return account.status === "CONNECTED" ? undefined : "Tài khoản chưa kết nối.";
   if (account.platform?.mode === "MANUAL") {
     return account.platform.connectorStatus === "API_REVIEW_REQUIRED"
       ? "Chưa có connector API đã duyệt cho nền tảng này."
@@ -27,7 +29,7 @@ export function getAutomationAccountBlocker(account: PlatformAccount): string | 
 
 export function isAutomationAccountEligible(account: PlatformAccount) {
   const supportedMode = ["OFFICIAL_API", "COMPATIBLE_API", "BROWSER_ASSISTED"]
-    .includes(account.platform?.mode ?? "");
+    .includes(account.platform?.mode ?? "") || account.settings?.delivery === "extension";
   return supportedMode && !getAutomationAccountBlocker(account);
 }
 

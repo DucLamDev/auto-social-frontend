@@ -51,7 +51,11 @@ Never log or persist the refresh token in JavaScript.
 
 ## OAuth
 
-Accounts reads `GET /oauth/providers`, enables only providers reported as `READY`, calls `GET /oauth/:provider/start`, and navigates to its authorization URL. The backend owns state, expiry, token exchange, encryption and callback redirect.
+Accounts reads `GET /oauth/providers`, enables only providers reported as `READY` (LinkedIn, Google/Blogger, Instagram, Threads, Tumblr when the backend has their app settings), calls `GET /oauth/:provider/start`, and navigates to its authorization URL. The backend owns state, expiry, token exchange, encryption, automatic refresh and callback redirect. The callback returns to `/accounts?oauth=success&provider=…&accounts=N` or `/accounts?oauth=error&provider=…&reason=<code>`; `features/accounts/oauth.ts` turns both into a toast and clears the query. OAuth accounts get a per-row **Kết nối lại** button that restarts the provider flow. Blogger and Tumblr rows have a **Đăng ngay / Lưu nháp** switch that sends `PUT /platform-accounts/:id/settings` with `{ publishImmediately }` (API accounts accept only `publishImmediately`, `rateLimit`, `rateWindowSeconds` there).
+
+## Account health
+
+`GET /account-health` (`useAccountHealth`, polled every `max(3 × pollInterval, 30s)`) returns accounts needing reconnection, tokens expiring within 7 days that the system cannot renew, and counts of `NEEDS_ACTION`/`FAILED`/`POSSIBLE_DUPLICATE`/`RETRY` jobs. It feeds the Dashboard **Cần xử lý** panel and the top bar bell badge. ADMIN can run `POST /account-health/check` (**Kiểm tra tất cả** on Accounts) to refresh due Meta tokens and test every connection immediately.
 
 OAuth and credential connectors are deliberately separate flows. WordPress, dev.to, Discord, Bluesky, Mastodon, Instagram, Threads and X use the generic platform-account contract:
 
@@ -77,3 +81,13 @@ WordPress, dev.to/Forem, Mastodon and Bluesky base URLs must resolve to public H
 5. Add a stable query key/hook.
 6. Implement loading, empty, error, permission and mutation feedback states.
 7. Run the complete quality suite.
+
+## Chrome extension delivery
+
+Accounts shows `ExtensionPanel` (`GET/POST /extension/devices`, `DELETE /extension/devices/:id`; the pairing token is
+displayed once) and, for every non-`OFFICIAL_API` account, a **Tiện ích** dialog that calls
+`PUT /extension/accounts/:id` with `{ enabled, engine, targetUrl, autoSubmit }`. Accounts with
+`settings.delivery === "extension"` are eligible for automated campaigns even on `MANUAL` platforms. Publish jobs whose
+latest attempt has `extensionQueued` map to `needsAction.kind` `EXTENSION_PENDING` (no `lastErrorCode`) or
+`EXTENSION_ACTION` (`lastErrorCode` `EXTENSION_*`); the latter offers **Đã đăng** and
+`POST /extension/jobs/:id/requeue`. The extension itself talks only to `/extension/agent/*` with its device token.

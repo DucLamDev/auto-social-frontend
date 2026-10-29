@@ -456,6 +456,28 @@ describe("resourcesService contract adapters", () => {
     expect(payload.content).toContain("Alt text: VPS dashboard");
   });
 
+  it("separates jobs waiting for the Chrome extension from ones that need the operator", async () => {
+    const job = (lastErrorCode: string | null, lastErrorMessage: string | null) => ({
+      id: `job-${lastErrorCode ?? "pending"}`,
+      status: "NEEDS_ACTION",
+      attemptCount: 1,
+      maxAttempts: 3,
+      lastErrorCode,
+      lastErrorMessage,
+      platformAccount: { name: "Voz", platform: { slug: "voz-forums", name: "Voz Forums" } },
+      target: { campaign: { id: "c", name: "C" }, contentVariant: { id: "v", title: "T" } },
+      attempts: [{ id: "a", attemptNumber: 1, status: "SUCCEEDED", startedAt: "2026-10-24T00:00:00.000Z", responseMetadata: { extensionQueued: true } }],
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(apiResponse([job(null, null), job("EXTENSION_CAPTCHA_REQUIRED", "Hoàn thành CAPTCHA")])));
+
+    const response = await resourcesService.publishJobs();
+
+    expect(response.items[0]?.needsAction).toEqual({ kind: "EXTENSION_PENDING" });
+    expect(response.items[0]?.error).toBeNull();
+    expect(response.items[1]?.needsAction).toEqual({ kind: "EXTENSION_ACTION", reason: "CAPTCHA_REQUIRED", message: "Hoàn thành CAPTCHA" });
+    expect(response.items[1]?.error).toBeNull();
+  });
+
   it("distinguishes an already-submitted moderation job from manual publishing", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(apiResponse([{
       id: "job-1",
