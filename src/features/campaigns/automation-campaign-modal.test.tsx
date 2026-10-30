@@ -47,6 +47,16 @@ const accounts: PlatformAccount[] = [
 ];
 
 describe("AutomationCampaignModal", () => {
+  it("requires Pixelfed media before generating or submitting the campaign", async () => {
+    const onSubmit = vi.fn();
+    const pixelfed: PlatformAccount = { ...accounts[0]!, id: "pixelfed", name: "Pixelfed", settings: { delivery: "extension", extensionEngine: "pixelfed", extensionAutoSubmit: true } };
+    render(<AutomationCampaignModal open accounts={[pixelfed]} aiProviders={aiProviders} onClose={vi.fn()} onSubmit={onSubmit} />);
+    fireEvent.change(screen.getByLabelText("Mô tả bài đăng"), { target: { value: "Chia sẻ thông tin sản phẩm theo nội dung được cung cấp." } });
+    fireEvent.click(screen.getByRole("button", { name: /Tạo bằng AI & đăng ngay/ }));
+    await screen.findByText(/Pixelfed cần ảnh đính kèm tối đa 20 MiB/);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it("keeps an automation failure visible so the user can switch provider and retry", () => {
     render(<AutomationCampaignModal
       open
@@ -86,7 +96,6 @@ describe("AutomationCampaignModal", () => {
     fireEvent.change(screen.getByLabelText("Mô tả bài đăng"), {
       target: { value: "Quảng bá gói VPS tốc độ cao cho lập trình viên với ưu đãi tháng đầu." },
     });
-    fireEvent.click(screen.getByRole("checkbox", { name: /Tôi xác nhận cho phép tự động đăng bài thật/ }));
     fireEvent.click(screen.getByRole("button", { name: /Tạo bằng AI & đăng ngay/ }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
@@ -99,7 +108,7 @@ describe("AutomationCampaignModal", () => {
     }));
   });
 
-  it("requires explicit consent before posting externally", async () => {
+  it("uses the named publish button as the single submission action", async () => {
     const onSubmit = vi.fn();
     render(<AutomationCampaignModal
       open
@@ -115,8 +124,8 @@ describe("AutomationCampaignModal", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /Tạo bằng AI & đăng ngay/ }));
 
-    expect(await screen.findByText("Bạn cần xác nhận trước khi hệ thống đăng bài thật.")).toBeInTheDocument();
-    expect(onSubmit).not.toHaveBeenCalled();
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole("checkbox", { name: /Tôi xác nhận/ })).not.toBeInTheDocument();
   });
 
   it("allows the user to select another configured provider", async () => {
@@ -137,7 +146,6 @@ describe("AutomationCampaignModal", () => {
     fireEvent.change(screen.getByLabelText("Mô tả bài đăng"), {
       target: { value: "Mô tả chiến dịch đủ chi tiết để tạo nội dung tự động cho các kênh." },
     });
-    fireEvent.click(screen.getByRole("checkbox", { name: /Tôi xác nhận cho phép tự động đăng bài thật/ }));
     fireEvent.click(screen.getByRole("button", { name: /Tạo bằng AI & đăng ngay/ }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
@@ -202,7 +210,6 @@ describe("AutomationCampaignModal", () => {
     fireEvent.change(screen.getByLabelText("Mô tả bài đăng"), {
       target: { value: "Quảng bá VPS cho lập trình viên bằng hình ảnh dashboard thực tế." },
     });
-    fireEvent.click(screen.getByRole("checkbox", { name: /Tôi xác nhận cho phép tự động đăng bài thật/ }));
     fireEvent.click(screen.getByRole("button", { name: /Tạo bằng AI & đăng ngay/ }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
@@ -213,8 +220,8 @@ describe("AutomationCampaignModal", () => {
     }));
   });
 
-  it("preselects and enforces at most 12 distinct destination platforms", async () => {
-    const destinations: PlatformAccount[] = Array.from({ length: 13 }, (_, index) => ({
+  it("preselects and enforces at most 50 distinct destination platforms", async () => {
+    const destinations: PlatformAccount[] = Array.from({ length: 51 }, (_, index) => ({
       id: `account-${index}`,
       platformId: `platform-${index}`,
       platform: { id: `platform-${index}`, name: `Platform ${index}`, slug: `platform-${index}`, mode: "OFFICIAL_API" },
@@ -230,11 +237,11 @@ describe("AutomationCampaignModal", () => {
       onSubmit={vi.fn()}
     />);
 
-    expect(screen.getByText("Đã chọn 12/12 nền tảng; có thể chọn nhiều tài khoản cùng nền tảng.")).toBeInTheDocument();
-    const thirteenth = screen.getByRole("checkbox", { name: /Destination 12/ });
+    expect(screen.getByText("Đã chọn 50/50 nền tảng; có thể chọn nhiều tài khoản cùng nền tảng.")).toBeInTheDocument();
+    const thirteenth = screen.getByRole("checkbox", { name: /Destination 50/ });
     expect(thirteenth).not.toBeChecked();
     fireEvent.click(thirteenth);
     expect(thirteenth).not.toBeChecked();
-    expect(await screen.findByText(/Tối đa 12 nền tảng khác nhau mỗi lần/)).toBeInTheDocument();
+    expect(await screen.findByText(/Tối đa 50 nền tảng khác nhau mỗi lần/)).toBeInTheDocument();
   });
 });

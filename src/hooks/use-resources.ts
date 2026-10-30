@@ -14,6 +14,7 @@ export const resourceKeys = {
   variants: (id: string) => ["variants", id] as const,
   campaigns: (params?: ListParams) => ["campaigns", params ?? {}] as const,
   jobs: (params?: ListParams) => ["publish-jobs", params ?? {}] as const,
+  publishedPosts: (params?: ListParams) => ["published-posts", params ?? {}] as const,
   jobMetrics: (todayFrom: string, todayTo: string) => ["publish-job-metrics", todayFrom, todayTo] as const,
   prompts: ["prompts"] as const, logs: (params?: ListParams) => ["logs", params ?? {}] as const, settings: ["settings"] as const,
   publishLogs: (params?: ListParams) => ["publish-logs", params ?? {}] as const,
@@ -29,6 +30,7 @@ export function useOAuthProviders() { return useQuery({ queryKey: resourceKeys.o
 /** Polled app-wide (top bar badge), so it refreshes less often than the job list. */
 export function useAccountHealth() { return useQuery({ queryKey: resourceKeys.accountHealth, queryFn: resourcesService.accountHealth, refetchInterval: Math.max(env.pollIntervalMs * 3, 30_000) }); }
 export function useExtensionDevices() { return useQuery({ queryKey: resourceKeys.extensionDevices, queryFn: resourcesService.extensionDevices, refetchInterval: 30_000 }); }
+export function useExtensionLoginChecks() { return useQuery({ queryKey: ["extension-login-checks"], queryFn: resourcesService.extensionLoginChecks, refetchInterval: 5_000 }); }
 export function useSources(params?: ListParams) { return useQuery({ queryKey: resourceKeys.sources(params), queryFn: () => resourcesService.sources(params) }); }
 export function useSourceArticles(params?: ListParams) { return useQuery({ queryKey: resourceKeys.sourceArticles(params), queryFn: () => resourcesService.sourceArticles(params) }); }
 export function useContents(params?: ListParams) { return useQuery({ queryKey: resourceKeys.contents(params), queryFn: () => resourcesService.contents(params) }); }
@@ -36,6 +38,8 @@ export function useContent(id: string) { return useQuery({ queryKey: resourceKey
 export function useVariants(id: string) { return useQuery({ queryKey: resourceKeys.variants(id), queryFn: () => resourcesService.variants(id), enabled: Boolean(id), refetchInterval: (query) => query.state.data?.items.some((v) => v.status === "AI_GENERATING") ? 3_000 : false }); }
 export function useCampaigns(params?: ListParams) { return useQuery({ queryKey: resourceKeys.campaigns(params), queryFn: () => resourcesService.campaigns(params) }); }
 export function usePublishJobs(params?: ListParams, polling = true) { return useQuery({ queryKey: resourceKeys.jobs(params), queryFn: () => resourcesService.publishJobs(params), refetchInterval: polling ? env.pollIntervalMs : false }); }
+export function usePublishedPosts(params?: ListParams) { return useQuery({ queryKey: resourceKeys.publishedPosts(params), queryFn: () => resourcesService.publishedPosts(params), refetchInterval: env.pollIntervalMs }); }
+export function usePublishJobContent(id: string) { return useQuery({ queryKey: ["publish-jobs", "content", id], queryFn: () => resourcesService.publishJobContent(id), enabled: Boolean(id) }); }
 export function usePublishJobMetrics(todayFrom: string, todayTo: string) { return useQuery({ queryKey: resourceKeys.jobMetrics(todayFrom, todayTo), queryFn: () => resourcesService.publishJobMetrics(todayFrom, todayTo), refetchInterval: env.pollIntervalMs }); }
 export function usePrompts() { return useQuery({ queryKey: resourceKeys.prompts, queryFn: () => resourcesService.prompts() }); }
 export function useLogs(params?: ListParams, enabled = true) { return useQuery({ queryKey: resourceKeys.publishLogs(params), queryFn: () => resourcesService.publishLogs(params), enabled }); }
@@ -43,5 +47,6 @@ export function useAudit(params?: ListParams, enabled = true) { return useQuery(
 export const usePublishLogs = useLogs;
 export function useMedia(params?: ListParams) { return useQuery({ queryKey: resourceKeys.media(params), queryFn: () => resourcesService.media(params) }); }
 export function useSettings() { return useQuery({ queryKey: resourceKeys.settings, queryFn: resourcesService.settings }); }
+export function useGeminiKeys() { return useQuery({ queryKey: ["gemini-keys"], queryFn: resourcesService.geminiKeys, refetchInterval: 30_000 }); }
 export function useInvalidate() { const client = useQueryClient(); return (...keys: string[]) => Promise.all(keys.map((key) => client.invalidateQueries({ queryKey: [key] }))); }
 export function useResourceMutation<TVariables, TResult>(mutationFn: (variables: TVariables) => Promise<TResult>, invalidate: string[]) { const client = useQueryClient(); return useMutation({ mutationFn, onSuccess: async () => { await Promise.all(invalidate.map((key) => client.invalidateQueries({ queryKey: [key] }))); } }); }

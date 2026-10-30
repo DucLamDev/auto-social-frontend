@@ -14,6 +14,13 @@ const styles: Record<string, string> = {
 };
 const labels: Record<string, string> = { PUBLISHED: "Đã đăng", CONNECTED: "Đã kết nối", ACTIVE: "Hoạt động", READY: "Sẵn sàng", SUCCESS: "Thành công", QUEUED: "Trong hàng đợi", SCHEDULED: "Đã lên lịch", GENERATED: "Đã tạo", APPROVED: "Đã duyệt", PUBLISHING: "Đang đăng", PROCESSING: "Đang xử lý", AI_GENERATING: "AI đang tạo", RETRY: "Đang thử lại", WAITING_REVIEW: "Chờ duyệt", NEEDS_ACTION: "Cần thao tác", POSSIBLE_DUPLICATE: "Có thể trùng", FAILED: "Thất bại", ERROR: "Có lỗi", EXPIRED: "Hết hạn", RECONNECT_REQUIRED: "Cần kết nối lại", DRAFT: "Bản nháp", INACTIVE: "Tắt", DISABLED: "Đã tắt", DISCONNECTED: "Chưa kết nối", PAUSED: "Tạm dừng", API_REVIEW_REQUIRED: "Cần API review", CREDENTIAL_REQUIRED: "Cần thông tin xác thực", API_RESEARCH_REQUIRED: "Cần nghiên cứu API", MANUAL_ONLY: "Chỉ đăng thủ công", RUNNING: "Đang chạy", COMPLETED: "Hoàn tất", PARTIAL: "Hoàn tất một phần", CANCELLED: "Đã hủy", ARCHIVED: "Lưu trữ", REJECTED: "Từ chối", DISCOVERED: "Đã phát hiện", FETCHED: "Đã thu thập", DUPLICATE: "Trùng lặp", WAITING_EXTENSION: "Chờ tiện ích", EXTENSION_OFFLINE: "Chrome chưa chạy" };
 
+styles.AUTHENTICATED = styles.CONNECTED!;
+styles.MODERATION_PENDING = styles.WAITING_REVIEW!;
+labels.MODERATION_PENDING = "Đã gửi · chờ duyệt";
+labels.AUTHENTICATED = "Đã đăng nhập";
+styles.CHROME_BOUND = styles.WAITING_EXTENSION!;
+labels.CHROME_BOUND = "Đã gán Chrome";
+
 export function Badge({ value, className, dot = true }: { value: Status | string; className?: string; dot?: boolean }) {
   return <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ring-inset", styles[value] ?? "bg-slate-100 text-slate-600 ring-slate-500/10", className)}>{dot && <span className="size-1.5 rounded-full bg-current opacity-70" />}{labels[value] ?? value.replaceAll("_", " ")}</span>;
 }

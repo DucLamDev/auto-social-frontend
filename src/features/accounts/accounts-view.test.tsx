@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/services/api/errors";
 import type { Platform, PlatformAccount } from "@/types/domain";
+import type { ExtensionLoginCheckRow } from "@/services/resources.service";
 import { AccountsView } from "./accounts-view";
 
 const mocks = vi.hoisted(() => ({
@@ -13,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   updateAccount: vi.fn(),
   revokeBrowserSession: vi.fn(),
   testAccount: vi.fn(),
+  queueExtensionLoginChecks: vi.fn(),
+  loginChecks: [] as ExtensionLoginCheckRow[],
   refetchAccounts: vi.fn(),
   invalidate: vi.fn(),
   oauthStart: vi.fn(),
@@ -45,6 +48,7 @@ vi.mock("@/hooks/use-resources", () => ({
   useOAuthProviders: () => ({ data: mocks.providers, isPending: false, isError: false, error: null, refetch: vi.fn() }),
   useInvalidate: () => mocks.invalidate,
   useExtensionDevices: () => ({ data: mocks.devices, isPending: false, isError: false, error: null, refetch: vi.fn() }),
+  useExtensionLoginChecks: () => ({ data: mocks.loginChecks, isError: false }),
   useResourceMutation: (mutation: (value: never) => Promise<unknown>) => ({
     isPending: false,
     mutateAsync: (value: never) => mutation(value),
@@ -59,6 +63,7 @@ vi.mock("@/services/resources.service", () => ({
     updateAccount: mocks.updateAccount,
     revokeBrowserSession: mocks.revokeBrowserSession,
     testAccount: mocks.testAccount,
+    queueExtensionLoginChecks: mocks.queueExtensionLoginChecks,
     oauthStart: mocks.oauthStart,
     runAccountCheck: mocks.runAccountCheck,
     configureExtensionDelivery: mocks.configureExtensionDelivery,
@@ -105,6 +110,76 @@ const browserAccount: PlatformAccount = {
   },
   credential: { status: "ACTIVE" },
 };
+
+beforeEach(() => {
+  mocks.loginChecks = [];
+  mocks.queueExtensionLoginChecks.mockReset().mockResolvedValue({ queued: 1, batchId: "batch" });
+});
+
+describe("selected Chrome connections", () => {
+  const account: PlatformAccount = { ...browserAccount, id: "selected", name: "Selected VPSTTT", status: "CONNECTED", settings: {
+    extensionImport: { selected: true }, extensionSession: { deviceId: "chrome", provider: "google", loginUsername: "owner@example.test" },
+    delivery: "extension", extensionTargetUrl: "https://forum.test/new-topic", extensionAutoSubmit: true,
+  } };
+  beforeEach(() => {
+    mocks.role = "ADMIN";
+    mocks.platforms = [vozPlatform]; mocks.devices = []; mocks.providers = [];
+    mocks.accounts = [account, { ...browserAccount, id: "old", name: "Old import", settings: { extensionImport: { selected: false } } }];
+    mocks.loginChecks = [{ id: account.id, name: account.name, platform: "Forum", configured: true, issues: [],
+      check: { id: "check", status: "AUTHENTICATED", message: "Session verified" } }];
+    mocks.testAccount.mockReset(); mocks.runAccountCheck.mockReset();
+  });
+  it("shows the selected scope and sends Test to Chrome without testing API credentials", async () => {
+    render(<AccountsView />);
+    const row = screen.getByRole("row", { name: /Selected VPSTTT/ });
+    expect(within(row).getByText("Đã kết nối")).toBeInTheDocument();
+    expect(within(row).getByText("Tiện ích Chrome")).toBeInTheDocument();
+    expect(screen.queryByText("Old import")).not.toBeInTheDocument();
+    fireEvent.click(within(row).getByRole("button", { name: "Test" }));
+    await waitFor(() => expect(mocks.queueExtensionLoginChecks).toHaveBeenCalledWith(["selected"], true));
+    expect(mocks.testAccount).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Kiểm tra tất cả" }));
+    await waitFor(() => expect(mocks.queueExtensionLoginChecks).toHaveBeenCalledTimes(2));
+    expect(mocks.runAccountCheck).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("Phạm vi tài khoản"), { target: { value: "all" } });
+    expect(screen.getByText("Old import")).toBeInTheDocument();
+  });
+  it("uses the failed browser check even when the old API status is connected", () => {
+    mocks.loginChecks[0]!.check = { id: "check", status: "NEEDS_ACTION", message: "Wrong Chrome account" };
+    render(<AccountsView />);
+    const row = screen.getByRole("row", { name: /Selected VPSTTT/ });
+    expect(within(row).queryByText("Đã kết nối")).not.toBeInTheDocument();
+    expect(within(row).getByText("Wrong Chrome account")).toBeInTheDocument();
+  });
+  it("does not describe login-only Chrome bindings as automatic publishing", () => {
+    mocks.accounts = [{ ...account, settings: { extensionImport: { selected: true }, extensionSession: { deviceId: "chrome" } } }];
+    render(<AccountsView />);
+    const row = screen.getByRole("row", { name: /Selected VPSTTT/ });
+    expect(within(row).getByText("Đã đăng nhập")).toBeInTheDocument();
+    expect(within(row).getByText(/chưa có luồng đăng tự động/)).toBeInTheDocument();
+    expect(within(row).queryByText("Đã kết nối")).not.toBeInTheDocument();
+  });
+  it("opens manual connection instructions and checks the existing session", async () => {
+    mocks.loginChecks[0]!.check = { id: "check", status: "NEEDS_ACTION", message: "Chrome đang đăng nhập tài khoản khác." };
+    render(<AccountsView />);
+    fireEvent.click(screen.getByRole("button", { name: "Hướng dẫn kết nối" }));
+    const dialog = screen.getByRole("dialog", { name: "Kết nối Selected VPSTTT" });
+    expect(within(dialog).getByText(/Kiểm tra username và link hồ sơ/)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Tôi đã đăng nhập · Kiểm tra" }));
+    await waitFor(() => expect(mocks.queueExtensionLoginChecks).toHaveBeenCalledWith(["selected"], true));
+    expect(mocks.testAccount).not.toHaveBeenCalled();
+  });
+  it("keeps restricted accounts in the needs-action filter despite verified login", () => {
+    mocks.accounts = [{ ...account, settings: { ...account.settings, extensionSetup: { status: "ACCESS_RESTRICTED", message: "Nền tảng trả 403: không có quyền tạo bài." } } }];
+    render(<AccountsView />);
+    fireEvent.change(screen.getByLabelText("Lọc trạng thái kết nối"), { target: { value: "needs_action" } });
+    const row = screen.getByRole("row", { name: /Selected VPSTTT/ });
+    expect(within(row).getByText("Cần thao tác")).toBeInTheDocument();
+    expect(within(row).getByText(/Nền tảng trả 403/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Lọc trạng thái kết nối"), { target: { value: "connected" } });
+    expect(screen.queryByRole("row", { name: /Selected VPSTTT/ })).not.toBeInTheDocument();
+  });
+});
 
 describe("AccountsView Playwright flow", () => {
   beforeEach(() => {
@@ -301,12 +376,34 @@ describe("AccountsView publish mode", () => {
 });
 
 describe("AccountsView Chrome extension delivery", () => {
+  const nginxPlatform: Platform = {
+    ...vozPlatform,
+    id: "platform-nginx",
+    slug: "nginx-community",
+    name: "NGINX Community",
+    mode: "COMPATIBLE_API",
+    connectorKey: "discourse",
+    defaultSettings: { baseUrl: "https://community.nginx.org", apiUsername: "forum-user", categoryId: 23 },
+  };
+  const nginxAccount: PlatformAccount = {
+    id: "account-nginx",
+    platformId: nginxPlatform.id,
+    platform: nginxPlatform,
+    name: "NGINX Chrome",
+    username: "forum-user",
+    enabled: true,
+    status: "RECONNECT_REQUIRED",
+    settings: nginxPlatform.defaultSettings,
+  };
+
   beforeEach(() => {
     mocks.platforms = [];
     mocks.providers = [];
     mocks.role = "ADMIN";
     mocks.devices = [{ id: "d1", name: "Chrome văn phòng", lastSeenAt: new Date().toISOString(), createdAt: new Date().toISOString() }];
     mocks.configureExtensionDelivery.mockReset().mockResolvedValue({ enabled: true });
+    mocks.createAccount.mockReset().mockResolvedValue(nginxAccount);
+    mocks.testAccount.mockReset();
     mocks.accounts = [{
       id: "7a1c2f9e-3b4d-4e5f-8a6b-7c8d9e0f1a2b",
       platformId: "platform-da",
@@ -316,6 +413,127 @@ describe("AccountsView Chrome extension delivery", () => {
       status: "CONNECTED",
       settings: {},
     }];
+  });
+
+  it("creates a Discourse account without API credentials and opens Chrome configuration", async () => {
+    mocks.platforms = [nginxPlatform];
+    render(<AccountsView />);
+    fireEvent.click(screen.getByRole("button", { name: "Kết nối / cấu hình" }));
+    fireEvent.click(screen.getByRole("button", { name: /NGINX Community/ }));
+    const createDialog = screen.getByRole("dialog", { name: "Thêm NGINX Community" });
+    fireEvent.change(within(createDialog).getByLabelText("Tên hiển thị"), { target: { value: "NGINX Chrome" } });
+    fireEvent.change(within(createDialog).getByLabelText("Username (tuỳ chọn)"), { target: { value: "forum-user" } });
+    // Switching methods must not send any API key that was entered beforehand.
+    fireEvent.change(within(createDialog).getByLabelText("API Key"), { target: { value: "unused-api-key" } });
+    fireEvent.change(within(createDialog).getByLabelText("Phương thức đăng"), { target: { value: "extension" } });
+    expect(within(createDialog).queryByLabelText("API Key")).not.toBeInTheDocument();
+    expect(within(createDialog).queryByLabelText("API Username")).not.toBeInTheDocument();
+    fireEvent.click(within(createDialog).getByRole("button", { name: "Tạo & cấu hình tiện ích" }));
+
+    const extensionDialog = await screen.findByRole("dialog", { name: "Tiện ích Chrome · NGINX Chrome" });
+    expect(mocks.createAccount).toHaveBeenCalledExactlyOnceWith({
+      platformSlug: "nginx-community", name: "NGINX Chrome", username: "forum-user", settings: { delivery: "extension" }, enabled: true,
+    });
+    expect(mocks.testAccount).not.toHaveBeenCalled();
+    expect(within(extensionDialog).getByLabelText("Luồng đăng")).toHaveValue("discourse");
+    fireEvent.change(within(extensionDialog).getByLabelText("Trang tạo chủ đề"), { target: { value: "https://community.nginx.org/new-topic?category=projects/nginx" } });
+    fireEvent.change(within(extensionDialog).getByLabelText("Tags"), { target: { value: " #NGINX-Open-Source, nginx-open-source " } });
+    fireEvent.click(within(extensionDialog).getByRole("switch", { name: "Tự bấm Đăng" }));
+    fireEvent.click(within(extensionDialog).getByRole("button", { name: "Lưu" }));
+    await waitFor(() => expect(mocks.configureExtensionDelivery).toHaveBeenCalledExactlyOnceWith("account-nginx", {
+      enabled: true, engine: "discourse", targetUrl: "https://community.nginx.org/new-topic?category=projects%2Fnginx&tags=nginx-open-source", autoSubmit: false,
+    }));
+  });
+
+  it("loads saved Discourse tags and can clear them while keeping the category", async () => {
+    mocks.accounts = [{ ...nginxAccount, status: "CONNECTED", settings: {
+      delivery: "extension", extensionEngine: "discourse", extensionAutoSubmit: true,
+      extensionTargetUrl: "https://community.nginx.org/new-topic?category=projects%2Fnginx&tags=nginx-open-source",
+    } }];
+    render(<AccountsView />);
+    fireEvent.click(screen.getByRole("button", { name: /Tiện ích$/ }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByLabelText("Tags")).toHaveValue("nginx-open-source");
+    fireEvent.change(within(dialog).getByLabelText("Tags"), { target: { value: "" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Lưu" }));
+    await waitFor(() => expect(mocks.configureExtensionDelivery).toHaveBeenCalledWith("account-nginx", {
+      enabled: true, engine: "discourse", targetUrl: "https://community.nginx.org/new-topic?category=projects%2Fnginx", autoSubmit: true,
+    }));
+  });
+
+  it("creates a dedicated Caddy flow with its own forum URL, category and tags", async () => {
+    const platform: Platform = { ...nginxPlatform, id: 'caddy-platform', slug: 'caddy-community', name: 'Caddy Community', defaultSettings: {
+      extensionFlowId: 'caddy-community', extensionEngine: 'discourse', extensionForumUrl: 'https://caddy.community', extensionTargetUrl: 'https://caddy.community/new-topic',
+    } };
+    mocks.platforms = [platform];
+    mocks.createAccount.mockResolvedValue({ ...nginxAccount, id: 'caddy-account', name: 'Caddy Chrome', platformId: platform.id, platform, settings: { delivery: 'extension' } });
+    render(<AccountsView />);
+    fireEvent.click(screen.getByRole('button', { name: 'Kết nối / cấu hình' }));
+    expect(screen.getByText('Luồng đăng bằng tiện ích Chrome')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Caddy Community/ }));
+    const create = screen.getByRole('dialog');
+    expect(within(create).getByLabelText('Phương thức đăng')).toHaveValue('extension');
+    expect(within(create).queryByLabelText('API Key')).not.toBeInTheDocument();
+    fireEvent.change(within(create).getByLabelText('Tên hiển thị'), { target: { value: 'Caddy Chrome' } });
+    fireEvent.click(within(create).getByRole('button', { name: 'Tạo & cấu hình tiện ích' }));
+    const flow = await screen.findByRole('dialog', { name: 'Tiện ích Chrome · Caddy Chrome' });
+    expect(within(flow).getByLabelText('Trang tạo chủ đề')).toHaveValue('https://caddy.community/new-topic');
+    fireEvent.change(within(flow).getByLabelText('Chuyên mục (slug hoặc ID)'), { target: { value: 'help' } });
+    fireEvent.change(within(flow).getByLabelText('Tags'), { target: { value: 'reverse-proxy' } });
+    fireEvent.click(within(flow).getByRole('button', { name: 'Lưu' }));
+    await waitFor(() => expect(mocks.configureExtensionDelivery).toHaveBeenCalledWith('caddy-account', {
+      enabled: true, engine: 'discourse', targetUrl: 'https://caddy.community/new-topic?category=help&tags=reverse-proxy', autoSubmit: true,
+    }));
+  });
+
+  it("still saves and tests API credentials when switching back to the API method", async () => {
+    mocks.platforms = [nginxPlatform];
+    mocks.testAccount.mockResolvedValue({ ok: true });
+    render(<AccountsView />);
+    fireEvent.click(screen.getByRole("button", { name: "Kết nối / cấu hình" }));
+    fireEvent.click(screen.getByRole("button", { name: /NGINX Community/ }));
+    const dialog = screen.getByRole("dialog", { name: "Thêm NGINX Community" });
+    fireEvent.change(within(dialog).getByLabelText("Phương thức đăng"), { target: { value: "extension" } });
+    fireEvent.change(within(dialog).getByLabelText("Phương thức đăng"), { target: { value: "connector" } });
+    expect(within(dialog).getByLabelText("API Key")).toBeRequired();
+    fireEvent.change(within(dialog).getByLabelText("Tên hiển thị"), { target: { value: "NGINX API" } });
+    fireEvent.change(within(dialog).getByLabelText("API Key"), { target: { value: "api-test-key" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Lưu & kiểm tra" }));
+    await waitFor(() => expect(mocks.testAccount).toHaveBeenCalledExactlyOnceWith("account-nginx"));
+    expect(mocks.createAccount).toHaveBeenCalledWith(expect.objectContaining({
+      name: "NGINX API", credential: { apiKey: "api-test-key" },
+      settings: expect.objectContaining({ baseUrl: "https://community.nginx.org", apiUsername: "forum-user", categoryId: "23" }),
+    }));
+    expect(mocks.configureExtensionDelivery).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { slug: 'substack', name: 'Substack', engine: 'substack', url: 'https://writer.substack.com/publish/post', flair: '' },
+    { slug: 'reddit', name: 'Reddit', engine: 'reddit', url: 'https://www.reddit.com/r/example/submit', flair: 'Discussion' },
+  ])('creates an automatic $name flow with its own destination and options', async ({ slug, name, engine, url, flair }) => {
+    const platform: Platform = { ...nginxPlatform, id: `platform-${slug}`, slug, name, mode: 'MANUAL', connectorKey: 'manual', defaultSettings: {
+      extensionFlowId: slug, extensionEngine: engine, extensionTargetUrl: '', extensionForumUrl: url,
+    } };
+    mocks.platforms = [platform];
+    mocks.createAccount.mockResolvedValue({ ...nginxAccount, id: 'social-account', name: `${name} Chrome`, platformId: platform.id, platform, settings: { delivery: 'extension' } });
+    render(<AccountsView />);
+    fireEvent.click(screen.getByRole('button', { name: 'Kết nối / cấu hình' }));
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(name) }));
+    const create = screen.getByRole('dialog');
+    expect(within(create).getByLabelText('Phương thức đăng')).toHaveValue('extension');
+    expect(within(create).queryByRole('option', { name: 'Bàn giao thủ công' })).not.toBeInTheDocument();
+    fireEvent.change(within(create).getByLabelText('Tên hiển thị'), { target: { value: `${name} Chrome` } });
+    fireEvent.click(within(create).getByRole('button', { name: 'Tạo & cấu hình tiện ích' }));
+    const flow = await screen.findByRole('dialog', { name: `Tiện ích Chrome · ${name} Chrome` });
+    expect(within(flow).getByLabelText('Luồng đăng')).toHaveValue(engine);
+    expect(within(flow).getByRole('switch', { name: 'Tự bấm Đăng' })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.change(within(flow).getByLabelText('Trang tạo chủ đề'), { target: { value: url } });
+    if (flair) fireEvent.change(within(flow).getByLabelText('Flair của subreddit'), { target: { value: flair } });
+    else expect(within(flow).getByText(/tắt gửi email và app inbox/)).toBeInTheDocument();
+    fireEvent.click(within(flow).getByRole('button', { name: 'Lưu' }));
+    await waitFor(() => expect(mocks.configureExtensionDelivery).toHaveBeenCalledWith('social-account', {
+      enabled: true, engine, targetUrl: url, autoSubmit: true, tags: [], category: '', flair,
+    }));
   });
 
   it("shows paired Chromes and switches a manual forum to extension delivery", async () => {

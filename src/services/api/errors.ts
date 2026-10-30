@@ -21,10 +21,12 @@ export function getAiGenerationErrorMessage(error: unknown) {
         : "Nhà cung cấp AI";
   let actionable = error.message;
 
-  if (message.includes("insufficient balance") || message.includes("insufficient quota")) {
+  if (message.includes("all configured gemini api keys")) {
+    actionable = "Tất cả API key Gemini đang hết quota hoặc bị giới hạn. Hãy chờ quota phục hồi hoặc cập nhật key tại Cài đặt → API key Gemini.";
+  } else if (message.includes("insufficient balance") || message.includes("insufficient quota")) {
     actionable = `${provider} đã hết số dư hoặc quota. Hãy nạp quota hoặc chọn AI khác.`;
   } else if (error.code === "PLATFORM_AUTH_FAILED" || message.includes("rejected the configured api credentials")) {
-    actionable = `API key của ${provider} không hợp lệ hoặc không có quyền sử dụng model. Hãy cập nhật key trong backend.`;
+    actionable = `API key của ${provider} không hợp lệ hoặc không có quyền sử dụng model. Hãy cập nhật key ${provider === "Google Gemini" ? "tại Cài đặt → API key Gemini" : "trong backend"}.`;
   } else if (error.code === "PLATFORM_RATE_LIMITED" || error.status === 429) {
     actionable = `${provider} đang giới hạn tốc độ. Hãy đợi một lúc hoặc chọn AI khác rồi thử lại.`;
   } else if (error.status === 504 || message.includes("timed out")) {

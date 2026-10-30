@@ -15,6 +15,7 @@ import { useAiProviders, useResourceMutation, useSettings } from "@/hooks/use-re
 import { settingsSchema, type SettingsInput } from "@/schemas/settings";
 import { resourcesService } from "@/services/resources.service";
 import type { AiProviderOption, SystemSettings } from "@/types/domain";
+import { GeminiKeysForm } from "./gemini-keys-form";
 
 function SettingsForm({ settings, aiProviders }: { settings: SystemSettings; aiProviders: AiProviderOption[] }) {
   const update = useResourceMutation((input: Partial<SystemSettings>) => resourcesService.updateSettings(input), ["settings"]);
@@ -42,9 +43,9 @@ function SettingsForm({ settings, aiProviders }: { settings: SystemSettings; aiP
   });
 
   return <form onSubmit={submit} className="space-y-5">
-    <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900"><Info className="mt-0.5 size-5 shrink-0" /><p><strong>Lưu ý:</strong> API key và model runtime của từng AI provider chỉ lấy từ backend environment. User chọn provider theo từng lần tạo nội dung hoặc chiến dịch; secret không được gửi xuống trình duyệt.</p></div>
+    <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900"><Info className="mt-0.5 size-5 shrink-0" /><p><strong>Lưu ý:</strong> Gemini dùng các key cấu hình ở trên. Model và key của các AI khác được quản lý ở backend. Bạn có thể chọn AI theo từng lần tạo nội dung hoặc chiến dịch.</p></div>
     <Card className="overflow-hidden">
-      <div className="flex items-start gap-3 border-b border-border p-5"><span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600"><ShieldCheck className="size-5" /></span><div><h2 className="font-bold">AI providers runtime</h2><p className="mt-1 text-xs text-muted">Trạng thái được đọc từ backend env; model được quản trị phía server.</p></div></div>
+      <div className="flex items-start gap-3 border-b border-border p-5"><span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600"><ShieldCheck className="size-5" /></span><div><h2 className="font-bold">AI providers runtime</h2><p className="mt-1 text-xs text-muted">Trạng thái cấu hình hiện tại; model được quản trị phía server.</p></div></div>
       <div className="grid gap-3 p-5 sm:grid-cols-3">{aiProviders.map((provider) => <div key={provider.id} className="rounded-xl border border-border p-4"><div className="flex items-center justify-between gap-2"><p className="text-sm font-bold">{provider.label}</p><Badge value={provider.configured ? "READY" : "CREDENTIAL_REQUIRED"} /></div><p className="mt-2 text-xs text-muted">{provider.model}</p>{provider.isDefault && <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-primary">Mặc định hệ thống</p>}</div>)}</div>
     </Card>
     <Card className="overflow-hidden">
@@ -74,5 +75,5 @@ function SettingsAdmin() {
   const aiProviders = useAiProviders();
   if (query.isPending || aiProviders.isPending) return <PageLoader />;
   if (query.isError || aiProviders.isError) return <><PageHeader title="Cài đặt" /><Card><ErrorState error={query.error ?? aiProviders.error} onRetry={() => { void query.refetch(); void aiProviders.refetch(); }} /></Card></>;
-  return <div className="animate-enter"><PageHeader eyebrow="System" title="Cài đặt" description="Lưu metadata quản trị không chứa secret. Cấu hình runtime vẫn do backend/deployment environment quản lý." action={<span className="inline-flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700"><ShieldCheck className="size-4" />Không lưu secret</span>} /><SettingsForm settings={query.data} aiProviders={aiProviders.data} /></div>;
+  return <div className="animate-enter"><PageHeader eyebrow="System" title="Cài đặt" description="Quản lý API key Gemini và cấu hình dùng chung cho hệ thống." action={<span className="inline-flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700"><ShieldCheck className="size-4" />API key được mã hóa</span>} /><GeminiKeysForm /><SettingsForm settings={query.data} aiProviders={aiProviders.data} /></div>;
 }

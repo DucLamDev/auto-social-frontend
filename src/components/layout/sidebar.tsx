@@ -2,15 +2,15 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, BookOpenText, CalendarDays, ChevronLeft, FileText, LayoutDashboard, Megaphone, MessageSquareCode, PlugZap, ScrollText, Settings, Sparkles, UsersRound, X } from "lucide-react";
+import { BarChart3, BookOpenText, CalendarDays, CheckCheck, Clock3, ChevronLeft, FileText, LayoutDashboard, Megaphone, MessageSquareCode, PlugZap, ScrollText, Settings, Sparkles, UsersRound, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { env } from "@/config/env";
 
 const groups = [
   { label: "TỔNG QUAN", items: [{ label: "Dashboard", href: "/dashboard", icon: LayoutDashboard }] },
   { label: "NỘI DUNG", items: [{ label: "Nguồn nội dung", href: "/sources", icon: BookOpenText }, { label: "Thư viện nội dung", href: "/contents", icon: FileText }, { label: "Content Studio", href: "/studio", icon: Sparkles }, { label: "Prompt templates", href: "/prompts", icon: MessageSquareCode }] },
-  { label: "PHÂN PHỐI", items: [{ label: "Nền tảng", href: "/platforms", icon: PlugZap }, { label: "Tài khoản", href: "/accounts", icon: UsersRound }, { label: "Chiến dịch", href: "/campaigns", icon: Megaphone }, { label: "Lịch xuất bản", href: "/calendar", icon: CalendarDays }, { label: "Publishing", href: "/publishing", icon: BarChart3 }] },
-  { label: "HỆ THỐNG", items: [{ label: "Nhật ký", href: "/logs", icon: ScrollText }, { label: "Cài đặt", href: "/settings", icon: Settings }] },
+  { label: "PHÂN PHỐI", items: [{ label: "Nền tảng", href: "/platforms", icon: PlugZap }, { label: "Tài khoản", href: "/accounts", icon: UsersRound }, { label: "Chiến dịch", href: "/campaigns", icon: Megaphone }, { label: "Lịch xuất bản", href: "/calendar", icon: CalendarDays }, { label: "Publishing", href: "/publishing", icon: BarChart3 }, { label: "Bài chờ duyệt", href: "/pending-posts", icon: Clock3 }, { label: "Bài đã đăng", href: "/published-posts", icon: CheckCheck }] },
+  { label: "HỆ THỐNG", items: [{ label: "Hướng dẫn API", href: "/api-guide", icon: BookOpenText }, { label: "Nhật ký", href: "/logs", icon: ScrollText }, { label: "Cài đặt", href: "/settings", icon: Settings }] },
 ] as const;
 
 export function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose }: { collapsed: boolean; mobileOpen: boolean; onCollapse: () => void; onMobileClose: () => void }) {

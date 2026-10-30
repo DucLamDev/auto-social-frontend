@@ -1,6 +1,7 @@
 "use client";
 
-import { ExternalLink, HeartPulse, Puzzle, KeyRound, Link2, LockKeyhole, LogIn, MonitorPlay, PlugZap, RefreshCw, Settings2, ShieldCheck, ShieldOff, TestTube2 } from "lucide-react";
+import { ExternalLink, HeartPulse, Puzzle, KeyRound, Link2, LockKeyhole, LogIn, MonitorPlay, PlugZap, RefreshCw, Settings2, ShieldCheck, ShieldOff, TestTube2, Upload } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/auth/permission-gate";
@@ -16,7 +17,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/ui/states";
 import { Table, TableWrap, Td, Th } from "@/components/ui/table";
 import { Toolbar } from "@/components/ui/toolbar";
-import { useAccounts, useInvalidate, useOAuthProviders, usePlatforms, useResourceMutation } from "@/hooks/use-resources";
+import { useAccounts, useExtensionLoginChecks, useInvalidate, useOAuthProviders, usePlatforms, useResourceMutation } from "@/hooks/use-resources";
 import { fromNow } from "@/lib/utils";
 import { ApiError } from "@/services/api/errors";
 import { resourcesService, type AccountConnectionTestResult } from "@/services/resources.service";
@@ -27,6 +28,12 @@ import { getBrowserConnectionErrorMessage, getTagPolicyWarning } from "./connect
 import { buildCredentialPayload, getCredentialConfig, getInitialCredentialValues, type CredentialValue } from "./credential-config";
 import { isAutoRefreshPlatform, oauthProviderForPlatform, oauthProviderLabel, oauthProviderNote, readOAuthResult } from "./oauth";
 import { canUseExtension, ExtensionDeliveryForm, ExtensionPanel, isExtensionAccount } from "./extension-panel";
+import { ExtensionSessionForm } from "./extension-session-form";
+import { ExtensionLoginCheckPanel } from "./extension-login-check-panel";
+import { AccountImportModal } from "./account-import-modal";
+import { accountConnectionState, chromeSession, extensionSetupMessage, isChromeBound, isSelectedExtensionAccount } from "./extension-account-state";
+import { ExtensionConnectionHelpModal } from "./extension-connection-help-modal";
+import { extensionConnectionHelp } from "./extension-connection-help";
 
 interface CredentialTarget { platform: Pick<Platform, "id" | "slug" | "name"> & Partial<Pick<Platform, "connectorKey" | "mode" | "defaultSettings">>; account?: PlatformAccount }
 
@@ -42,8 +49,13 @@ function showSuccessfulConnectionTest(result: AccountConnectionTestResult, messa
   if (tagPolicyWarning) toast.warning(tagPolicyWarning, { duration: 12_000 });
 }
 
-function CredentialAccountForm({ target, onClose, onBrowserLogin }: { target: CredentialTarget; onClose: () => void; onBrowserLogin: (account: PlatformAccount) => void }) {
+function CredentialAccountForm({ target, onClose, onBrowserLogin, onExtensionConfigure }: { target: CredentialTarget; onClose: () => void; onBrowserLogin: (account: PlatformAccount) => void; onExtensionConfigure: (account: PlatformAccount) => void }) {
   const config = getCredentialConfig(target.platform);
+  const hasExtensionFlow = typeof target.platform.defaultSettings?.extensionFlowId === "string";
+  const canCreateWithExtension = !target.account && target.platform.mode !== "OFFICIAL_API"
+    && (hasExtensionFlow || target.platform.connectorKey === "discourse" || target.platform.slug === "discourse");
+  const [delivery, setDelivery] = useState(hasExtensionFlow ? "extension" : "connector");
+  const useExtension = canCreateWithExtension && delivery === "extension";
   const [accountName, setAccountName] = useState(target.account?.name ?? "");
   const [username, setUsername] = useState(target.account?.username ?? "");
   const [values, setValues] = useState<Record<string, CredentialValue>>(() => config
@@ -72,12 +84,19 @@ function CredentialAccountForm({ target, onClose, onBrowserLogin }: { target: Cr
   const verify = useResourceMutation((id: string) => resourcesService.testAccount(id), ["accounts"]);
 
   if (!config) return <p className="text-sm text-danger">Connector này chưa khai báo credential form.</p>;
-  const visibleFields = config.fields;
+  const visibleFields = useExtension ? [] : config.fields;
   const busy = save.isPending || verify.isPending;
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
       if (!target.account && accountName.trim().length < 2) throw new Error("Tên tài khoản cần ít nhất 2 ký tự.");
+      if (useExtension) {
+        const account = await save.mutateAsync({ settings: { delivery: "extension" } });
+        toast.success("Đã tạo tài khoản. Chọn trang tạo chủ đề để bật tiện ích Chrome.");
+        onClose();
+        onExtensionConfigure(account);
+        return;
+      }
       const payload = buildCredentialPayload(config, values, {
         includeEmptySettings: Boolean(target.account),
       });
@@ -108,7 +127,8 @@ function CredentialAccountForm({ target, onClose, onBrowserLogin }: { target: Cr
   };
 
   return <form className="space-y-5" onSubmit={(event) => void submit(event)}>
-    <div className="flex gap-3 rounded-xl border border-indigo-100 bg-indigo-50 p-4 text-xs leading-5 text-indigo-900"><LockKeyhole className="mt-0.5 size-4 shrink-0" /><p>{config.description}{config.requiresCredential === false && !config.browserAssisted ? " Không cần API key, token hoặc credential giả." : config.browserAssisted ? " Bạn tự hoàn tất đăng nhập, 2FA hoặc CAPTCHA trong cửa sổ Chromium khi helper mở." : " Secret chỉ được gửi một chiều và không bao giờ được API trả lại."}</p></div>
+    {canCreateWithExtension && <div><Label htmlFor="account-delivery">Phương thức đăng</Label><Select id="account-delivery" value={delivery} onChange={(event) => setDelivery(event.target.value)} disabled={busy}><option value="extension">Tiện ích Chrome (không cần API Key)</option>{target.platform.mode !== "MANUAL" && <option value="connector">{target.platform.connectorKey === "discourse" ? "API Discourse" : "Playwright"}</option>}</Select></div>}
+    <div className="flex gap-3 rounded-xl border border-indigo-100 bg-indigo-50 p-4 text-xs leading-5 text-indigo-900"><LockKeyhole className="mt-0.5 size-4 shrink-0" /><p>{useExtension ? "Tiện ích đăng trực tiếp trên diễn đàn bằng phiên đã đăng nhập trong Chrome của bạn. Không cần API Key hoặc mật khẩu. Bước tiếp theo chọn trang tạo chủ đề và chế độ tự bấm Đăng." : <>{config.description}{config.requiresCredential === false && !config.browserAssisted ? " Không cần API key, token hoặc credential giả." : config.browserAssisted ? " Bạn tự hoàn tất đăng nhập, 2FA hoặc CAPTCHA trong cửa sổ Chromium khi helper mở." : " Secret chỉ được gửi một chiều và không bao giờ được API trả lại."}</>}</p></div>
     {target.account ? <div className="rounded-xl border border-border bg-slate-50 p-4"><p className="text-xs font-bold">{target.account.name}</p><p className="mt-1 text-[11px] text-muted">{config.browserAssisted ? "Chỉ cập nhật cấu hình adapter bên dưới. Session trình duyệt đã mã hóa được giữ nguyên; dùng nút đăng nhập/kết nối lại ở danh sách tài khoản khi cần." : config.requiresCredential === false ? "Cập nhật cấu hình điểm đến; không có secret nào được yêu cầu." : "Có thể sửa connector settings bên dưới. Secret cũ không được tải về, vì vậy cần nhập lại đầy đủ credential."}</p></div> : <div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="credential-account-name">Tên hiển thị</Label><Input id="credential-account-name" required minLength={2} value={accountName} onChange={(event) => setAccountName(event.target.value)} placeholder={`${config.title} · Marketing`} /></div><div><Label htmlFor="credential-account-username">Username (tuỳ chọn)</Label><Input id="credential-account-username" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="account_handle" /></div></div>}
     <div className="grid gap-4 sm:grid-cols-2">{visibleFields.map((field) => {
       const value = values[field.key] ?? "";
@@ -117,28 +137,40 @@ function CredentialAccountForm({ target, onClose, onBrowserLogin }: { target: Cr
       const wide = field.key.toLowerCase().includes("token") || field.key.toLowerCase().includes("password") || field.key === "webhookUrl";
       return <div key={field.key} className={wide ? "sm:col-span-2" : undefined}><Label htmlFor={`credential-${field.key}`}>{field.label}</Label><Input id={`credential-${field.key}`} type={field.type} required={field.required} autoComplete={field.type === "password" ? "new-password" : "off"} value={String(value)} placeholder={field.placeholder} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))} />{field.help && <p className="mt-1 text-[11px] text-muted">{field.help}</p>}</div>;
     })}</div>
-    {!target.account && <p className="text-[11px] leading-5 text-muted">{config.browserAssisted
+    {!target.account && <p className="text-[11px] leading-5 text-muted">{useExtension
+      ? "Username chỉ để nhận diện tài khoản. Bài được đăng bằng tài khoản đang đăng nhập trong Chrome đã ghép nối."
+      : config.browserAssisted
       ? "Sau khi tạo account, sao chép lệnh đăng nhập Playwright từ thông báo hoặc danh sách tài khoản. Account chỉ chuyển CONNECTED sau khi session được lưu và kiểm tra thành công."
       : config.requiresCredential === false
       ? "Sau khi lưu, hệ thống kiểm tra cấu hình bàn giao và đánh dấu điểm đến sẵn sàng. Bài viết vẫn cần bạn xác nhận trên trang đích."
       : "Tên, username và settings không phải secret. Credential được lưu riêng bằng AES-256-GCM. Sau khi lưu, hệ thống gọi endpoint test thật; chỉ test thành công mới chuyển tài khoản sang CONNECTED."}</p>}
-    <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={onClose} disabled={busy}>Huỷ</Button><Button type="submit" loading={busy}><ShieldCheck className="size-4" />{config.browserAssisted ? target.account ? "Lưu cấu hình" : "Tạo & tiếp tục đăng nhập" : "Lưu & kiểm tra"}</Button></div>
+    <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={onClose} disabled={busy}>Huỷ</Button><Button type="submit" loading={busy}><ShieldCheck className="size-4" />{useExtension ? "Tạo & cấu hình tiện ích" : config.browserAssisted ? target.account ? "Lưu cấu hình" : "Tạo & tiếp tục đăng nhập" : "Lưu & kiểm tra"}</Button></div>
   </form>;
 }
 
 export function AccountsView() {
   const [search, setSearch] = useState("");
+  const [accountScope, setAccountScope] = useState("selected");
+  const [connectionFilter, setConnectionFilter] = useState("");
   const [platformId, setPlatformId] = useState("");
   const [connectOpen, setConnectOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [destinationSearch, setDestinationSearch] = useState("");
   const [automaticPage, setAutomaticPage] = useState(1);
   const [browserPage, setBrowserPage] = useState(1);
   const [manualPage, setManualPage] = useState(1);
+  const [helpAccount, setHelpAccount] = useState<PlatformAccount | null>(null);
+  const [extensionPage, setExtensionPage] = useState(1);
   const [credentialTarget, setCredentialTarget] = useState<CredentialTarget | null>(null);
   const [browserLoginAccount, setBrowserLoginAccount] = useState<PlatformAccount | null>(null);
   const [browserSessionRevokeTarget, setBrowserSessionRevokeTarget] = useState<PlatformAccount | null>(null);
   const [extensionTarget, setExtensionTarget] = useState<PlatformAccount | null>(null);
-  const query = useAccounts({ limit: 100, platformId: platformId || undefined });
+  const [sessionTarget, setSessionTarget] = useState<PlatformAccount | null>(null);
+  const query = useAccounts({ limit: 100 });
+  const refetchAccounts = query.refetch;
+  const loginChecks = useExtensionLoginChecks();
+  const checksByAccount = new Map((loginChecks.data ?? []).map(row => [row.id, row.check]));
+  const testChrome = useResourceMutation((ids: string[]) => resourcesService.queueExtensionLoginChecks(ids, true), ["extension-login-checks", "accounts"]);
   const platforms = usePlatforms({ limit: 100 });
   const providers = useOAuthProviders();
   const update = useResourceMutation(({ id, enabled }: { id: string; enabled: boolean }) => resourcesService.updateAccount(id, { enabled }), ["accounts"]);
@@ -147,21 +179,32 @@ export function AccountsView() {
   const setPublishMode = useResourceMutation(({ id, publishImmediately }: { id: string; publishImmediately: boolean }) => resourcesService.updateAccountSettings(id, { publishImmediately }), ["accounts"]);
   const checkAll = useResourceMutation(() => resourcesService.runAccountCheck(), ["accounts", "account-health"]);
   const readyProviders = new Set((providers.data ?? []).filter((provider) => provider.status === "READY").map((provider) => provider.provider));
-  const items = (query.data?.items ?? []).filter((item) => `${item.name} ${item.username ?? ""} ${item.platform?.name ?? ""}`.toLowerCase().includes(search.toLowerCase()));
+  const selectedCount = (query.data?.items ?? []).filter(isSelectedExtensionAccount).length;
+  const items = (query.data?.items ?? []).filter(item => (!selectedCount || accountScope === "all" || isSelectedExtensionAccount(item))
+    && (!platformId || item.platformId === platformId)
+    && (!connectionFilter || accountConnectionState(item, checksByAccount.get(item.id)?.status) === connectionFilter
+      || (connectionFilter === "needs_action" && accountConnectionState(item, checksByAccount.get(item.id)?.status) === "authenticated"))
+    && `${item.name} ${item.username ?? ""} ${item.platform?.name ?? ""}`.toLowerCase().includes(search.toLowerCase()));
   const catalogPlatforms = useMemo(() => platforms.data?.items ?? [], [platforms.data?.items]);
   const configurablePlatforms = useMemo(() => catalogPlatforms.filter((platform) => platform.enabled && getCredentialConfig(platform)), [catalogPlatforms]);
   const normalizedDestinationSearch = destinationSearch.trim().toLowerCase();
   const matchingPlatforms = configurablePlatforms.filter((platform) => !normalizedDestinationSearch
     || `${platform.name} ${platform.slug}`.toLowerCase().includes(normalizedDestinationSearch));
-  const automaticPlatforms = matchingPlatforms.filter((platform) => ["OFFICIAL_API", "COMPATIBLE_API"].includes(platform.mode));
-  const browserPlatforms = matchingPlatforms.filter((platform) => platform.mode === "BROWSER_ASSISTED");
-  const manualPlatforms = matchingPlatforms.filter((platform) => platform.mode === "MANUAL");
+  const extensionPlatforms = matchingPlatforms.filter((platform) => typeof platform.defaultSettings?.extensionFlowId === "string");
+  const otherPlatforms = matchingPlatforms.filter((platform) => typeof platform.defaultSettings?.extensionFlowId !== "string");
+  const automaticPlatforms = otherPlatforms.filter((platform) => ["OFFICIAL_API", "COMPATIBLE_API"].includes(platform.mode));
+  const browserPlatforms = otherPlatforms.filter((platform) => platform.mode === "BROWSER_ASSISTED");
+  const manualPlatforms = otherPlatforms.filter((platform) => platform.mode === "MANUAL");
   const automaticTotalPages = Math.ceil(automaticPlatforms.length / DESTINATION_PAGE_SIZE);
   const browserTotalPages = Math.ceil(browserPlatforms.length / DESTINATION_PAGE_SIZE);
   const manualTotalPages = Math.ceil(manualPlatforms.length / DESTINATION_PAGE_SIZE);
   const visibleAutomaticPlatforms = automaticPlatforms.slice((automaticPage - 1) * DESTINATION_PAGE_SIZE, automaticPage * DESTINATION_PAGE_SIZE);
   const visibleBrowserPlatforms = browserPlatforms.slice((browserPage - 1) * DESTINATION_PAGE_SIZE, browserPage * DESTINATION_PAGE_SIZE);
   const visibleManualPlatforms = manualPlatforms.slice((manualPage - 1) * DESTINATION_PAGE_SIZE, manualPage * DESTINATION_PAGE_SIZE);
+
+  useEffect(() => {
+    if (loginChecks.data?.some(row => row.check)) void refetchAccounts();
+  }, [loginChecks.data, refetchAccounts]);
 
   useEffect(() => {
     const outcome = readOAuthResult(window.location.search);
@@ -173,6 +216,11 @@ export function AccountsView() {
 
   const testConnection = async (account: PlatformAccount) => {
     try {
+      if (isChromeBound(account)) {
+        const result = await testChrome.mutateAsync([account.id]);
+        toast.success(result.queued ? "Đã giao Chrome kiểm tra đăng nhập; trạng thái sẽ tự cập nhật." : "Tài khoản đang chờ hoặc đang được Chrome kiểm tra.");
+        return false;
+      }
       const response = await test.mutateAsync(account.id);
       if (response.ok) showSuccessfulConnectionTest(response, `Kết nối hoạt động tốt${response.accountName ? `: ${response.accountName}` : ""}`);
       else toast.warning(response.message || "Connector cần thao tác thủ công");
@@ -200,6 +248,12 @@ export function AccountsView() {
   };
   const runCheckAll = async () => {
     try {
+      const chromeAccounts = items.filter(isChromeBound);
+      if (chromeAccounts.length) {
+        const result = await testChrome.mutateAsync(chromeAccounts.map(account => account.id));
+        toast.success(`Đã giao Chrome kiểm tra ${result.queued} tài khoản trong danh sách đang hiển thị.`);
+        return;
+      }
       const { tokens, connections } = await checkAll.mutateAsync(undefined);
       const failed = (tokens.failed ?? 0) + (connections.failed ?? 0);
       const summary = `Đã kiểm tra ${connections.checked ?? 0} tài khoản, gia hạn ${tokens.refreshed ?? 0} token.`;
@@ -231,7 +285,7 @@ export function AccountsView() {
     setCredentialTarget(target);
   };
 
-  const destinationCards = (destinations: Platform[], kind: "api" | "browser" | "manual") => <div className="grid gap-2 sm:grid-cols-2">
+  const destinationCards = (destinations: Platform[], kind: "api" | "browser" | "manual" | "extension") => <div className="grid gap-2 sm:grid-cols-2">
     {destinations.map((platform) => <button
       type="button"
       key={platform.id}
@@ -241,23 +295,35 @@ export function AccountsView() {
       <PlatformMark slug={platform.slug} name={platform.name} size="sm" />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs font-bold">{platform.name}</span>
-        <span className="block truncate text-[10px] text-muted" title={getPlatformAutomationLabel(platform)}>{getPlatformAutomationLabel(platform)}</span>
+        <span className="block truncate text-[10px] text-muted" title={kind === "extension" ? "Cấu hình luồng Chrome riêng" : getPlatformAutomationLabel(platform)}>{kind === "extension" ? "Chrome · chuyên mục và tag riêng" : getPlatformAutomationLabel(platform)}</span>
       </span>
-      {kind === "manual" ? <ExternalLink className="size-4 text-slate-400" /> : kind === "browser" ? <MonitorPlay className="size-4 text-slate-400" /> : <KeyRound className="size-4 text-slate-400" />}
+      {kind === "extension" ? <Puzzle className="size-4 text-indigo-500" /> : kind === "manual" ? <ExternalLink className="size-4 text-slate-400" /> : kind === "browser" ? <MonitorPlay className="size-4 text-slate-400" /> : <KeyRound className="size-4 text-slate-400" />}
     </button>)}
   </div>;
 
   return <div className="animate-enter">
-    <PageHeader eyebrow="Destinations" title="Tài khoản" description="Kết nối API hoặc đăng nhập một lần bằng Playwright để hệ thống tự đăng; mật khẩu social không đi qua ứng dụng." action={<PermissionGate allow={["ADMIN"]}><Button onClick={() => setConnectOpen(true)}><Link2 className="size-4" />Kết nối / cấu hình</Button></PermissionGate>} />
+    <PageHeader eyebrow="Destinations" title="Tài khoản" description="Nhập file để kết nối social, lọc kênh sẵn sàng rồi tạo và đăng bài tự động." action={<div className="flex flex-wrap gap-2"><Link href="/campaigns?automate=1" className="inline-flex items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white">Tạo bài & đăng tự động</Link><PermissionGate allow={["ADMIN"]}><Button variant="secondary" onClick={() => setImportOpen(true)}><Upload className="size-4" />Nhập file tài khoản</Button><Button variant="secondary" onClick={() => setConnectOpen(true)}><Link2 className="size-4" />Kết nối / cấu hình</Button></PermissionGate></div>} />
+    <AccountImportModal open={importOpen} onClose={() => setImportOpen(false)} />
     <ExtensionPanel />
+    <ExtensionLoginCheckPanel />
     <Card className="overflow-hidden">
-      <Toolbar search={search} onSearch={setSearch} searchPlaceholder="Tìm tài khoản…" filters={<Select aria-label="Lọc nền tảng" className="w-44" value={platformId} onChange={(event) => setPlatformId(event.target.value)}><option value="">Mọi nền tảng</option>{catalogPlatforms.map((platform) => <option value={platform.id} key={platform.id}>{platform.name}</option>)}</Select>} end={<div className="flex gap-1"><PermissionGate allow={["ADMIN"]}><Button variant="ghost" size="sm" loading={checkAll.isPending} onClick={() => void runCheckAll()} title="Gia hạn token đến hạn và kiểm tra kết nối mọi tài khoản ngay"><HeartPulse className="size-4" />Kiểm tra tất cả</Button></PermissionGate><Button variant="ghost" size="sm" onClick={() => void query.refetch()}><RefreshCw className="size-4" />Refresh</Button></div>} />
+      <Toolbar search={search} onSearch={setSearch} searchPlaceholder="Tìm tài khoản…" filters={<>
+        {selectedCount > 0 && <Select aria-label="Phạm vi tài khoản" value={accountScope} onChange={event => setAccountScope(event.target.value)}><option value="selected">{selectedCount} tài khoản đã chọn</option><option value="all">Toàn bộ tài khoản</option></Select>}
+        <Select aria-label="Lọc nền tảng" className="w-44" value={platformId} onChange={(event) => setPlatformId(event.target.value)}><option value="">Mọi nền tảng</option>{catalogPlatforms.map((platform) => <option value={platform.id} key={platform.id}>{platform.name}</option>)}</Select>
+        <Select aria-label="Lọc trạng thái kết nối" value={connectionFilter} onChange={event => setConnectionFilter(event.target.value)}><option value="">Mọi trạng thái</option><option value="connected">Đã kết nối · có thể đăng</option><option value="needs_action">Cần thao tác</option><option value="authenticated">Đã đăng nhập · chưa cấu hình đăng</option><option value="running">Đang kết nối</option></Select>
+      </>} end={<div className="flex gap-1"><PermissionGate allow={["ADMIN"]}><Button variant="ghost" size="sm" loading={checkAll.isPending || testChrome.isPending} onClick={() => void runCheckAll()} title={items.some(isChromeBound) ? "Kiểm tra phiên Chrome của các tài khoản đang hiển thị" : "Gia hạn token đến hạn và kiểm tra kết nối mọi tài khoản ngay"}><HeartPulse className="size-4" />Kiểm tra tất cả</Button></PermissionGate><Button variant="ghost" size="sm" onClick={() => void query.refetch()}><RefreshCw className="size-4" />Refresh</Button></div>} />
       {query.isPending ? <div className="p-5"><TableSkeleton /></div> : query.isError ? <ErrorState error={query.error} onRetry={() => void query.refetch()} /> : items.length === 0 ? <EmptyState title="Chưa có tài khoản" description="Kết nối API hoặc thêm điểm đến bàn giao thủ công đầu tiên." action={<PermissionGate allow={["ADMIN"]}><Button onClick={() => setConnectOpen(true)}><PlugZap className="size-4" />Cấu hình ngay</Button></PermissionGate>} /> : <TableWrap><Table><thead><tr><Th>Nền tảng / tài khoản</Th><Th>Trạng thái</Th><Th>Kiểu kết nối</Th><Th>Kiểm tra gần nhất</Th><Th>Đang bật</Th><Th className="text-right">Thao tác</Th></tr></thead><tbody>{items.map((account) => {
         const platform = catalogPlatforms.find((item) => item.id === account.platformId) ?? account.platform;
         const config = getCredentialConfig(platform);
         const viaExtension = isExtensionAccount(account);
-        const manual = platform?.mode === "MANUAL" && !viaExtension;
-        const browserAssisted = platform?.mode === "BROWSER_ASSISTED" && !viaExtension;
+        const chromeBound = isChromeBound(account);
+        const loginCheck = checksByAccount.get(account.id);
+        const connectionHelp = extensionConnectionHelp(account, loginCheck ?? undefined);
+        const restricted = typeof account.settings?.extensionSetup === "object" && account.settings.extensionSetup !== null && "status" in account.settings.extensionSetup && account.settings.extensionSetup.status === "ACCESS_RESTRICTED";
+        const chromeStatus = restricted ? "NEEDS_ACTION" : loginCheck?.status === "AUTHENTICATED" ? viaExtension && account.enabled && account.status === "CONNECTED" ? "CONNECTED" : "AUTHENTICATED" : loginCheck?.status ?? "CHROME_BOUND";
+        const setupMessage = extensionSetupMessage(account);
+        const manual = platform?.mode === "MANUAL" && !viaExtension && !chromeBound;
+        const browserAssisted = platform?.mode === "BROWSER_ASSISTED" && !viaExtension && !chromeBound;
         const oauthProvider = oauthProviderForPlatform(account.platform?.slug);
         const canReconnectOAuth = Boolean(oauthProvider && readyProviders.has(oauthProvider));
         const autoRefresh = account.oauthConfigured && isAutoRefreshPlatform(account.platform?.slug);
@@ -266,14 +332,19 @@ export function AccountsView() {
         const publishImmediately = account.settings?.publishImmediately !== false;
         return <tr key={account.id} className="group hover:bg-slate-50/70">
           <Td><div className="flex items-center gap-3"><PlatformMark slug={account.platform?.slug} name={account.platform?.name ?? "Platform"} /><div><p className="font-bold text-foreground">{account.name}</p><p className="mt-0.5 text-xs text-muted">{account.platform?.name ?? "—"}{account.username ? ` · @${account.username}` : ""}</p></div></div></Td>
-          <Td><Badge value={account.status} />{browserAssisted && <p className="mt-1 max-w-40 text-[10px] leading-4 text-muted">{account.status === "CONNECTED" ? "Session sẵn sàng cho worker" : account.browserSessionConfigured ? "Cần làm mới và kiểm tra session" : "Chưa lưu session đăng nhập"}</p>}</Td>
-          <Td>{viaExtension ? <><span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600"><Puzzle className="size-3.5 text-indigo-600" />Tiện ích Chrome</span><p className="mt-1 max-w-48 truncate text-[10px] text-muted" title={String(account.settings?.extensionTargetUrl ?? "")}>{hostOf(account.settings?.extensionTargetUrl)} · {account.settings?.extensionAutoSubmit === false ? "chờ bạn bấm Đăng" : "tự bấm Đăng"}</p></> : <><span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">{manual ? <ExternalLink className="size-3.5 text-violet-600" /> : browserAssisted ? <MonitorPlay className="size-3.5 text-indigo-600" /> : account.oauthConfigured ? <Link2 className="size-3.5 text-sky-600" /> : <KeyRound className="size-3.5 text-amber-600" />}{manual ? "Bàn giao thủ công" : browserAssisted ? "Playwright" : account.oauthConfigured ? "OAuth" : account.credential ? "Credential" : "Chưa cấu hình"}</span><p className="mt-1 text-[10px] text-muted">{manual ? "Không lưu API key/token" : browserAssisted ? account.credential ? "Session đã mã hóa" : "Chưa đăng nhập trình duyệt" : autoRefresh ? "Token tự gia hạn" : account.oauthToken?.expiresAt ? `Hết hạn ${fromNow(account.oauthToken.expiresAt)}` : account.credential?.expiresAt ? `Hết hạn ${fromNow(account.credential.expiresAt)}` : account.credential?.status ?? (account.oauthConfigured ? "Token đã mã hóa" : "—")}</p>{draftCapable && <PermissionGate allow={["ADMIN"]} fallback={<p className="mt-1 text-[10px] text-muted">{publishImmediately ? "Đăng ngay" : "Lưu nháp"}</p>}><label className="mt-1.5 flex items-center gap-2 text-[10px] font-semibold text-slate-600"><Switch checked={publishImmediately} disabled={setPublishMode.isPending} label={`Đăng ngay trên ${account.name}`} onChange={(value) => void setPublishMode.mutateAsync({ id: account.id, publishImmediately: value }).then(() => toast.success(value ? "Bài mới sẽ được đăng ngay" : "Bài mới sẽ được lưu nháp để bạn duyệt")).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Có lỗi"))} />{publishImmediately ? "Đăng ngay" : "Lưu nháp"}</label></PermissionGate>}</>}</Td>
-          <Td className="text-xs">{fromNow(account.lastCheckedAt)}</Td>
-          <Td><PermissionGate allow={["ADMIN"]} fallback={<Badge value={account.enabled ? "ACTIVE" : "INACTIVE"} />}><Switch checked={account.enabled} disabled={update.isPending} label={`Bật ${account.name}`} onChange={(enabled) => void update.mutateAsync({ id: account.id, enabled }).then(() => toast.success("Đã cập nhật")).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Có lỗi"))} /></PermissionGate></Td>
+          <Td><Badge value={chromeBound ? chromeStatus : account.status} />{chromeBound && <p className="mt-1 max-w-52 text-[10px] leading-4 text-muted" title={loginCheck?.message ?? undefined}>{restricted ? connectionHelp.reason : loginCheck?.message ?? "Đã gán hồ sơ Chrome; cần kiểm tra phiên đăng nhập."}</p>}{browserAssisted && <p className="mt-1 max-w-40 text-[10px] leading-4 text-muted">{account.status === "CONNECTED" ? "Session sẵn sàng cho worker" : account.browserSessionConfigured ? "Cần làm mới và kiểm tra session" : "Chưa lưu session đăng nhập"}</p>}</Td>
+          <Td>{viaExtension || chromeBound ? <><span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600"><Puzzle className="size-3.5 text-indigo-600" />Tiện ích Chrome</span><p className="mt-1 max-w-48 text-[10px] text-muted" title={String(account.settings?.extensionTargetUrl ?? "")}>{viaExtension ? `${hostOf(account.settings?.extensionTargetUrl)} · ${account.settings?.extensionAutoSubmit === false ? "chờ bạn bấm Đăng" : "tự bấm Đăng"}` : setupMessage}</p>{chromeBound && chromeSession(account).provider === "google" && <p className="mt-1 max-w-48 break-all text-[10px] text-muted">Google · {String(chromeSession(account).loginUsername ?? "")}</p>}</> : <><span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">{manual ? <ExternalLink className="size-3.5 text-violet-600" /> : browserAssisted ? <MonitorPlay className="size-3.5 text-indigo-600" /> : account.oauthConfigured ? <Link2 className="size-3.5 text-sky-600" /> : <KeyRound className="size-3.5 text-amber-600" />}{manual ? "Bàn giao thủ công" : browserAssisted ? "Playwright" : account.oauthConfigured ? "OAuth" : account.credential ? "Credential" : "Chưa cấu hình"}</span><p className="mt-1 text-[10px] text-muted">{manual ? "Không lưu API key/token" : browserAssisted ? account.credential ? "Session đã mã hóa" : "Chưa đăng nhập trình duyệt" : autoRefresh ? "Token tự gia hạn" : account.oauthToken?.expiresAt ? `Hết hạn ${fromNow(account.oauthToken.expiresAt)}` : account.credential?.expiresAt ? `Hết hạn ${fromNow(account.credential.expiresAt)}` : account.credential?.status ?? (account.oauthConfigured ? "Token đã mã hóa" : "—")}</p>{draftCapable && <PermissionGate allow={["ADMIN"]} fallback={<p className="mt-1 text-[10px] text-muted">{publishImmediately ? "Đăng ngay" : "Lưu nháp"}</p>}><label className="mt-1.5 flex items-center gap-2 text-[10px] font-semibold text-slate-600"><Switch checked={publishImmediately} disabled={setPublishMode.isPending} label={`Đăng ngay trên ${account.name}`} onChange={(value) => void setPublishMode.mutateAsync({ id: account.id, publishImmediately: value }).then(() => toast.success(value ? "Bài mới sẽ được đăng ngay" : "Bài mới sẽ được lưu nháp để bạn duyệt")).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Có lỗi"))} />{publishImmediately ? "Đăng ngay" : "Lưu nháp"}</label></PermissionGate>}</>}</Td>
+          <Td className="text-xs">{fromNow(chromeBound ? loginCheck?.finishedAt : account.lastCheckedAt)}</Td>
+          <Td><PermissionGate allow={["ADMIN"]} fallback={<Badge value={account.enabled ? "ACTIVE" : "INACTIVE"} />}><Switch checked={account.enabled} disabled={update.isPending || (!account.enabled && chromeBound && !viaExtension)} label={`Bật ${account.name}`} onChange={(enabled) => void update.mutateAsync({ id: account.id, enabled }).then(async () => {
+            if (enabled && chromeBound) await testChrome.mutateAsync([account.id]);
+            toast.success(enabled && chromeBound ? "Đã bật và giao Chrome kiểm tra kết nối" : "Đã cập nhật");
+          }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Có lỗi"))} />{chromeBound && !viaExtension && <p className="mt-1 max-w-36 text-[10px] text-muted">Cần cấu hình đăng bằng tiện ích</p>}</PermissionGate></Td>
           <Td><div className="flex flex-wrap justify-end gap-1">
-            <PermissionGate allow={["ADMIN", "EDITOR"]}>{(!browserAssisted || account.browserSessionConfigured === true) && <Button variant="ghost" size="sm" loading={test.isPending} onClick={() => void testConnection(account)}><TestTube2 className="size-4" />Test</Button>}</PermissionGate>
-            <PermissionGate allow={["ADMIN"]}>{platform && canUseExtension({ platform }) && <Button variant={viaExtension ? "secondary" : "ghost"} size="sm" onClick={() => setExtensionTarget(account)}><Puzzle className="size-4" />Tiện ích</Button>}</PermissionGate>
-            <PermissionGate allow={["ADMIN"]}>{viaExtension ? null : browserAssisted ? <>
+            {chromeBound && <PermissionGate allow={["ADMIN"]}><Button variant="ghost" size="sm" onClick={() => setHelpAccount(account)}>Hướng dẫn kết nối</Button></PermissionGate>}
+            <PermissionGate allow={chromeBound ? ["ADMIN"] : ["ADMIN", "EDITOR"]}>{(!browserAssisted || account.browserSessionConfigured === true) && <Button variant="ghost" size="sm" loading={chromeBound ? testChrome.isPending : test.isPending} onClick={() => void testConnection(account)}><TestTube2 className="size-4" />Test</Button>}</PermissionGate>
+            <PermissionGate allow={["ADMIN"]}>{platform && canUseExtension({ platform }) && (!chromeBound || viaExtension || typeof platform.defaultSettings?.extensionFlowId === "string") && <Button variant={viaExtension ? "secondary" : "ghost"} size="sm" onClick={() => setExtensionTarget(account)}><Puzzle className="size-4" />Tiện ích</Button>}</PermissionGate>
+            <PermissionGate allow={["ADMIN"]}>{(viaExtension || Boolean(account.settings?.extensionLoginTarget)) && <Button variant="secondary" size="sm" onClick={() => setSessionTarget(account)}>Phiên Chrome / 2FA</Button>}</PermissionGate>
+            <PermissionGate allow={["ADMIN"]}>{viaExtension || chromeBound ? null : browserAssisted ? <>
               {config && platform && <Button variant="ghost" size="sm" onClick={() => openCredential({ platform, account })}><Settings2 className="size-4" />Cấu hình</Button>}
               <Button variant="secondary" size="sm" onClick={() => setBrowserLoginAccount(account)}><LogIn className="size-4" />{account.status === "CONNECTED" ? "Đăng nhập lại" : account.browserSessionConfigured ? "Kết nối lại" : "Đăng nhập"}</Button>
               {account.browserSessionConfigured === true && <Button variant="danger" size="sm" onClick={() => setBrowserSessionRevokeTarget(account)}><ShieldOff className="size-4" />Thu hồi session</Button>}
@@ -283,9 +354,17 @@ export function AccountsView() {
       })}</tbody></Table></TableWrap>}
     </Card>
 
-    <Modal open={connectOpen} onClose={() => setConnectOpen(false)} title="Kết nối / cấu hình điểm đến" description="Chọn kênh tự động qua API hoặc kênh bàn giao thủ công." className="max-w-3xl">
+    <ExtensionConnectionHelpModal account={helpAccount} check={helpAccount ? checksByAccount.get(helpAccount.id) ?? undefined : undefined} onClose={() => setHelpAccount(null)} onSession={setSessionTarget} onDelivery={setExtensionTarget} />
+
+    <Modal open={connectOpen} onClose={() => setConnectOpen(false)} title="Kết nối / cấu hình điểm đến" description="Chọn luồng đăng cho từng nền tảng qua Chrome, API hoặc Playwright." className="max-w-3xl">
       <div className="space-y-7">
-        <div><Label htmlFor="destination-search">Tìm điểm đến</Label><Input id="destination-search" value={destinationSearch} onChange={(event) => { setDestinationSearch(event.target.value); setAutomaticPage(1); setBrowserPage(1); setManualPage(1); }} placeholder="Medium, Discourse, Mastodon…" /></div>
+        <div><Label htmlFor="destination-search">Tìm điểm đến</Label><Input id="destination-search" value={destinationSearch} onChange={(event) => { setDestinationSearch(event.target.value); setAutomaticPage(1); setBrowserPage(1); setManualPage(1); setExtensionPage(1); }} placeholder="NGINX, Caddy, DirectAdmin…" /></div>
+        {extensionPlatforms.length > 0 && <section>
+          <h3 className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">Luồng đăng bằng tiện ích Chrome</h3>
+          <p className="mb-3 text-xs leading-5 text-muted">Mỗi nền tảng có trang đăng và cấu hình riêng. Chọn nhiều tài khoản trong cùng chiến dịch để chạy tối đa 3 nền tảng song song. Giữ Chrome mở và đăng nhập sẵn các tài khoản.</p>
+          {destinationCards(extensionPlatforms.slice((extensionPage - 1) * DESTINATION_PAGE_SIZE, extensionPage * DESTINATION_PAGE_SIZE), "extension")}
+          <Pagination page={extensionPage} totalPages={Math.ceil(extensionPlatforms.length / DESTINATION_PAGE_SIZE)} total={extensionPlatforms.length} onPage={setExtensionPage} />
+        </section>}
         <section><h3 className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">Đăng nhập một lần (OAuth chính thức)</h3><p className="mb-3 text-xs leading-5 text-muted">Bấm Kết nối, đăng nhập trên trang của nền tảng và cấp quyền. Hệ thống lưu token đã mã hoá; không cần dán token thủ công.</p>{providers.isPending ? <TableSkeleton rows={2} /> : providers.isError ? <ErrorState compact error={providers.error} onRetry={() => void providers.refetch()} /> : <div className="grid gap-3 sm:grid-cols-2">{providers.data.map((provider) => { const providerPlatform = provider.platform || provider.provider; const ready = provider.status === "READY"; return <div key={provider.provider} className="flex items-center gap-3 rounded-xl border border-border p-4"><PlatformMark slug={providerPlatform} name={providerPlatform} /><div className="min-w-0 flex-1"><p className="text-sm font-bold">{oauthProviderLabel(provider.provider)}</p><p className="mt-1 text-[11px] text-muted">{oauthProviderNote(provider.provider, provider.status)}</p>{!ready && <Badge value={provider.status} className="mt-2" />}</div>{ready && <Button size="sm" className="shrink-0" onClick={() => void connect(provider.provider)}><Link2 className="size-4" />Kết nối</Button>}</div>; })}</div>}</section>
         <section>
           <h3 className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">Kênh tự động qua API</h3>
@@ -315,16 +394,23 @@ export function AccountsView() {
           : credentialTarget.platform.mode === "MANUAL"
             ? "Cập nhật điểm đến bàn giao; không cần API key hoặc token."
             : "Secret cũ không được tải về; form này thay toàn bộ credential payload."
-        : credentialTarget?.platform.mode === "MANUAL"
+        : credentialTarget?.platform.defaultSettings?.extensionFlowId
+          ? "Tạo tài khoản và cấu hình luồng Chrome riêng cho diễn đàn này."
+          : credentialTarget?.platform.mode === "MANUAL"
           ? "Tạo điểm đến bàn giao thủ công, không cần API key hoặc token."
           : credentialTarget?.platform.mode === "BROWSER_ASSISTED"
             ? "Tạo account rồi đăng nhập bằng Playwright helper; không nhập mật khẩu social vào ứng dụng."
-            : "Tạo account, lưu credential mã hóa, rồi test connector."}
+            : credentialTarget?.platform.connectorKey === "discourse" || credentialTarget?.platform.slug === "discourse"
+              ? "Chọn đăng bằng tiện ích Chrome hoặc kết nối bằng API Key của diễn đàn."
+              : "Tạo account, lưu credential mã hóa, rồi test connector."}
       className="max-w-2xl"
     >
-      {credentialTarget && <CredentialAccountForm key={`${credentialTarget.platform.slug}:${credentialTarget.account?.id ?? "new"}`} target={credentialTarget} onClose={() => setCredentialTarget(null)} onBrowserLogin={setBrowserLoginAccount} />}
+      {credentialTarget && <CredentialAccountForm key={`${credentialTarget.platform.slug}:${credentialTarget.account?.id ?? "new"}`} target={credentialTarget} onClose={() => setCredentialTarget(null)} onBrowserLogin={setBrowserLoginAccount} onExtensionConfigure={setExtensionTarget} />}
     </Modal>
-    <Modal open={Boolean(extensionTarget)} onClose={() => setExtensionTarget(null)} title={`Tiện ích Chrome · ${extensionTarget?.name ?? ""}`} description="Đăng bài cho tài khoản này bằng Chrome đã đăng nhập diễn đàn, không cần API key hay mật khẩu." className="max-w-xl">
+    <Modal open={Boolean(sessionTarget)} onClose={() => setSessionTarget(null)} title={`Phiên Chrome / 2FA · ${sessionTarget?.name ?? ""}`} description="Gán đúng hồ sơ Chrome, thông tin đăng nhập và TOTP cho tài khoản này." className="max-w-xl">
+      {sessionTarget && <ExtensionSessionForm key={sessionTarget.id} account={sessionTarget} onClose={() => setSessionTarget(null)} />}
+    </Modal>
+    <Modal open={Boolean(extensionTarget)} onClose={() => setExtensionTarget(null)} title={`Tiện ích Chrome · ${extensionTarget?.name ?? ""}`} description="Cấu hình luồng đăng bài. Với nhiều tài khoản hoặc tự đăng nhập, mở Phiên Chrome / 2FA sau khi lưu." className="max-w-xl">
       {extensionTarget && <ExtensionDeliveryForm key={extensionTarget.id} account={extensionTarget} onClose={() => setExtensionTarget(null)} />}
     </Modal>
     <BrowserLoginGuide

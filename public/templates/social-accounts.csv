@@ -1,0 +1,3 @@
+Social Network,User,Pass,2FA,Phương thức Login,URL Profile,URL đăng bài,Tags,Category
+NGINX Community,name@example.com,,,Google,https://community.nginx.org/u/your-username,https://community.nginx.org/new-topic?category=projects%2Fnginx,web-server,projects/nginx
+Mastodon.social,your-username@example.com,replace-with-password,,Email,https://mastodon.social/@your-username,https://mastodon.social/publish,,

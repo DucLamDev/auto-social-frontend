@@ -34,7 +34,7 @@ const defaultValues: AutomationCampaignInput = {
   aiProvider: "openai",
   runMode: "NOW",
   scheduledAt: "",
-  confirmAutoPublish: false,
+  confirmAutoPublish: true,
 };
 
 export function AutomationCampaignModal({
@@ -100,6 +100,10 @@ export function AutomationCampaignModal({
   }, [accountKey, aiProviders, defaultAccountIds, form, open, preferredAiProvider]);
 
   const submit = form.handleSubmit(async (values) => {
+    if (accounts.some(account => values.accountIds.includes(account.id) && account.settings?.extensionEngine === "pixelfed") && (!values.image || values.image.size > 20 * 1024 * 1024)) {
+      form.setError("image", { type: "manual", message: "Pixelfed cần ảnh đính kèm tối đa 20 MiB. Thêm ảnh để đăng cùng các nền tảng đã chọn." });
+      return;
+    }
     const provider = aiProviders.find((item) => item.id === values.aiProvider);
     if (!provider?.configured) {
       form.setError("aiProvider", {
@@ -124,22 +128,36 @@ export function AutomationCampaignModal({
   return <Modal
     open={open}
     onClose={safeClose}
-    title="Tạo chiến dịch tự động"
-    description="Nhập mô tả một lần, AI sẽ viết nội dung riêng rồi tự đăng qua API hoặc adapter Playwright đã được kiểm thử."
+    title="Tạo bài & đăng tự động"
+    description="Nhập mô tả, chọn tài khoản rồi bấm Tạo bằng AI & đăng ngay. Hệ thống tự viết nội dung phù hợp từng nền tảng và đăng qua các kết nối đã thiết lập."
     className="max-w-3xl"
   >
     <form className="space-y-6" onSubmit={submit}>
       <div className="grid gap-2 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-violet-50 p-4 sm:grid-cols-3">
         <FlowStep icon={<Bot className="size-4" />} number="1" label="AI viết bài" />
-        <FlowStep icon={<CheckCircle2 className="size-4" />} number="2" label="Tự duyệt biến thể" />
+        <FlowStep icon={<CheckCircle2 className="size-4" />} number="2" label="Phù hợp từng kênh" />
         <FlowStep icon={<Send className="size-4" />} number="3" label="Đăng lên các kênh" />
+      </div>
+
+      <div>
+        <Label htmlFor="automation-brief">Mô tả bài đăng</Label>
+        <Textarea
+          id="automation-brief"
+          autoFocus
+          className="min-h-40"
+          placeholder="Mô tả sản phẩm, khách hàng mục tiêu, lợi ích nổi bật, ưu đãi, đường dẫn và giọng văn mong muốn. AI sẽ dùng thông tin này để viết bài phù hợp cho từng kênh."
+          {...form.register("brief")}
+        />
+        <div className="mt-1.5 flex items-start justify-between gap-3">
+          <FieldError>{form.formState.errors.brief?.message}</FieldError>
+          <span className="ml-auto shrink-0 text-[11px] text-muted">Càng cụ thể, bài viết càng đúng ý</span>
+        </div>
       </div>
 
       <div>
         <Label htmlFor="automation-name">Tên chiến dịch (tuỳ chọn)</Label>
         <Input
           id="automation-name"
-          autoFocus
           placeholder="Ví dụ: Ra mắt dịch vụ VPS tháng 10"
           {...form.register("name")}
         />
@@ -152,7 +170,7 @@ export function AutomationCampaignModal({
           <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-white text-indigo-600 shadow-sm"><ImagePlus className="size-4" /></span>
           <div>
             <Label htmlFor="automation-image" className="mb-0">Ảnh minh hoạ (tuỳ chọn)</Label>
-            <p className="mt-1 text-xs leading-5 text-muted">JPEG, PNG hoặc WebP, tối đa 50 MiB. Ảnh được tải lên một lần và dùng chung cho các biến thể phù hợp.</p>
+            <p className="mt-1 text-xs leading-5 text-muted">JPEG, PNG hoặc WebP, tối đa 50 MiB; Pixelfed tối đa 20 MiB. Bắt buộc khi chọn Pixelfed. Ảnh được tải lên một lần và dùng chung cho các biến thể phù hợp.</p>
           </div>
         </div>
         <Controller
@@ -180,22 +198,8 @@ export function AutomationCampaignModal({
           <FieldError>{form.formState.errors.imageAltText?.message}</FieldError>
         </div>
         <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-800">
-          Ảnh chỉ được gửi tới kênh có capability hỗ trợ ảnh. Kênh API hoặc Playwright chưa hỗ trợ ảnh (hiện gồm adapter VOZ) sẽ đăng bản chỉ có văn bản; điểm đến thủ công không tham gia chiến dịch tự động.
+          Ảnh được gửi tới các kênh hỗ trợ ảnh; các kênh còn lại đăng nội dung văn bản.
         </p>
-      </div>
-
-      <div>
-        <Label htmlFor="automation-brief">Mô tả bài đăng</Label>
-        <Textarea
-          id="automation-brief"
-          className="min-h-40"
-          placeholder="Mô tả sản phẩm, khách hàng mục tiêu, lợi ích nổi bật, ưu đãi, đường dẫn và giọng văn mong muốn. AI sẽ dùng thông tin này để viết bài phù hợp cho từng kênh."
-          {...form.register("brief")}
-        />
-        <div className="mt-1.5 flex items-start justify-between gap-3">
-          <FieldError>{form.formState.errors.brief?.message}</FieldError>
-          <span className="ml-auto shrink-0 text-[11px] text-muted">Càng cụ thể, bài viết càng đúng ý</span>
-        </div>
       </div>
 
       <div>
@@ -218,8 +222,8 @@ export function AutomationCampaignModal({
           ? <p className="mt-1.5 text-xs text-danger">Không thể tải cấu hình AI. Hãy đóng cửa sổ và thử lại.</p>
           : <p className="mt-1.5 text-xs text-muted">
             {selectedAiProviderOption?.configured
-              ? `Model do backend quản lý: ${selectedAiProviderOption.model}. API key không được gửi xuống trình duyệt.`
-              : "Provider này cần được cấu hình API key trong backend trước khi sử dụng."}
+              ? "Đã chọn sẵn AI của workspace. Bạn có thể giữ nguyên để đăng ngay."
+              : "AI này chưa được cấu hình cho workspace."}
           </p>}
       </div>
 
@@ -227,7 +231,7 @@ export function AutomationCampaignModal({
         <div className="mb-2 flex items-center justify-between gap-3">
           <div>
             <Label className="mb-0">Đăng tới tài khoản</Label>
-            <p className="mt-1 text-xs text-muted">Chỉ tài khoản API đã kết nối hoặc Playwright có session, quyền automation và auto-submit mới được chọn.</p>
+            <p className="mt-1 text-xs text-muted">Các tài khoản đã kết nối và bật đăng tự động được chọn sẵn. Bạn có thể bỏ những kênh không muốn đăng.</p>
             <p className="mt-1 text-[11px] font-semibold text-indigo-700">Đã chọn {selectedPlatformCount}/{MAX_AUTOMATION_PLATFORMS} nền tảng; có thể chọn nhiều tài khoản cùng nền tảng.</p>
           </div>
           {eligibleAccounts.length > 0 && <Controller
@@ -287,7 +291,9 @@ export function AutomationCampaignModal({
                       <span className="block truncate text-xs font-bold text-foreground">{account.name}</span>
                       <span className="block truncate text-[10px] text-muted">
                         {account.platform?.name ?? "Nền tảng"}{account.username ? ` · @${account.username.replace(/^@/, "")}` : ""}
-                        {account.platform?.mode === "MANUAL"
+                        {account.settings?.delivery === "extension"
+                          ? " · Tự động qua tiện ích Chrome"
+                          : account.platform?.mode === "MANUAL"
                           ? " · Bàn giao thủ công"
                           : account.platform?.mode === "BROWSER_ASSISTED"
                             ? " · Tự động qua Playwright"
@@ -297,7 +303,7 @@ export function AutomationCampaignModal({
                   </label>;
                 }) : <div className="col-span-2 py-7 text-center">
                   <p className="text-sm font-semibold text-slate-700">Chưa có tài khoản sẵn sàng</p>
-                  <p className="mt-1 text-xs leading-5 text-muted">Hãy kết nối ít nhất một tài khoản API hoặc hoàn tất session và cấu hình của adapter Playwright đã kiểm thử.</p>
+                  <p className="mt-1 text-xs leading-5 text-muted">Hãy kết nối tài khoản API, cấu hình luồng diễn đàn qua tiện ích Chrome hoặc hoàn tất đăng nhập Playwright.</p>
                 </div>}
           </div>}
         />
@@ -339,25 +345,7 @@ export function AutomationCampaignModal({
         </div>}
       </fieldset>
 
-      <div>
-        <Controller
-          control={form.control}
-          name="confirmAutoPublish"
-          render={({ field }) => <label className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 ${field.value ? "border-amber-300 bg-amber-50" : "border-border bg-slate-50"}`}>
-            <input
-              type="checkbox"
-              className="mt-1 size-4 shrink-0 accent-amber-600"
-              checked={field.value}
-              onChange={(event) => field.onChange(event.target.checked)}
-            />
-            <span>
-              <span className="block text-sm font-bold text-slate-800">Tôi xác nhận cho phép tự động đăng bài thật</span>
-              <span className="mt-1 block text-xs leading-5 text-slate-600">Hệ thống sẽ tự duyệt nội dung do AI tạo, gọi API hoặc chạy adapter Playwright của các tài khoản đủ điều kiện mà không cần duyệt thủ công lần nữa.</span>
-            </span>
-          </label>}
-        />
-        <FieldError>{form.formState.errors.confirmAutoPublish?.message}</FieldError>
-      </div>
+      <p className="rounded-xl bg-indigo-50 p-3 text-sm text-indigo-950">Bấm nút bên dưới sẽ tạo nội dung và đăng lên {selectedAccountIds.length} tài khoản đã chọn. Tiến độ và các bài chờ duyệt được cập nhật trên web.</p>
 
       {submitError && (
         <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800">
@@ -366,7 +354,7 @@ export function AutomationCampaignModal({
         </div>
       )}
 
-      <div className="flex flex-col-reverse justify-end gap-2 border-t border-border pt-5 sm:flex-row">
+      <div className="sticky -bottom-6 z-10 -mx-6 flex flex-col-reverse justify-end gap-2 border-t border-border bg-white px-6 py-4 shadow-[0_-4px_12px_0_rgb(0_0_0/0.04)] sm:flex-row">
         <Button variant="secondary" type="button" disabled={busy} onClick={safeClose}>Hủy</Button>
         <Button
           type="submit"

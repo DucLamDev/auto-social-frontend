@@ -1,11 +1,11 @@
 import type { Content, ContentVariant, PlatformAccount } from "@/types/domain";
 
-export const MAX_AUTOMATION_PLATFORMS = 12;
+export const MAX_AUTOMATION_PLATFORMS = 50;
 
 export function getAutomationAccountBlocker(account: PlatformAccount): string | undefined {
   if (!account.enabled || account.status === "DISABLED") return "Tài khoản đang tắt.";
   // The Chrome extension posts for any forum; it only needs the account to be connected.
-  if (account.settings?.delivery === "extension") return account.status === "CONNECTED" ? undefined : "Tài khoản chưa kết nối.";
+  if (account.settings?.delivery === "extension") return account.settings.extensionAutoSubmit === false ? "Chưa bật tự động bấm Đăng." : account.status === "CONNECTED" ? undefined : "Tài khoản chưa kết nối.";
   if (account.platform?.mode === "MANUAL") {
     return account.platform.connectorStatus === "API_REVIEW_REQUIRED"
       ? "Chưa có connector API đã duyệt cho nền tảng này."

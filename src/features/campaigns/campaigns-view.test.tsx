@@ -82,7 +82,6 @@ describe("CampaignsView automation media retries", () => {
     fireEvent.change(brief, { target: { value: "Quảng bá VPS hiệu năng cao cho cộng đồng lập trình viên Việt Nam." } });
     fireEvent.change(screen.getByLabelText("Ảnh minh hoạ (tuỳ chọn)"), { target: { files: [image] } });
     fireEvent.change(screen.getByLabelText("Mô tả ảnh / alt text (tuỳ chọn)"), { target: { value: "Dashboard VPS" } });
-    fireEvent.click(screen.getByRole("checkbox", { name: /Tôi xác nhận cho phép tự động đăng bài thật/ }));
     const submit = screen.getByRole("button", { name: /Tạo bằng AI & đăng ngay/ });
 
     fireEvent.click(submit);

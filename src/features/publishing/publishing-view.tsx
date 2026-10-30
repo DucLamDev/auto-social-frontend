@@ -1,12 +1,13 @@
 "use client";
-import { AlertTriangle, Clock3, Copy, ExternalLink, LogIn, Play, Puzzle, RefreshCw, RotateCcw, Settings2 } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, Clock3, Copy, ExternalLink, FileText, LogIn, Play, Puzzle, RefreshCw, RotateCcw, Settings2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import { PageHeader } from "@/components/layout/page-header";
 import { PlatformMark } from "@/components/platforms/platform-mark";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input, Label } from "@/components/ui/form";
@@ -22,6 +23,7 @@ import { env } from "@/config/env";
 import type { PublishJob } from "@/types/domain";
 import { buildBrowserLoginCommand } from "@/features/accounts/browser-login-guide";
 import { getNeedsActionMessage } from "./needs-action-feedback";
+import { safeReviewUrl } from "./review-links";
 
 const tabs = ["", "QUEUED", "PUBLISHING", "PROCESSING", "PUBLISHED", "RETRY", "FAILED", "NEEDS_ACTION"] as const;
 
@@ -31,7 +33,18 @@ function canResumeBrowserJob(job: PublishJob) {
     && (job.accountStatus === undefined || job.accountStatus === "CONNECTED");
 }
 
-export function PublishingView() {
+function ModerationLink({ job }: { job: PublishJob }) {
+  if (job.needsAction?.kind !== "MODERATION") return null;
+  const postUrl = safeReviewUrl(job.needsAction.url) || safeReviewUrl(job.publishedUrl);
+  const href = postUrl || safeReviewUrl(job.reviewUrl);
+  return <div className="mt-2 flex flex-col items-start gap-2 text-xs">
+    <Link href={`/pending-posts/${job.id}`} className="inline-flex items-center gap-1 font-semibold text-primary hover:underline"><FileText className="size-3.5" />Xem nội dung</Link>
+    {href && <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline"><ExternalLink className="size-3.5 shrink-0" />{postUrl ? "Mở bài viết" : job.reviewUrlKind === "pending_queue" ? "Xem hàng đợi trên diễn đàn" : "Mở diễn đàn để kiểm tra"}</a>}
+    {!postUrl && <p className="text-muted">Chưa có link công khai của bài viết.</p>}
+  </div>;
+}
+
+export function PublishingView({ moderationOnly = false }: { moderationOnly?: boolean } = {}) {
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -42,13 +55,13 @@ export function PublishingView() {
   const [reconcileRetryTarget, setReconcileRetryTarget] = useState<PublishJob | null>(null);
   const [browserResumeTarget, setBrowserResumeTarget] = useState<PublishJob | null>(null);
   const [extensionRequeueTarget, setExtensionRequeueTarget] = useState<PublishJob | null>(null);
-  const query = usePublishJobs({ page, limit: 50, status: status || undefined, search: search || undefined });
+  const query = usePublishJobs({ page, limit: 50, status: moderationOnly ? "NEEDS_ACTION" : status || undefined, reviewState: moderationOnly ? "MODERATION" : undefined, search: search || undefined });
   const confirmationJob = query.data?.items.find((job) => job.id === manualJobId);
   const retry = useResourceMutation((id: string) => resourcesService.retryJob(id), ["publish-jobs"]);
   const reconcileRetry = useResourceMutation((id: string) => resourcesService.reconcileNotFound(id), ["publish-jobs"]);
   const resumeBrowser = useResourceMutation((id: string) => resourcesService.resumeBrowserJob(id), ["publish-jobs"]);
   const requeueExtension = useResourceMutation((id: string) => resourcesService.requeueExtensionJob(id), ["publish-jobs", "account-health"]);
-  const mark = useResourceMutation((input: { id: string; externalPostId: string; url?: string }) => resourcesService.markPublished(input.id, { externalPostId: input.externalPostId, url: input.url }), ["publish-jobs"]);
+  const mark = useResourceMutation((input: { id: string; externalPostId: string; url?: string }) => resourcesService.markPublished(input.id, { externalPostId: input.externalPostId, url: input.url }), ["publish-jobs", "published-posts"]);
 
   const copyAndOpen = async (id: string, openUrl?: string) => {
     const destinationWindow = window.open("about:blank", "_blank");
@@ -119,15 +132,16 @@ export function PublishingView() {
   };
 
   return <div className="animate-enter">
-    <PageHeader eyebrow="Operations" title="Publishing" description={`Theo dõi publish jobs theo thời gian gần thực. Bảng tự làm mới mỗi ${Math.max(1, Math.round(env.pollIntervalMs / 1000))} giây mà không chặn giao diện.`} action={<div className="flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-700"><span className="size-2 animate-pulse rounded-full bg-emerald-500" />Live polling</div>} />
+    <PageHeader eyebrow="Operations" title={moderationOnly ? "Bài chờ duyệt" : "Publishing"} description={moderationOnly ? "Các bài nền tảng đã nhận và đang chờ duyệt. Nếu chưa có link bài, mở diễn đàn để kiểm tra. Sau khi được duyệt, cập nhật URL bằng nút Đã được duyệt để đưa vào Bài đã đăng." : `Theo dõi publish jobs theo thời gian gần thực. Bảng tự làm mới mỗi ${Math.max(1, Math.round(env.pollIntervalMs / 1000))} giây mà không chặn giao diện.`} action={<div className="flex flex-wrap items-center gap-3">{!moderationOnly && <Link href="/pending-posts" className={buttonVariants({ variant: "secondary" })}><Clock3 className="size-4" />Bài chờ duyệt</Link>}<Link href="/published-posts" className={buttonVariants({ variant: "secondary" })}><ExternalLink className="size-4" />Bài đã đăng</Link><div className="flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-700"><span className="size-2 animate-pulse rounded-full bg-emerald-500" />Live polling</div></div>} />
     <Card className="overflow-hidden">
-      <div className="flex gap-1 overflow-x-auto border-b border-border px-4 pt-3">{tabs.map((tab) => <button key={tab || "all"} onClick={() => { setStatus(tab); setPage(1); }} className={cn("shrink-0 rounded-t-xl px-3 py-2.5 text-xs font-semibold", status === tab ? "border border-b-white border-border bg-white text-primary" : "text-slate-500 hover:bg-slate-50")}>{tab ? tab.replaceAll("_", " ") : "Tất cả"}</button>)}</div>
+      {moderationOnly && <div className="border-b border-border px-5 py-4 text-sm font-semibold">{query.data ? `${query.data.meta?.total ?? query.data.items.length} bài chờ duyệt${search ? " khớp tìm kiếm" : ""}` : "Đang tải bài chờ duyệt…"}</div>}
+      {!moderationOnly && <div className="flex gap-1 overflow-x-auto border-b border-border px-4 pt-3">{tabs.map((tab) => <button key={tab || "all"} onClick={() => { setStatus(tab); setPage(1); }} className={cn("shrink-0 rounded-t-xl px-3 py-2.5 text-xs font-semibold", status === tab ? "border border-b-white border-border bg-white text-primary" : "text-slate-500 hover:bg-slate-50")}>{tab ? tab.replaceAll("_", " ") : "Tất cả"}</button>)}</div>}
       <Toolbar search={search} onSearch={(value) => { setSearch(value); setPage(1); }} searchPlaceholder="Tìm theo nội dung, tài khoản…" end={<Button variant="ghost" size="sm" onClick={() => void query.refetch()}><RefreshCw className={cn("size-4", query.isFetching && "animate-spin")} />Làm mới</Button>} />
-      {query.isPending ? <div className="p-5"><TableSkeleton /></div> : query.isError ? <ErrorState error={query.error} onRetry={() => void query.refetch()} /> : !query.data.items.length ? <EmptyState title="Không có publish job" description="Các tác vụ từ campaign sẽ xuất hiện tại đây." /> : <><TableWrap><Table><thead><tr><Th>Nền tảng / tài khoản</Th><Th>Nội dung</Th><Th>Trạng thái</Th><Th>Lần thử</Th><Th>Thời gian</Th><Th className="text-right">Kết quả</Th></tr></thead><tbody>{query.data.items.map((job) => <tr key={job.id} className="hover:bg-slate-50/70">
+      {query.isPending ? <div className="p-5"><TableSkeleton /></div> : query.isError ? <ErrorState error={query.error} onRetry={() => void query.refetch()} /> : !query.data.items.length ? <EmptyState title={moderationOnly ? "Không có bài đang chờ duyệt" : "Không có publish job"} description={moderationOnly ? "Bài đã được nền tảng nhận và yêu cầu duyệt sẽ xuất hiện ở đây. Thử xóa từ khóa nếu đang tìm kiếm." : "Các tác vụ từ campaign sẽ xuất hiện tại đây."} /> : <><TableWrap><Table><thead><tr><Th>Nền tảng / tài khoản</Th><Th>Nội dung</Th><Th>Trạng thái</Th><Th>Lần thử</Th><Th>Thời gian</Th><Th className="text-right">Kết quả</Th></tr></thead><tbody>{query.data.items.map((job) => <tr key={job.id} className="hover:bg-slate-50/70">
         <Td><div className="flex items-center gap-3"><PlatformMark slug={job.platform.toLowerCase()} name={job.platform} /><div><p className="text-xs font-bold capitalize text-foreground">{job.platform}</p><p className="mt-0.5 text-[11px] text-muted">{job.account}</p></div></div></Td>
-        <Td className="max-w-xs"><p className="truncate font-semibold text-foreground">{job.contentTitle}</p>{job.error && <p title={job.error.message} className="mt-1 truncate text-[10px] text-danger">{job.error.code}: {job.error.message}</p>}{getNeedsActionMessage(job.needsAction) && <p title={job.needsAction?.message} className={cn("mt-1 line-clamp-2 text-[10px] leading-4", job.needsAction?.kind === "EXTENSION_PENDING" ? "text-indigo-700" : "text-amber-700")}>{getNeedsActionMessage(job.needsAction)}</p>}</Td>
-        <Td><Badge value={job.needsAction?.kind === "EXTENSION_PENDING" ? "WAITING_EXTENSION" : job.status} /></Td><Td><span className="text-xs font-semibold">{job.attempt}/{job.maxAttempts ?? 3}</span></Td>
-        <Td className="text-xs"><p>{formatDate(job.startedAt || job.scheduledAt)}</p>{job.finishedAt && <p className="mt-0.5 text-[10px] text-muted">Xong {formatDate(job.finishedAt)}</p>}</Td>
+        <Td className="max-w-xs"><p className="truncate font-semibold text-foreground">{job.contentTitle}</p>{job.error && job.needsAction?.kind !== "MODERATION" && <p title={job.error.message} className="mt-1 truncate text-[10px] text-danger">{job.error.code}: {job.error.message}</p>}{getNeedsActionMessage(job.needsAction) && <p title={job.needsAction?.message} className={cn("mt-1 line-clamp-2 text-[10px] leading-4", job.needsAction?.kind === "EXTENSION_PENDING" ? "text-indigo-700" : "text-amber-700")}>{getNeedsActionMessage(job.needsAction)}</p>}<ModerationLink job={job} /></Td>
+        <Td><Badge value={job.needsAction?.kind === "MODERATION" ? "MODERATION_PENDING" : job.needsAction?.kind === "EXTENSION_PENDING" ? "WAITING_EXTENSION" : job.status} /></Td><Td><span className="text-xs font-semibold">{job.attempt}/{job.maxAttempts ?? 3}</span></Td>
+        <Td className="text-xs"><p>{formatDate(job.startedAt || job.scheduledAt)}</p>{job.finishedAt && <p className="mt-0.5 text-[10px] text-muted">{job.needsAction?.kind === "MODERATION" ? "Đã gửi" : "Xong"} {formatDate(job.finishedAt)}</p>}</Td>
         <Td><div className="flex flex-wrap justify-end gap-1">{job.publishedUrl && <a href={job.publishedUrl} target="_blank" rel="noreferrer" className="grid size-9 place-items-center rounded-lg text-primary hover:bg-indigo-50" aria-label="Mở bài đã đăng"><ExternalLink className="size-4" /></a>}<PermissionGate allow={["ADMIN", "EDITOR"]}>{job.status === "FAILED" && <Button variant="ghost" size="sm" onClick={() => setRetryTarget({ id: job.id, contentTitle: job.contentTitle, account: job.account })}><RotateCcw className="size-4" />Retry</Button>}{job.status === "NEEDS_ACTION" && (job.needsAction ? <>
           {job.needsAction.kind === "EXTENSION_PENDING" && <span className="inline-flex items-center gap-1 px-2 text-[11px] font-semibold text-indigo-700" title="Tiện ích Chrome sẽ nhận bài này trong vòng 30 giây khi Chrome đang mở."><Puzzle className="size-3.5" />Chờ tiện ích Chrome</span>}
           {job.needsAction.kind === "EXTENSION_ACTION" && <><span className="inline-flex items-center gap-1 px-2 text-[11px] font-semibold text-amber-700"><Puzzle className="size-3.5" />Tiện ích cần bạn</span><Button variant="secondary" size="sm" onClick={() => openPublishedConfirmation(job)}>Đã đăng</Button><Button variant="ghost" size="sm" onClick={() => setExtensionRequeueTarget(job)}><RotateCcw className="size-4" />Giao lại cho tiện ích</Button></>}

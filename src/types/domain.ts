@@ -18,6 +18,16 @@ export interface Content { id: string; title: string; description?: string | nul
 export interface ContentVariant { id: string; contentId: string; platform: string; platformSlug: string; title?: string | null; body: string; summary?: string | null; hashtags?: string[]; cta?: string | null; status: Status; recommended?: boolean; reason?: string | null; updatedAt?: string; }
 export interface MediaAsset { id: string; contentId?: string | null; variantId?: string | null; type: "IMAGE" | "VIDEO" | "DOCUMENT"; storageKey: string; publicUrl?: string | null; mimeType: string; sizeBytes: number; altText?: string | null; createdAt: string; }
 export interface Campaign { id: string; name: string; content?: Pick<Content, "id" | "title">; status: Status; targetsCount?: number; publishedCount?: number; failedCount?: number; needsActionCount?: number; activeCount?: number; scheduledCount?: number; scheduledAt?: string | null; createdAt: string; }
+export interface PublishedPost {
+  id: string;
+  publishJobId: string;
+  title: string;
+  url: string | null;
+  publishedAt: string;
+  campaign: { id: string; name: string };
+  account: { id: string; name: string };
+  platform: { id: string; slug: string; name: string };
+}
 export type PublishNeedsAction = {
   kind: "MODERATION" | "RECONCILIATION" | "BROWSER_LOGIN" | "BROWSER_REVIEW" | "POLICY_BLOCKED" | "EXTENSION_PENDING" | "EXTENSION_ACTION";
   externalPostId?: string;
@@ -29,7 +39,7 @@ export type PublishNeedsAction = {
   message?: string;
   challengeKind?: string;
 };
-export interface PublishJob { id: string; campaignId?: string; platform: string; account: string; accountStatus?: PlatformAccount["status"]; accountEnabled?: boolean; contentTitle: string; status: Status; attempt: number; maxAttempts?: number; scheduledAt?: string | null; startedAt?: string | null; finishedAt?: string | null; publishedUrl?: string | null; error?: { code: string; message: string } | null; needsAction?: PublishNeedsAction; }
+export interface PublishJob { reviewUrl?: string; reviewUrlKind?: "pending_queue" | "platform"; id: string; campaignId?: string; platform: string; account: string; accountStatus?: PlatformAccount["status"]; accountEnabled?: boolean; contentTitle: string; status: Status; attempt: number; maxAttempts?: number; scheduledAt?: string | null; startedAt?: string | null; finishedAt?: string | null; publishedUrl?: string | null; error?: { code: string; message: string } | null; needsAction?: PublishNeedsAction; }
 export interface PromptTemplate { id: string; platform: string; platformSlug: string; name: string; systemPrompt: string; userPrompt?: string; version: number; active: boolean; updatedAt: string; }
 export interface AuditLog { id: string; action: string; resource: string; resourceId?: string | null; actor?: { name: string; email?: string } | null; status?: "SUCCESS" | "FAILED"; requestId?: string; metadata?: Record<string, unknown>; createdAt: string; }
 export interface DashboardMetrics { publishedToday: number; scheduled: number; failed: number; processing: number; connectedAccounts: number; enabledPlatforms: number; trend?: Array<{ date: string; published: number; failed: number }>; recentJobs?: PublishJob[]; }

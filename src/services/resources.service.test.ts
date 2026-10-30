@@ -19,6 +19,35 @@ afterEach(() => {
 });
 
 describe("resourcesService contract adapters", () => {
+  it("forwards the moderation filter and keeps destination links separate from published URLs", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(apiResponse([
+      { id: "pending", status: "NEEDS_ACTION", reviewUrl: "https://forum.example/my/activity/pending", reviewUrlKind: "pending_queue", lastErrorCode: "EXTENSION_MODERATION_PENDING", attemptCount: 1, maxAttempts: 3 },
+      { id: "approved", status: "PUBLISHED", attempts: [{ responseMetadata: { moderationQueue: true } }], attemptCount: 1, maxAttempts: 3 },
+    ]));
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await resourcesService.publishJobs({ reviewState: "MODERATION", status: "NEEDS_ACTION", page: 2, search: "test" });
+    const url = new URL(String(fetchMock.mock.calls[0]?.[0]));
+    expect(url.searchParams.get("reviewState")).toBe("MODERATION");
+    expect(result.items[0]).toMatchObject({ reviewUrl: "https://forum.example/my/activity/pending", reviewUrlKind: "pending_queue", needsAction: { kind: "MODERATION" } });
+    expect(result.items[0]?.publishedUrl).toBeUndefined();
+    expect(result.items[1]?.needsAction).toBeUndefined();
+  });
+
+  it("reads published history with pagination and retains the exact platform result URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      success: true,
+      data: [{ id: "post", publishJobId: "job", url: "https://forum.example.com/t/42", publishedAt: "2026-10-30T00:00:00Z", platformAccount: { id: "account", name: "Team account", platform: { id: "platform", slug: "discourse", name: "Forum" } }, job: { target: { campaign: { id: "campaign", name: "Launch" }, contentVariant: { title: null } } } }],
+      meta: { page: 2, limit: 25, total: 27, totalPages: 2 },
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await resourcesService.publishedPosts({ page: 2, limit: 25, platformId: "platform", accountId: "account", search: "launch" });
+    const url = new URL(String(fetchMock.mock.calls[0]?.[0]));
+    expect(url.pathname).toBe("/api/v1/published-posts");
+    expect(Object.fromEntries(url.searchParams)).toEqual({ page: "2", limit: "25", platformId: "platform", accountId: "account", search: "launch" });
+    expect(result.meta).toMatchObject({ page: 2, total: 27, totalPages: 2 });
+    expect(result.items[0]).toMatchObject({ title: "Launch", url: "https://forum.example.com/t/42", account: { id: "account", name: "Team account" }, campaign: { id: "campaign", name: "Launch" } });
+  });
+
   it("forwards platform pagination and catalog filters to the backend", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       success: true,
@@ -468,7 +497,7 @@ describe("resourcesService contract adapters", () => {
       target: { campaign: { id: "c", name: "C" }, contentVariant: { id: "v", title: "T" } },
       attempts: [{ id: "a", attemptNumber: 1, status: "SUCCEEDED", startedAt: "2026-10-24T00:00:00.000Z", responseMetadata: { extensionQueued: true } }],
     });
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(apiResponse([job(null, null), job("EXTENSION_CAPTCHA_REQUIRED", "Hoàn thành CAPTCHA")])));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(apiResponse([job(null, null), job("EXTENSION_CAPTCHA_REQUIRED", "Hoàn thành CAPTCHA"), job("EXTENSION_MODERATION_PENDING", "Diễn đàn đã nhận bài, chờ duyệt")])));
 
     const response = await resourcesService.publishJobs();
 
@@ -476,6 +505,8 @@ describe("resourcesService contract adapters", () => {
     expect(response.items[0]?.error).toBeNull();
     expect(response.items[1]?.needsAction).toEqual({ kind: "EXTENSION_ACTION", reason: "CAPTCHA_REQUIRED", message: "Hoàn thành CAPTCHA" });
     expect(response.items[1]?.error).toBeNull();
+    expect(response.items[2]?.needsAction).toEqual({ kind: "MODERATION", message: "Diễn đàn đã nhận bài, chờ duyệt" });
+    expect(response.items[2]?.error).toBeNull();
   });
 
   it("distinguishes an already-submitted moderation job from manual publishing", async () => {

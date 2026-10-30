@@ -29,7 +29,7 @@ vi.mock("@/services/resources.service", () => ({
   },
 }));
 
-function renderJob(job: PublishJob) {
+function renderJob(job: PublishJob, moderationOnly = false) {
   mocks.usePublishJobs.mockReturnValue({
     data: {
       items: [job],
@@ -40,7 +40,7 @@ function renderJob(job: PublishJob) {
     isFetching: false,
     refetch: mocks.refetch,
   });
-  render(<PublishingView />);
+  render(<PublishingView moderationOnly={moderationOnly} />);
 }
 
 const baseJob: PublishJob = {
@@ -54,6 +54,23 @@ const baseJob: PublishJob = {
 };
 
 describe("PublishingView provider reconciliation", () => {
+  it("requests the moderation queue and labels the forum link separately from a post permalink", () => {
+    renderJob({ ...baseJob, reviewUrl: "https://forum.example.com/my/activity/pending", reviewUrlKind: "pending_queue", needsAction: { kind: "MODERATION" } }, true);
+    expect(mocks.usePublishJobs).toHaveBeenCalledWith(expect.objectContaining({ reviewState: "MODERATION", status: "NEEDS_ACTION" }));
+    expect(screen.getByRole("heading", { name: "Bài chờ duyệt" })).toBeInTheDocument();
+    expect(screen.getByText("Chưa có link công khai của bài viết.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Xem hàng đợi trên diễn đàn" })).toHaveAttribute("href", "https://forum.example.com/my/activity/pending");
+    expect(screen.getByRole("link", { name: "Xem nội dung" })).toHaveAttribute("href", "/pending-posts/job-1");
+    expect(screen.queryByRole("button", { name: /Retry|Giao lại/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps local content accessible when the provider omits or returns an unsafe URL", () => {
+    renderJob({ ...baseJob, reviewUrl: "javascript:alert(1)", needsAction: { kind: "MODERATION", url: "https://user:password@forum.example/" } }, true);
+    expect(screen.getByRole("link", { name: "Xem nội dung" })).toHaveAttribute("href", "/pending-posts/job-1");
+    expect(screen.queryByRole("link", { name: "Mở bài viết" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Mở diễn đàn để kiểm tra" })).not.toBeInTheDocument();
+  });
+
   beforeEach(() => {
     mocks.refetch.mockReset();
     mocks.mutateAsync.mockReset();
@@ -72,6 +89,8 @@ describe("PublishingView provider reconciliation", () => {
     });
 
     expect(screen.getByText("Chờ forum duyệt")).toBeInTheDocument();
+    expect(screen.getByText("Đã gửi · chờ duyệt")).toBeInTheDocument();
+    expect(screen.queryByText("Cần thao tác")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Copy & mở" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Đã được duyệt" }));
     expect(screen.getByRole("dialog", { name: "Xác nhận forum đã duyệt" })).toBeInTheDocument();
