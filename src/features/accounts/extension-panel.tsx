@@ -31,6 +31,13 @@ export function canUseExtension(account: Pick<PlatformAccount, "platform">) {
 }
 
 export const ENGINE_HELP: Record<ExtensionEngine, { label: string; placeholder: string; help: string }> = {
+  differ: { label: "Differ", placeholder: "https://differ.blog/new-story", help: "Nhập tiêu đề, bài viết, Keyword rồi Publish." },
+  dzone: { label: "DZone", placeholder: "https://dzone.com/content/article/post.html", help: "Nhập bài và tl;dr, gửi ban biên tập duyệt. Cần đủ thông tin mà form yêu cầu." },
+  stackexchange: { label: "Stack Exchange · câu hỏi", placeholder: "https://serverfault.com/questions/ask", help: "Nhập ít nhất một tag đúng chuyên môn. Tự điền câu hỏi, Review rồi Post; Staging Ground được ghi nhận là chờ duyệt." },
+  lemmy: { label: "Lemmy", placeholder: "https://lemmy.world/create_post", help: "Điền tên community đích ở Chuyên mục. Tự chọn community, nhập nội dung và tạo bài." },
+  discuit: { label: "Discuit", placeholder: "https://discuit.org/new", help: "Điền tên community đích ở Chuyên mục. Luồng đăng bài Text." },
+  linkedin: { label: "LinkedIn · hồ sơ cá nhân", placeholder: "https://www.linkedin.com/feed/", help: "Start a post → điền nội dung → Post. Tối đa 3.000 ký tự." },
+  minds: { label: "Minds · My Channel", placeholder: "https://www.minds.com/newsfeed/subscriptions", help: "Create → Compose → My Channel → Post. Giữ nguyên bản nháp khác và không bật Boost." },
   mastodon: { label: "Mastodon / Vivaldi Social", placeholder: "https://mastodon.social/publish", help: "Bài viết ngắn trên hồ sơ đang đăng nhập, tối đa 500 ký tự." },
   bluesky: { label: "Bluesky", placeholder: "https://bsky.app/intent/compose", help: "Bài viết ngắn tối đa 300 ký tự." },
   tumblr: { label: "Tumblr", placeholder: "https://www.tumblr.com/new/text", help: "Đăng bài Text trên blog Tumblr đang chọn." },

@@ -12,10 +12,10 @@ const postingNotes: Record<string, string> = {
   producthunt: "Product Hunt dùng luồng ra mắt sản phẩm. Mở Submit → New Product hoặc bản nháp có sẵn, hoàn tất Launch tags rồi Finish setup. Extension hiện chưa có luồng tự xuất bản launch.",
   'product-hunt': "Product Hunt dùng luồng ra mắt sản phẩm. Mở Submit → New Product hoặc bản nháp có sẵn, hoàn tất Launch tags rồi Finish setup. Extension hiện chưa có luồng tự xuất bản launch.",
   dailymotion: "Dailymotion cần video. Mở Dailymotion Studio, tải video và hoàn tất thông tin xuất bản. Extension hiện chưa có luồng tự tải và xuất bản video.",
-  'stack-overflow': "Stack Overflow cần câu hỏi lập trình và tags phù hợp. Mở Ask Question để soạn câu hỏi. Extension hiện chưa có luồng tự đăng câu hỏi.",
-  'server-fault': "Server Fault cần câu hỏi quản trị hệ thống và tags phù hợp. Mở Ask Question để soạn câu hỏi. Extension hiện chưa có luồng tự đăng câu hỏi.",
-  'unix-linux-stackexchange': "Unix & Linux cần câu hỏi Linux/Unix và tags phù hợp. Mở Ask Question để soạn câu hỏi. Extension hiện chưa có luồng tự đăng câu hỏi.",
-  minds: "Phiên Minds có thể được xác nhận qua Chrome. Extension hiện chưa có luồng điền và xuất bản bài trên Minds.",
+  'stack-overflow': "Stack Overflow cần câu hỏi lập trình và tags phù hợp. Mở Ask Question để soạn câu hỏi. Cấu hình ít nhất một tag có thật; tiện ích đi qua bước review rồi gửi câu hỏi. Stack Overflow có thể chuyển bài vào Staging Ground.",
+  'server-fault': "Server Fault cần câu hỏi quản trị hệ thống và tags phù hợp. Mở Ask Question để soạn câu hỏi. Cấu hình ít nhất một tag có thật; tiện ích đi qua bước review rồi gửi câu hỏi. Stack Overflow có thể chuyển bài vào Staging Ground.",
+  'unix-linux-stackexchange': "Unix & Linux cần câu hỏi Linux/Unix và tags phù hợp. Mở Ask Question để soạn câu hỏi. Cấu hình ít nhất một tag có thật; tiện ích đi qua bước review rồi gửi câu hỏi. Stack Overflow có thể chuyển bài vào Staging Ground.",
+  minds: "Minds dùng Create → Compose → My Channel → Post. Cấu hình đăng qua tiện ích, sau đó kiểm tra phiên Chrome.",
 };
 
 export function extensionConnectionHelp(account: PlatformAccount, check?: { status: string; message?: string | null }) {

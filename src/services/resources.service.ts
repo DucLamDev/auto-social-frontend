@@ -20,8 +20,10 @@ export type GeminiKeysSettings = { revision: string; source: "environment" | "sa
 export type GeminiKeysUpdate = { revision: string; changes: Array<{ slot: number; apiKey?: string; clear?: boolean }> };
 export type AccountImportResult = { imported: number; queued: number; batchId: string; rows: Array<{ id?: string; row: string; name: string; setup?: string; issue?: string }> };
 export type ExtensionLoginCheckRow = { id: string; name: string; platform: string; configured: boolean; autoLogin?: boolean; issues: string[]; deviceId?: string;
+  posting?: { status: string; implemented: boolean; engine?: string; message: string; url?: string };
+  attempts?: Array<{ method: string; available: boolean; check: { status: string; message?: string | null; finishedAt?: string | null } | null }>;
   check: { id: string; status: string; message?: string | null; detectedUsername?: string | null; finishedAt?: string | null } | null };
-export type ExtensionEngine = "xenforo" | "discourse" | "phpbb" | "medium" | "substack" | "quora" | "reddit" | "slideshare" | "aws-builder" | "tinhte" | "pixelfed" | "mastodon" | "bluesky" | "tumblr" | "devto";
+export type ExtensionEngine = "xenforo" | "discourse" | "phpbb" | "medium" | "substack" | "quora" | "reddit" | "slideshare" | "aws-builder" | "tinhte" | "pixelfed" | "mastodon" | "bluesky" | "tumblr" | "devto" | "minds" | "stackexchange" | "lemmy" | "discuit" | "linkedin" | "differ" | "dzone";
 export type ExtensionDeliveryInput = { enabled: boolean; engine?: ExtensionEngine; targetUrl?: string; autoSubmit?: boolean; tags?: string[]; category?: string; flair?: string };
 export type ExtensionSessionInput = { deviceId: string; expectedUsername: string; profileUrl?: string; identitySelector?: string; provider: "password" | "google"; autoLogin: boolean; autoTotp: boolean; loginUrl?: string; loginUsername?: string; password?: string; totpSecret?: string };
 
@@ -174,7 +176,7 @@ const result = <T, U>(raw: ListResult<T>, items: U[]): ListResult<U> => ({ items
 
 export const resourcesService = {
   extensionLoginChecks: () => apiRequest<ExtensionLoginCheckRow[]>("/extension/login-checks"),
-  queueExtensionLoginChecks: (accountIds?: string[], verifyOnly = false) => apiRequest<{ batchId: string; queued: number }>("/extension/login-checks", { method: "POST", body: { accountIds, verifyOnly } }),
+  queueExtensionLoginChecks: (accountIds?: string[], verifyOnly = false, tryBoth = false) => apiRequest<{ batchId: string; queued: number }>("/extension/login-checks", { method: "POST", body: { accountIds, verifyOnly, tryBoth } }),
   aiProviders: () => apiRequest<AiProviderOption[]>("/ai/providers"),
   geminiKeys: () => apiRequest<GeminiKeysSettings>("/ai/gemini-keys"),
   updateGeminiKeys: (input: GeminiKeysUpdate) => apiRequest<GeminiKeysSettings>("/ai/gemini-keys", { method: "PUT", body: input }),

@@ -21,6 +21,6 @@ describe("bulk login panel", () => {
   it("queues authentication checks from the web", async () => {
     render(<ExtensionLoginCheckPanel />);
     fireEvent.click(screen.getByRole("button", { name: "Test đăng nhập hàng loạt" }));
-    await waitFor(() => expect(queue).toHaveBeenCalledWith());
+    await waitFor(() => expect(queue).toHaveBeenCalledWith(undefined, false, true));
   });
 });

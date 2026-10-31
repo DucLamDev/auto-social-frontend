@@ -22,7 +22,12 @@ export function getAiGenerationErrorMessage(error: unknown) {
   let actionable = error.message;
 
   if (message.includes("all configured gemini api keys")) {
-    actionable = "Tất cả API key Gemini đang hết quota hoặc bị giới hạn. Hãy chờ quota phục hồi hoặc cập nhật key tại Cài đặt → API key Gemini.";
+    const count = error.details?.configuredKeys;
+    const label = typeof count === "number" && Number.isInteger(count) && count > 0 && count <= 10 ? `Cả ${count} key Gemini` : "Tất cả key Gemini";
+    const retryAt = typeof error.details?.retryAt === "string" ? new Date(error.details.retryAt) : null;
+    const retryHint = retryAt && Number.isFinite(retryAt.getTime())
+      ? ` Có thể thử lại từ ${retryAt.toLocaleTimeString("vi-VN")}; quota vẫn có thể chưa phục hồi.` : " Hãy chờ quota phục hồi rồi thử lại.";
+    actionable = `${label} đã bị giới hạn quota. Hệ thống đã tự chuyển key nhưng chưa tạo được nội dung.${retryHint} Kiểm tra tại Cài đặt → API key Gemini. Các key cùng Google Cloud project dùng chung quota.`;
   } else if (message.includes("insufficient balance") || message.includes("insufficient quota")) {
     actionable = `${provider} đã hết số dư hoặc quota. Hãy nạp quota hoặc chọn AI khác.`;
   } else if (error.code === "PLATFORM_AUTH_FAILED" || message.includes("rejected the configured api credentials")) {

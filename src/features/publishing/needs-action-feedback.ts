@@ -23,7 +23,7 @@ const extensionMessages: Record<string, string> = {
 export function getNeedsActionMessage(action?: PublishNeedsAction) {
   if (!action) return undefined;
   if (action.kind === "EXTENSION_PENDING") return "Đang chờ tiện ích Chrome đăng (Chrome cần mở và đã đăng nhập diễn đàn).";
-  if (action.kind === "EXTENSION_ACTION") return (action.reason && extensionMessages[action.reason]) || action.message;
+  if (action.kind === "EXTENSION_ACTION") return action.message?.trim() || (action.reason && extensionMessages[action.reason]);
   if (action.kind === "POLICY_BLOCKED") {
     return "Automation bị vô hiệu hóa theo chính sách của nền tảng. Dùng luồng bàn giao an toàn thay vì cố chạy Playwright.";
   }
