@@ -3,6 +3,14 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.2.0 · 31/10/2026
+### Tính năng
+- Nút "Nhập file cấu hình API" trên trang Tài khoản (chỉ ADMIN)
+  Tải file mẫu, điền mỗi dòng một tài khoản dev.to, Mastodon, Bluesky, Discord, Discourse hoặc WordPress kèm khoá,
+  rồi bấm "Nhập & kiểm tra". Kết quả hiện theo từng dòng: đã kết nối, khoá sai, dòng thiếu thông tin, trùng dòng…
+  kèm lý do. Dòng Instagram, Threads, Blogger, LinkedIn, Tumblr có sẵn nút "Kết nối" để đăng nhập một lần. Cần
+  backend bản có API import-api.
+
 ## 1.1.0 · 21/10/2026
 ### Tính năng
 - Nút "Kết nối" Instagram, Threads (và LinkedIn, Google · Blogger) trên trang Tài khoản

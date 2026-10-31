@@ -51,7 +51,7 @@ Never place AI provider keys (OpenAI, DeepSeek, or Gemini), social/API tokens (i
 
 The Studio and automated-campaign form load the safe provider catalog from `GET /api/v1/ai/providers` and let the user choose a configured provider for each generation. The browser sends only the provider ID; API keys and model configuration stay in the backend environment. Providers without a backend key are shown as unavailable, so Gemini remains disabled until `GEMINI_API_KEY` is configured and the backend is restarted. `AI_DEFAULT_PROVIDER` determines the initial selection and the backend fallback when a request omits a provider.
 
-Social credentials entered on `/accounts` are sent directly to the backend write-only credential endpoints, encrypted there, and never returned to the browser. Studio media uploads use the authenticated multipart `/media` endpoint and attach the asset to the selected content variant.
+Social credentials entered on `/accounts` are sent directly to the backend write-only credential endpoints, encrypted there, and never returned to the browser. **Nhập file cấu hình API** uploads an XLSX/CSV/TSV (template `/templates/api-accounts.csv`) to `POST /platform-accounts/import-api`; the backend stores each key encrypted, tests every connection and returns only per-row status and reasons. Studio media uploads use the authenticated multipart `/media` endpoint and attach the asset to the selected content variant.
 
 ## Main publishing workflow
 
