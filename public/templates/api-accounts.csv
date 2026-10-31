@@ -1,0 +1,9 @@
+Nền tảng,Tên hiển thị,URL,Username / Handle,Khoá bí mật,Category ID,Tags,Đăng ngay,Chế độ hiển thị
+dev.to,,,your-devto-username,replace-with-dev-api-key,,,không,
+Mastodon.social,,,your-mastodon-username,replace-with-access-token,,,,public
+Mastodon,,https://fosstodon.org,your-username,replace-with-access-token,,,,unlisted
+Bluesky,,,your-handle.bsky.social,xxxx-xxxx-xxxx-xxxx,,,,
+Discord,Kênh thông báo,,Social Publisher,https://discord.com/api/webhooks/000000000000000000/replace-with-webhook-token,,,,
+Discourse,Diễn đàn công ty,https://community.example.com,publisher-bot,replace-with-discourse-api-key,12,"huong-dan, vps",,
+WordPress,,https://blog.example.com,editor,replace-with-application-password,,,không,
+Instagram,,,,,,,,
