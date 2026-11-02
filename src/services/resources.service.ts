@@ -19,6 +19,8 @@ export type ExtensionDevice = { id: string; name: string; lastSeenAt?: string | 
 export type GeminiKeysSettings = { revision: string; source: "environment" | "saved"; maxKeys: number; slots: Array<{ slot: number; configured: boolean; active: boolean; retryAt: string | null }> };
 export type GeminiKeysUpdate = { revision: string; changes: Array<{ slot: number; apiKey?: string; clear?: boolean }> };
 export type AccountImportResult = { imported: number; queued: number; batchId: string; rows: Array<{ id?: string; row: string; name: string; setup?: string; issue?: string }> };
+export type ApiAccountImportStatus = "CONNECTED" | "CHECK_FAILED" | "OAUTH_REQUIRED" | "INVALID_ROW" | "NOT_SUPPORTED" | "ACCOUNT_BUSY" | "DUPLICATE_ROW";
+export type ApiAccountImportResult = { total: number; connected: number; needsAttention: number; rows: Array<{ row: number; platform: string; slug?: string; name: string; status: ApiAccountImportStatus; message: string; accountId?: string }> };
 export type ExtensionLoginCheckRow = { id: string; name: string; platform: string; configured: boolean; autoLogin?: boolean; issues: string[]; deviceId?: string;
   posting?: { status: string; implemented: boolean; engine?: string; message: string; url?: string };
   attempts?: Array<{ method: string; available: boolean; check: { status: string; message?: string | null; finishedAt?: string | null } | null }>;
@@ -197,6 +199,10 @@ export const resourcesService = {
   importExtensionAccounts: (file: File, deviceId: string, googleEmail?: string) => {
     const body = new FormData(); body.set("file", file); body.set("deviceId", deviceId); if (googleEmail?.trim()) body.set("googleEmail", googleEmail.trim());
     return apiRequest<AccountImportResult>("/extension/accounts/import", { method: "POST", body });
+  },
+  importApiAccounts: (file: File) => {
+    const body = new FormData(); body.set("file", file);
+    return apiRequest<ApiAccountImportResult>("/platform-accounts/import-api", { method: "POST", body });
   },
   createExtensionDevice: (name: string) => apiRequest<ExtensionDevice & { token: string }>("/extension/devices", { method: "POST", body: { name } }),
   revokeExtensionDevice: (id: string) => apiRequest<{ revoked: boolean }>(`/extension/devices/${id}`, { method: "DELETE" }),

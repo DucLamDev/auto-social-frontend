@@ -31,6 +31,7 @@ import { canUseExtension, ExtensionDeliveryForm, ExtensionPanel, isExtensionAcco
 import { ExtensionSessionForm } from "./extension-session-form";
 import { ExtensionLoginCheckPanel } from "./extension-login-check-panel";
 import { AccountImportModal } from "./account-import-modal";
+import { ApiImportModal } from "./api-import-modal";
 import { accountConnectionState, chromeSession, extensionSetupMessage, isChromeBound, isSelectedExtensionAccount } from "./extension-account-state";
 import { ExtensionConnectionHelpModal } from "./extension-connection-help-modal";
 import { extensionConnectionHelp } from "./extension-connection-help";
@@ -155,6 +156,7 @@ export function AccountsView() {
   const [platformId, setPlatformId] = useState("");
   const [connectOpen, setConnectOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [apiImportOpen, setApiImportOpen] = useState(false);
   const [destinationSearch, setDestinationSearch] = useState("");
   const [automaticPage, setAutomaticPage] = useState(1);
   const [browserPage, setBrowserPage] = useState(1);
@@ -302,8 +304,9 @@ export function AccountsView() {
   </div>;
 
   return <div className="animate-enter">
-    <PageHeader eyebrow="Destinations" title="Tài khoản" description="Nhập file để kết nối social, lọc kênh sẵn sàng rồi tạo và đăng bài tự động." action={<div className="flex flex-wrap gap-2"><Link href="/campaigns?automate=1" className="inline-flex items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white">Tạo bài & đăng tự động</Link><PermissionGate allow={["ADMIN"]}><Button variant="secondary" onClick={() => setImportOpen(true)}><Upload className="size-4" />Nhập file tài khoản</Button><Button variant="secondary" onClick={() => setConnectOpen(true)}><Link2 className="size-4" />Kết nối / cấu hình</Button></PermissionGate></div>} />
+    <PageHeader eyebrow="Destinations" title="Tài khoản" description="Nhập file để kết nối social, lọc kênh sẵn sàng rồi tạo và đăng bài tự động." action={<div className="flex flex-wrap gap-2"><Link href="/campaigns?automate=1" className="inline-flex items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white">Tạo bài & đăng tự động</Link><PermissionGate allow={["ADMIN"]}><Button variant="secondary" onClick={() => setImportOpen(true)}><Upload className="size-4" />Nhập file tài khoản</Button><Button variant="secondary" onClick={() => setApiImportOpen(true)}><KeyRound className="size-4" />Nhập file cấu hình API</Button><Button variant="secondary" onClick={() => setConnectOpen(true)}><Link2 className="size-4" />Kết nối / cấu hình</Button></PermissionGate></div>} />
     <AccountImportModal open={importOpen} onClose={() => setImportOpen(false)} />
+    <ApiImportModal open={apiImportOpen} onClose={() => setApiImportOpen(false)} />
     <ExtensionPanel />
     <ExtensionLoginCheckPanel />
     <Card className="overflow-hidden">
