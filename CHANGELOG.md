@@ -3,6 +3,14 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.3.0 · 02/11/2026
+### Tính năng
+- Ô "Mật khẩu Google" và "Khoá TOTP Google" trong hộp "Nhập file tài khoản"
+  Điền cùng email Google dùng chung để tiện ích tự đăng nhập Google và tự điền mã 2 bước cho mọi tài khoản đăng nhập
+  bằng Google đó. Khoá TOTP là khoá thiết lập hoặc chuỗi otpauth:// (lấy từ phần sao lưu/xuất của Authenticator); dán
+  nhầm mã 6 số sẽ được báo ngay. Hai ô xoá trắng sau khi nhập hoặc khi đóng hộp, không hiển thị lại. Cần backend bản có
+  googlePassword/googleTotpSecret.
+
 ## 1.2.0 · 31/10/2026
 ### Tính năng
 - Nút "Nhập file cấu hình API" trên trang Tài khoản (chỉ ADMIN)
