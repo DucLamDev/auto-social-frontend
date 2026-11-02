@@ -7,7 +7,7 @@
 | `/login` | JWT/cookie authentication | Public |
 | `/dashboard` | Metrics, 7-day throughput, recent jobs | All |
 | `/platforms` | Connector modes, availability and capabilities | All; ADMIN toggles |
-| `/accounts` | OAuth **Kết nối** / per-row **Kết nối lại**, write-only credential forms, real connection test, **Kiểm tra tất cả**, **Nhập file cấu hình API** (ADMIN, template `/templates/api-accounts.csv`, per-row result with **Kết nối** for OAuth rows), status and enable/disable | All; mutations restricted |
+| `/accounts` | OAuth **Kết nối** / per-row **Kết nối lại**, write-only credential forms, real connection test, **Kiểm tra tất cả**, **Nhập file cấu hình API** (ADMIN, template `/templates/api-accounts.csv`, per-row result with **Kết nối** for OAuth rows), **Nhập file tài khoản** (Chrome profile, optional shared Google email with Google password and TOTP setup key, write-only), status and enable/disable | All; mutations restricted |
 | `/sources` | URL/RSS/Sitemap/WordPress/manual ingestion | ADMIN, EDITOR |
 | `/contents` | Canonical content library and filters | All |
 | `/studio/[contentId]` | Original/variant editor, media attach, generate/save/approve | ADMIN, EDITOR |
