@@ -128,15 +128,15 @@ export function AutomationCampaignModal({
   return <Modal
     open={open}
     onClose={safeClose}
-    title="Tạo bài & đăng tự động"
-    description="Nhập mô tả, chọn tài khoản rồi bấm Tạo bằng AI & đăng ngay. Hệ thống tự viết nội dung phù hợp từng nền tảng và đăng qua các kết nối đã thiết lập."
+    title="Tạo nội dung AI chạy ngầm"
+    description="Nhập mô tả và chọn tài khoản. AI tạo nội dung ở chế độ nền; bạn xem, chỉnh sửa và duyệt trong tab Content đợi duyệt trước khi đăng."
     className="max-w-3xl"
   >
     <form className="space-y-6" onSubmit={submit}>
       <div className="grid gap-2 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-violet-50 p-4 sm:grid-cols-3">
         <FlowStep icon={<Bot className="size-4" />} number="1" label="AI viết bài" />
-        <FlowStep icon={<CheckCircle2 className="size-4" />} number="2" label="Phù hợp từng kênh" />
-        <FlowStep icon={<Send className="size-4" />} number="3" label="Đăng lên các kênh" />
+        <FlowStep icon={<CheckCircle2 className="size-4" />} number="2" label="Bạn xem và duyệt" />
+        <FlowStep icon={<Send className="size-4" />} number="3" label="Đăng sau khi duyệt" />
       </div>
 
       <div>
@@ -222,7 +222,7 @@ export function AutomationCampaignModal({
           ? <p className="mt-1.5 text-xs text-danger">Không thể tải cấu hình AI. Hãy đóng cửa sổ và thử lại.</p>
           : <p className="mt-1.5 text-xs text-muted">
             {selectedAiProviderOption?.configured
-              ? "Đã chọn sẵn AI của workspace. Bạn có thể giữ nguyên để đăng ngay."
+              ? "Đã chọn sẵn AI của workspace. Bạn có thể giữ nguyên để tạo nội dung."
               : "AI này chưa được cấu hình cho workspace."}
           </p>}
       </div>
@@ -325,17 +325,17 @@ export function AutomationCampaignModal({
       </div>
 
       <fieldset>
-        <legend className="mb-2 text-sm font-semibold text-slate-700">Thời điểm chạy</legend>
+        <legend className="mb-2 text-sm font-semibold text-slate-700">Thời điểm đăng sau khi duyệt</legend>
         <div className="grid gap-2 sm:grid-cols-2">
           <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${runMode === "NOW" ? "border-indigo-300 bg-indigo-50/60 ring-2 ring-indigo-100" : "border-border"}`}>
             <input type="radio" value="NOW" className="mt-1 accent-indigo-600" {...form.register("runMode")} />
             <Zap className="mt-0.5 size-4 shrink-0 text-indigo-600" />
-            <span><span className="block text-sm font-bold">Chạy ngay</span><span className="mt-0.5 block text-xs leading-5 text-muted">Viết bằng AI và đưa vào hàng đợi đăng ngay.</span></span>
+            <span><span className="block text-sm font-bold">Sau khi duyệt</span><span className="mt-0.5 block text-xs leading-5 text-muted">Tạo nội dung ngay, chỉ đăng khi bạn duyệt.</span></span>
           </label>
           <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${runMode === "SCHEDULED" ? "border-indigo-300 bg-indigo-50/60 ring-2 ring-indigo-100" : "border-border"}`}>
             <input type="radio" value="SCHEDULED" className="mt-1 accent-indigo-600" {...form.register("runMode")} />
             <Clock3 className="mt-0.5 size-4 shrink-0 text-indigo-600" />
-            <span><span className="block text-sm font-bold">Lên lịch</span><span className="mt-0.5 block text-xs leading-5 text-muted">Chuẩn bị ngay và tự đăng khi đến giờ.</span></span>
+            <span><span className="block text-sm font-bold">Lên lịch</span><span className="mt-0.5 block text-xs leading-5 text-muted">Chỉ đăng khi đã duyệt và đến giờ hẹn.</span></span>
           </label>
         </div>
         {runMode === "SCHEDULED" && <div className="mt-3">
@@ -345,7 +345,7 @@ export function AutomationCampaignModal({
         </div>}
       </fieldset>
 
-      <p className="rounded-xl bg-indigo-50 p-3 text-sm text-indigo-950">Bấm nút bên dưới sẽ tạo nội dung và đăng lên {selectedAccountIds.length} tài khoản đã chọn. Tiến độ và các bài chờ duyệt được cập nhật trên web.</p>
+      <p className="rounded-xl bg-indigo-50 p-3 text-sm text-indigo-950">AI sẽ tạo nội dung chạy ngầm cho {selectedAccountIds.length} tài khoản đã chọn. Bạn có thể tiếp tục làm việc hoặc đóng trang. Bài chỉ được đăng sau khi bạn duyệt trong tab Content đợi duyệt.</p>
 
       {submitError && (
         <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800">
@@ -363,7 +363,7 @@ export function AutomationCampaignModal({
           disabled={aiProvidersPending || !selectedAiProviderOption?.configured}
         >
           <Sparkles className="size-4" />
-          {runMode === "SCHEDULED" ? "Tạo bằng AI & lên lịch" : "Tạo bằng AI & đăng ngay"}
+          Tạo bằng AI chạy ngầm
         </Button>
       </div>
     </form>

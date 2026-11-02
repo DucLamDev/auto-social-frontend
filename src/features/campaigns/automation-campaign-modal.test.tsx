@@ -52,7 +52,7 @@ describe("AutomationCampaignModal", () => {
     const pixelfed: PlatformAccount = { ...accounts[0]!, id: "pixelfed", name: "Pixelfed", settings: { delivery: "extension", extensionEngine: "pixelfed", extensionAutoSubmit: true } };
     render(<AutomationCampaignModal open accounts={[pixelfed]} aiProviders={aiProviders} onClose={vi.fn()} onSubmit={onSubmit} />);
     fireEvent.change(screen.getByLabelText("Mô tả bài đăng"), { target: { value: "Chia sẻ thông tin sản phẩm theo nội dung được cung cấp." } });
-    fireEvent.click(screen.getByRole("button", { name: /Tạo bằng AI & đăng ngay/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Tạo bằng AI chạy ngầm/ }));
     await screen.findByText(/Pixelfed cần ảnh đính kèm tối đa 20 MiB/);
     expect(onSubmit).not.toHaveBeenCalled();
   });
@@ -96,7 +96,7 @@ describe("AutomationCampaignModal", () => {
     fireEvent.change(screen.getByLabelText("Mô tả bài đăng"), {
       target: { value: "Quảng bá gói VPS tốc độ cao cho lập trình viên với ưu đãi tháng đầu." },
     });
-    fireEvent.click(screen.getByRole("button", { name: /Tạo bằng AI & đăng ngay/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Tạo bằng AI chạy ngầm/ }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
@@ -122,7 +122,7 @@ describe("AutomationCampaignModal", () => {
     fireEvent.change(screen.getByLabelText("Mô tả bài đăng"), {
       target: { value: "Quảng bá gói VPS tốc độ cao cho lập trình viên với ưu đãi tháng đầu." },
     });
-    fireEvent.click(screen.getByRole("button", { name: /Tạo bằng AI & đăng ngay/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Tạo bằng AI chạy ngầm/ }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole("checkbox", { name: /Tôi xác nhận/ })).not.toBeInTheDocument();
@@ -146,7 +146,7 @@ describe("AutomationCampaignModal", () => {
     fireEvent.change(screen.getByLabelText("Mô tả bài đăng"), {
       target: { value: "Mô tả chiến dịch đủ chi tiết để tạo nội dung tự động cho các kênh." },
     });
-    fireEvent.click(screen.getByRole("button", { name: /Tạo bằng AI & đăng ngay/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Tạo bằng AI chạy ngầm/ }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0]?.[0]).toEqual(expect.objectContaining({ aiProvider: "gemini" }));
@@ -162,7 +162,7 @@ describe("AutomationCampaignModal", () => {
       onSubmit={onSubmit}
     />);
 
-    expect(screen.getByRole("button", { name: /Tạo bằng AI & đăng ngay/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Tạo bằng AI chạy ngầm/ })).toBeDisabled();
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
@@ -210,7 +210,7 @@ describe("AutomationCampaignModal", () => {
     fireEvent.change(screen.getByLabelText("Mô tả bài đăng"), {
       target: { value: "Quảng bá VPS cho lập trình viên bằng hình ảnh dashboard thực tế." },
     });
-    fireEvent.click(screen.getByRole("button", { name: /Tạo bằng AI & đăng ngay/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Tạo bằng AI chạy ngầm/ }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0]?.[0]).toEqual(expect.objectContaining({

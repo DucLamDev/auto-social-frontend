@@ -57,7 +57,7 @@ Social credentials entered on `/accounts` are sent directly to the backend write
 
 The `/platforms` screen shows the backend catalog of **65 destinations** in 8 groups: Social, Blogging, Community, Forum, Developer, Media, Commerce, and Event. It requests 12 cards per page from the backend and supports search plus group, connector-mode, support-level, and enabled-state filters; changing a filter resets pagination to page 1.
 
-For the shortest workflow, open `/campaigns`, click **Tạo tự động**, enter **Mô tả bài đăng**, optionally add **Ảnh minh hoạ** and **Mô tả ảnh / alt text**, choose OpenAI, DeepSeek, or Gemini under **Nhà cung cấp AI**, select the destinations, then run now or schedule. One request creates canonical content and a tailored, SEO-aware variant for each destination. The title is optional in the UI and can be derived from the brief. One automation request supports at most 12 distinct platforms; use separate campaigns for a wider rollout.
+Open `/campaigns`, click **Tạo tự động**, enter a brief, optionally attach an image, choose an AI provider and destinations, then click **Tạo bằng AI chạy ngầm**. The server persists the task and immediately returns, so navigation or closing the page does not cancel generation. The sidebar's **Content đợi duyệt** (`/ai-content`) refreshes every two seconds and shows queued, generating, reviewable and failed tasks. Review platform variants, edit and save the text, then choose **Hẹn lịch đăng** (a future local time) or **Duyệt đăng ngay**. No publish jobs are created before that explicit approval. Failed tasks can be retried and unwanted drafts rejected. Up to 50 distinct platforms are supported per automation request.
 
 Destination behavior is explicit:
 

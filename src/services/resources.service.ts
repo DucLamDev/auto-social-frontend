@@ -44,7 +44,7 @@ type RawSource = Contract["ContentSourceContractDto"];
 type RawSourceArticle = Omit<Contract["SourceArticleContractDto"], "content"> & { content?: SourceArticle["content"] };
 type RawVariant = Contract["ContentVariantContractDto"];
 type RawContent = Contract["ContentContractDto"] & { variants?: RawVariant[] };
-type RawCampaign = { id: string; name: string; status: Status; scheduledAt?: string | null; createdAt: string; content?: { id: string; title: string }; _count?: { targets?: number }; targets?: Array<{ publishJobs?: RawJob[] }>; progress?: { total?: number; published?: number; failed?: number; needsAction?: number; active?: number; scheduled?: number; cancelled?: number } };
+type RawCampaign = { id: string; name: string; status: Status; reviewMode?: "AUTOMATION" | "EXISTING_CAMPAIGN" | "CONTENT"; automationState?: Status | null; automationErrorCode?: string | null; automationVariantIds?: string[]; automationAccountIds?: string[]; scheduledAt?: string | null; createdAt: string; content?: { id: string; title: string }; _count?: { targets?: number }; targets?: Array<{ publishJobs?: RawJob[] }>; progress?: { total?: number; published?: number; failed?: number; needsAction?: number; active?: number; scheduled?: number; cancelled?: number } };
 type RawAttempt = Contract["PublishAttemptLogContractDto"] & { responseMetadata?: unknown };
 type RawPublishedPost = {
   id: string; publishJobId: string; url: string | null; publishedAt: string;
@@ -93,7 +93,7 @@ const mapMedia = (item: RawMedia): MediaAsset => {
     ...(typeof metadata.altText === "string" ? { altText: metadata.altText } : {}),
   };
 };
-const mapCampaign = (item: RawCampaign): Campaign => { const jobs = item.targets?.flatMap((target) => target.publishJobs ?? []) ?? []; return { id: item.id, name: item.name, content: item.content, status: item.status, targetsCount: item.progress?.total ?? item._count?.targets ?? item.targets?.length ?? 0, publishedCount: item.progress?.published ?? jobs.filter((job) => job.status === "PUBLISHED").length, failedCount: item.progress?.failed ?? jobs.filter((job) => ["FAILED", "POSSIBLE_DUPLICATE"].includes(job.status)).length, needsActionCount: item.progress?.needsAction ?? jobs.filter((job) => job.status === "NEEDS_ACTION").length, activeCount: item.progress?.active ?? jobs.filter((job) => ["QUEUED", "PUBLISHING", "PROCESSING", "RETRY"].includes(job.status)).length, scheduledCount: item.progress?.scheduled ?? jobs.filter((job) => job.status === "SCHEDULED").length, scheduledAt: item.scheduledAt, createdAt: item.createdAt }; };
+const mapCampaign = (item: RawCampaign): Campaign => { const jobs = item.targets?.flatMap((target) => target.publishJobs ?? []) ?? []; return { id: item.id, name: item.name, content: item.content, status: item.status, reviewMode: item.reviewMode, automationState: item.automationState, automationErrorCode: item.automationErrorCode, automationVariantIds: item.automationVariantIds, automationAccountIds: item.automationAccountIds, targetsCount: item.progress?.total ?? item._count?.targets ?? item.targets?.length ?? 0, publishedCount: item.progress?.published ?? jobs.filter((job) => job.status === "PUBLISHED").length, failedCount: item.progress?.failed ?? jobs.filter((job) => ["FAILED", "POSSIBLE_DUPLICATE"].includes(job.status)).length, needsActionCount: item.progress?.needsAction ?? jobs.filter((job) => job.status === "NEEDS_ACTION").length, activeCount: item.progress?.active ?? jobs.filter((job) => ["QUEUED", "PUBLISHING", "PROCESSING", "RETRY"].includes(job.status)).length, scheduledCount: item.progress?.scheduled ?? jobs.filter((job) => job.status === "SCHEDULED").length, scheduledAt: item.scheduledAt, createdAt: item.createdAt }; };
 const mapJob = (item: RawJob): PublishJob => {
   const latest = item.attempts?.[0];
   const metadata = latest?.responseMetadata
@@ -257,6 +257,16 @@ export const resourcesService = {
     };
   },
   async publishCampaign(id: string) { const campaign = await apiRequest<RawCampaign>(`/campaigns/${id}/publish`, { method: "POST" }); return { campaign: mapCampaign(campaign), jobsCreated: campaign.targets?.flatMap((target) => target.publishJobs ?? []).length ?? 0 }; },
+  async reviewAiCampaign(id: string, action: "approve" | "reject" | "retry-generation", options?: { publishMode: "NOW" | "SCHEDULED"; scheduledAt?: string }) {
+    return apiRequest<RawAutomateCampaignResult>(`/campaigns/${id}/${action}`, { method: "POST", ...(options ? { body: options } : {}) });
+  },
+  async aiReviewContents() {
+    const raw = await apiList<RawCampaign>("/campaigns/ai-review");
+    return result(raw, raw.items.map(mapCampaign));
+  },
+  async reviewExistingContent(contentId: string, input: { variantIds: string[]; platformAccountIds: string[]; publishMode: "NOW" | "SCHEDULED"; scheduledAt?: string }) {
+    return apiRequest<RawAutomateCampaignResult>(`/campaigns/review-content/${contentId}`, { method: "POST", body: input });
+  },
   async publishJobs(params?: ListParams) { const raw = await apiList<RawJob>("/publish-jobs", { query: { page: params?.page, limit: params?.limit, search: params?.search, status: params?.status, reviewState: params?.reviewState, from: params?.from, to: params?.to } }); return result(raw, raw.items.map(mapJob)); },
   async publishedPosts(params?: ListParams): Promise<ListResult<PublishedPost>> {
     const raw = await apiList<RawPublishedPost>("/published-posts", { query: params });

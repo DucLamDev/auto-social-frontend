@@ -128,6 +128,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform-accounts/import-api": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PlatformAccounts_importApi"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform-accounts": {
         parameters: {
             query?: never;
@@ -320,6 +336,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/gemini-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["GeminiKeys_get"];
+        put: operations["GeminiKeys_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/source-articles": {
         parameters: {
             query?: never;
@@ -432,6 +464,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/campaigns/ai-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Campaigns_listAiReview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/campaigns/review-content/{contentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Campaigns_reviewContent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/campaigns/{id}": {
         parameters: {
             query?: never;
@@ -458,6 +522,54 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["Campaigns_automate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/campaigns/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Campaigns_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/campaigns/{id}/retry-generation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Campaigns_retry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/campaigns/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Campaigns_reject"];
         delete?: never;
         options?: never;
         head?: never;
@@ -538,6 +650,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["PublishJobs_retry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/publish-jobs/{id}/approve-content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PublishJobs_approveContent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -818,6 +946,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/extension/accounts/{id}/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Extension_configureSession"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/extension/devices": {
         parameters: {
             query?: never;
@@ -885,6 +1029,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/extension/agent/tasks/{id}/auth": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ExtensionAgent_authStep"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/extension/agent/heartbeat": {
         parameters: {
             query?: never;
@@ -917,6 +1077,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/extension/agent/tasks/{id}/media/{assetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExtensionAgent_media"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/extension/agent/tasks/{id}/result": {
         parameters: {
             query?: never;
@@ -927,6 +1103,102 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["ExtensionAgent_report"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extension/login-checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExtensionLoginCheck_list"];
+        put?: never;
+        post: operations["ExtensionLoginCheck_queue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extension/agent/login-checks/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExtensionLoginCheckAgent_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extension/agent/login-checks/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ExtensionLoginCheckAgent_claim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extension/agent/login-checks/{id}/auth": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ExtensionLoginCheckAgent_auth"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extension/agent/login-checks/{id}/result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ExtensionLoginCheckAgent_result"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extension/accounts/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AccountImport_upload"];
         delete?: never;
         options?: never;
         head?: never;
@@ -972,6 +1244,8 @@ export interface components {
             loggedOut?: boolean;
             queued?: boolean;
             published?: boolean;
+            /** Format: uuid */
+            contentVariantId?: string;
         };
         AdminUserContractDto: {
             /** Format: uuid */
@@ -1044,6 +1318,26 @@ export interface components {
             capability: {
                 [key: string]: unknown;
             };
+        };
+        ApiImportRowContractDto: {
+            /** @description Row number in the uploaded file */
+            row: number;
+            platform: string;
+            /** @description Catalog slug when the platform was recognised */
+            slug?: string;
+            name: string;
+            /** @enum {string} */
+            status: "CONNECTED" | "CHECK_FAILED" | "OAUTH_REQUIRED" | "INVALID_ROW" | "NOT_SUPPORTED" | "ACCOUNT_BUSY" | "DUPLICATE_ROW";
+            /** @description Operator-facing reason; never contains the secret */
+            message: string;
+            /** Format: uuid */
+            accountId?: string;
+        };
+        ApiImportResultContractDto: {
+            total: number;
+            connected: number;
+            needsAttention: number;
+            rows: components["schemas"]["ApiImportRowContractDto"][];
         };
         PlatformSummaryContractDto: {
             slug: string;
@@ -1272,6 +1566,15 @@ export interface components {
             configured: boolean;
             isDefault: boolean;
         };
+        GeminiKeyChangeDto: {
+            slot: number;
+            apiKey?: string;
+            clear?: boolean;
+        };
+        UpdateGeminiKeysDto: {
+            revision: string;
+            changes: components["schemas"]["GeminiKeyChangeDto"][];
+        };
         SourceArticleContractDto: {
             /** Format: uuid */
             id: string;
@@ -1367,6 +1670,12 @@ export interface components {
             cancelled: number;
         };
         CampaignContractDto: {
+            /** @enum {string} */
+            reviewMode?: "AUTOMATION" | "EXISTING_CAMPAIGN" | "CONTENT";
+            automationState?: string | null;
+            automationErrorCode?: string | null;
+            automationVariantIds?: string[];
+            automationAccountIds?: string[];
             /** Format: uuid */
             id: string;
             name: string;
@@ -1392,6 +1701,25 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        AutomatedCampaignContractDto: {
+            campaign: components["schemas"]["CampaignContractDto"];
+            content: components["schemas"]["ContentContractDto"];
+            generatedVariants: number;
+            jobsCreated: number;
+            /** @description Whether the campaign was activated for immediate or scheduled delivery. */
+            activated: boolean;
+        };
+        ReviewExistingContentDto: {
+            /**
+             * @default NOW
+             * @enum {string}
+             */
+            publishMode: "NOW" | "SCHEDULED";
+            /** @description Future ISO-8601 timestamp with an explicit UTC offset. Required for SCHEDULED. */
+            scheduledAt?: string;
+            platformAccountIds: string[];
+            variantIds: string[];
+        };
         CampaignTargetDto: {
             platformAccountId: string;
             contentVariantId: string;
@@ -1410,14 +1738,6 @@ export interface components {
              */
             timezone: string;
             targets: components["schemas"]["CampaignTargetDto"][];
-        };
-        AutomatedCampaignContractDto: {
-            campaign: components["schemas"]["CampaignContractDto"];
-            content: components["schemas"]["ContentContractDto"];
-            generatedVariants: number;
-            jobsCreated: number;
-            /** @description Whether the campaign was activated for immediate or scheduled delivery. */
-            activated: boolean;
         };
         AutomateCampaignDto: {
             /** @example Ra mắt sản phẩm VPS mới */
@@ -1448,7 +1768,23 @@ export interface components {
              */
             publishImmediately: boolean;
         };
+        ApproveAiCampaignDto: {
+            /**
+             * @default NOW
+             * @enum {string}
+             */
+            publishMode: "NOW" | "SCHEDULED";
+            /** @description Future ISO-8601 timestamp with an explicit UTC offset. Required for SCHEDULED. */
+            scheduledAt?: string;
+        };
         PublishJobContractDto: {
+            /**
+             * Format: uri
+             * @description Review queue or platform destination; not an individual post permalink
+             */
+            reviewUrl?: string;
+            /** @enum {string} */
+            reviewUrlKind?: "pending_queue" | "platform";
             /** Format: uuid */
             id: string;
             /** @enum {string} */
@@ -1492,7 +1828,18 @@ export interface components {
             /** @enum {string} */
             status: "SCHEDULED" | "QUEUED" | "PUBLISHING" | "PROCESSING" | "PUBLISHED" | "RETRY" | "FAILED" | "NEEDS_ACTION" | "POSSIBLE_DUPLICATE" | "CANCELLED";
             platform: string;
+            platformName?: string;
             accountName: string;
+            moderationPending: boolean;
+            /**
+             * Format: date-time
+             * @description Timestamp of the current stored variant, not an immutable submission snapshot
+             */
+            contentUpdatedAt?: string;
+            /** Format: uri */
+            reviewUrl?: string;
+            /** @enum {string} */
+            reviewUrlKind?: "pending_queue" | "platform";
             title?: string | null;
             body: string;
             summary?: string | null;
@@ -1511,6 +1858,12 @@ export interface components {
             suggestedExternalPostId?: string;
             /** Format: uri */
             openUrl?: string;
+        };
+        ApproveContentDto: {
+            /** @description New title; null removes it */
+            title?: Record<string, never> | null;
+            body?: string;
+            hashtags?: string[];
         };
         ReconcileNotFoundDto: {
             /**
@@ -1712,6 +2065,7 @@ export interface components {
              */
             connections: Record<string, never>;
         };
+        ExtensionSessionDto: Record<string, never>;
         CreateExtensionDeviceDto: {
             /** @example Chrome văn phòng */
             name: string;
@@ -1720,11 +2074,16 @@ export interface components {
             /** @description true: publish through the paired Chrome extension */
             enabled: boolean;
             /** @enum {string} */
-            engine?: "xenforo" | "discourse" | "phpbb";
+            engine?: "xenforo" | "discourse" | "phpbb" | "medium" | "substack" | "quora" | "reddit" | "slideshare" | "aws-builder" | "tinhte" | "pixelfed" | "mastodon" | "bluesky" | "tumblr" | "devto" | "minds" | "stackexchange" | "lemmy" | "discuit" | "linkedin" | "differ" | "dzone";
             /** @example https://voz.vn/f/chuyen-tro-linh-tinh.17/post-thread */
             targetUrl?: string;
             /** @description false: fill the form and wait for the operator to click Post */
             autoSubmit?: boolean;
+        };
+        ExtensionAuthStepDto: Record<string, never>;
+        ClaimExtensionTaskDto: {
+            /** @description Origins already running a flow in this Chrome */
+            excludeOrigins?: string[];
         };
         ExtensionTaskResultDto: {
             /** @enum {string} */
@@ -1732,10 +2091,14 @@ export interface components {
             /** @description Thread URL once the post exists */
             url?: string;
             /** @enum {string} */
-            reason?: "CAPTCHA_REQUIRED" | "WAITING_USER" | "SUBMIT_UNCONFIRMED" | "SUBMIT_REJECTED" | "LOGIN_REQUIRED" | "EDITOR_NOT_FOUND" | "PERMISSION_REQUIRED" | "PAGE_LOAD_FAILED" | "CANCELLED";
+            reason?: "CAPTCHA_REQUIRED" | "WAITING_USER" | "SUBMIT_UNCONFIRMED" | "SUBMIT_REJECTED" | "MODERATION_PENDING" | "AUTH_REQUIRED" | "ACCOUNT_MISMATCH" | "LOGIN_REQUIRED" | "EDITOR_NOT_FOUND" | "PERMISSION_REQUIRED" | "PAGE_LOAD_FAILED" | "CANCELLED" | "MEDIA_REQUIRED" | "PLATFORM_UNAVAILABLE";
             /** @description Short text shown to the operator (forum error banner, etc.) */
             message?: string;
         };
+        QueueChecksDto: Record<string, never>;
+        ClaimChecksDto: Record<string, never>;
+        LoginResultDto: Record<string, never>;
+        ImportAccountsDto: Record<string, never>;
     };
     responses: never;
     parameters: never;
@@ -2209,6 +2572,59 @@ export interface operations {
                         /** @example true */
                         success: boolean;
                         data: components["schemas"]["ConnectorDescriptorContractDto"][];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    PlatformAccounts_importApi: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["ApiImportResultContractDto"];
                         meta: components["schemas"]["ApiMetaContractDto"];
                     };
                 };
@@ -3027,6 +3443,88 @@ export interface operations {
             };
         };
     };
+    GeminiKeys_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    GeminiKeys_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateGeminiKeysDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
     SourceArticles_list: {
         parameters: {
             query?: {
@@ -3521,6 +4019,104 @@ export interface operations {
             };
         };
     };
+    Campaigns_listAiReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["CampaignContractDto"][];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    Campaigns_reviewContent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewExistingContentDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["AutomatedCampaignContractDto"];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
     Campaigns_get: {
         parameters: {
             query?: never;
@@ -3622,6 +4218,154 @@ export interface operations {
             };
         };
     };
+    Campaigns_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveAiCampaignDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["AutomatedCampaignContractDto"];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    Campaigns_retry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["AutomatedCampaignContractDto"];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    Campaigns_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["AutomatedCampaignContractDto"];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
     Campaigns_publish: {
         parameters: {
             query?: never;
@@ -3675,6 +4419,7 @@ export interface operations {
             query?: {
                 page?: number;
                 limit?: number;
+                reviewState?: "MODERATION";
                 status?: "SCHEDULED" | "QUEUED" | "PUBLISHING" | "PROCESSING" | "PUBLISHED" | "RETRY" | "FAILED" | "NEEDS_ACTION" | "POSSIBLE_DUPLICATE" | "CANCELLED";
                 search?: string;
                 from?: string;
@@ -3870,6 +4615,58 @@ export interface operations {
             };
         };
     };
+    PublishJobs_approveContent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveContentDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["MutationResultContractDto"];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
     PublishJobs_resumeBrowser: {
         parameters: {
             query?: never;
@@ -4024,7 +4821,16 @@ export interface operations {
     };
     PublishedPosts_list: {
         parameters: {
-            query?: never;
+            query?: {
+                page?: number;
+                limit?: number;
+                search?: string;
+                platformId?: string;
+                accountId?: string;
+                campaignId?: string;
+                from?: string;
+                to?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4737,6 +5543,51 @@ export interface operations {
             };
         };
     };
+    Extension_configureSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtensionSessionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
     Extension_devices: {
         parameters: {
             query?: never;
@@ -4946,6 +5797,51 @@ export interface operations {
             };
         };
     };
+    ExtensionAgent_authStep: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtensionAuthStepDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
     ExtensionAgent_heartbeat: {
         parameters: {
             query?: never;
@@ -4990,6 +5886,52 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimExtensionTaskDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ExtensionAgent_media: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                assetId: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -5040,6 +5982,303 @@ export interface operations {
         };
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ExtensionLoginCheck_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ExtensionLoginCheck_queue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueChecksDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ExtensionLoginCheckAgent_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ExtensionLoginCheckAgent_claim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimChecksDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ExtensionLoginCheckAgent_auth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtensionAuthStepDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ExtensionLoginCheckAgent_result: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginResultDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    AccountImport_upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportAccountsDto"];
+            };
+        };
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

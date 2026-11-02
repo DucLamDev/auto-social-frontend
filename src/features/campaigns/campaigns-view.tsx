@@ -155,7 +155,7 @@ export function CampaignsView({ initialAutomationOpen = false }: { initialAutoma
           ? new Date(values.scheduledAt).toISOString()
           : undefined,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        publishImmediately: true,
+        publishImmediately: false,
       };
       const requestFingerprint = JSON.stringify(semanticInput);
       const mediaAsset = values.image
@@ -170,11 +170,9 @@ export function CampaignsView({ initialAutomationOpen = false }: { initialAutoma
         ? automationRequest.current.idempotencyKey
         : createAutomationIdempotencyKey();
       automationRequest.current = { fingerprint, idempotencyKey };
-      const result = await automate.mutateAsync({ input, idempotencyKey });
-      toast.success(values.runMode === "SCHEDULED"
-        ? `AI đã tạo ${result.generatedVariants} biến thể và lên lịch ${result.jobsCreated} bài đăng.`
-        : `AI đã tạo ${result.generatedVariants} biến thể và đưa ${result.jobsCreated} bài vào hàng đợi.`, {
-        action: { label: "Xem tiến độ", onClick: () => router.push("/publishing") },
+      await automate.mutateAsync({ input, idempotencyKey });
+      toast.success("Đã nhận yêu cầu. AI sẽ tạo nội dung chạy ngầm; bạn duyệt trong tab Content đợi duyệt trước khi đăng.", {
+        action: { label: "Content đợi duyệt", onClick: () => router.push("/ai-content") },
       });
       automationRequest.current = null;
       automationMedia.current = null;
@@ -192,7 +190,7 @@ export function CampaignsView({ initialAutomationOpen = false }: { initialAutoma
     <PageHeader
       eyebrow="Distribution"
       title="Chiến dịch"
-      description="Nhập brief một lần để AI viết bài phù hợp từng nền tảng và tự động đăng ngay hoặc theo lịch."
+      description="AI tạo nội dung chạy ngầm. Xem và chỉnh sửa trong Content đợi duyệt, sau đó duyệt để đăng ngay hoặc theo lịch."
       action={<PermissionGate allow={["ADMIN", "EDITOR"]}><div className="flex flex-wrap gap-2">
         <Button variant="secondary" onClick={() => setOpen(true)}><Settings2 className="size-4" />Nâng cao</Button>
         <Button onClick={openAutomation}><Sparkles className="size-4" />Tạo tự động</Button>

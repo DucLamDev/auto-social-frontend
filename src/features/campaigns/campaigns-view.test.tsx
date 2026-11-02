@@ -82,7 +82,7 @@ describe("CampaignsView automation media retries", () => {
     fireEvent.change(brief, { target: { value: "Quảng bá VPS hiệu năng cao cho cộng đồng lập trình viên Việt Nam." } });
     fireEvent.change(screen.getByLabelText("Ảnh minh hoạ (tuỳ chọn)"), { target: { files: [image] } });
     fireEvent.change(screen.getByLabelText("Mô tả ảnh / alt text (tuỳ chọn)"), { target: { value: "Dashboard VPS" } });
-    const submit = screen.getByRole("button", { name: /Tạo bằng AI & đăng ngay/ });
+    const submit = screen.getByRole("button", { name: /Tạo bằng AI chạy ngầm/ });
 
     fireEvent.click(submit);
     await waitFor(() => expect(mocks.automateCampaign).toHaveBeenCalledTimes(1));
@@ -120,5 +120,15 @@ describe("CampaignsView automation media retries", () => {
 
     expect(screen.getByRole("checkbox", { name: /VOZ Production/ })).toBeChecked();
     expect(screen.getByText(/Tự động qua Playwright/)).toBeInTheDocument();
+  });
+
+  it("closes the form as soon as the background request is accepted without activating publication", async () => {
+    mocks.automateCampaign.mockReset().mockResolvedValue({ campaign: { automationState: "QUEUED" }, generatedVariants: 0, jobsCreated: 0, activated: false });
+    render(<CampaignsView initialAutomationOpen />);
+    fireEvent.change(screen.getByLabelText("Mô tả bài đăng"), { target: { value: "Quảng bá VPS hiệu năng cao cho cộng đồng lập trình viên Việt Nam." } });
+    fireEvent.click(screen.getByRole("button", { name: "Tạo bằng AI chạy ngầm" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(mocks.automateCampaign).toHaveBeenCalledWith(expect.objectContaining({ publishImmediately: false }), expect.any(String));
+    expect(screen.getByRole("button", { name: "Tạo tự động" })).toBeEnabled();
   });
 });
