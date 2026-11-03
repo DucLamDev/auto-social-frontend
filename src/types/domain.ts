@@ -7,7 +7,9 @@ export type SourceType = "MANUAL" | "URL" | "RSS" | "SITEMAP" | "WORDPRESS";
 export type AiProviderId = "openai" | "deepseek" | "gemini" | "vpsttt";
 export interface AiProviderOption { id: AiProviderId; label: string; model: string; configured: boolean; isDefault: boolean; }
 /** Whether the backend can create images with VPSTTT AI. */
-export interface AiImageStatus { configured: boolean; model: string; }
+export interface AiImageStatus { configured: boolean; model: string; provider?: "vpsttt" | "openai"; }
+/** Name of the service that draws AI images, as shown to the user. */
+export const aiImageProviderLabel = (status?: Pick<AiImageStatus, "provider"> | null) => status?.provider === "openai" ? "GPT Image (OpenAI)" : "VPSTTT AI";
 export interface User { id: string; email: string; name: string; role: UserRole; avatarUrl?: string | null; }
 export type PlatformAutomationStatus = "READY_AFTER_CREDENTIALS" | "READY_AFTER_LOGIN" | "API_CONNECTOR_REQUIRED" | "BROWSER_RECIPE_REVIEW_REQUIRED" | "POLICY_BLOCKED" | "PLATFORM_RESEARCH_REQUIRED";
 export interface PlatformAutomationMetadata { status: PlatformAutomationStatus; route: "API" | "PLAYWRIGHT" | "NONE"; automaticPublishing: boolean; connectorKey?: string; browserRecipe?: string; browserRecipeRevision?: number; loginCaptureRequired?: boolean; permissionAttestationRequired?: boolean; autoSubmitDefault?: boolean; mediaUploadSupported?: boolean; requiredAccountSettings?: string[]; reasonCode?: string; }

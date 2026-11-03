@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/hooks/use-auth", () => ({ useCurrentUser: () => ({ data: { role: "EDITOR" } }) }));
 vi.mock("@/hooks/use-resources", () => ({
   useMedia: () => ({ data: { items: mocks.media }, isPending: mocks.pending, isError: mocks.error, refetch: vi.fn() }),
+  useAiImageStatus: () => ({ data: { configured: true, model: "vpsttt-image", provider: "vpsttt" } }),
   useResourceMutation: (fn: (...args: unknown[]) => unknown) => ({ mutateAsync: (...args: unknown[]) => fn(...args), isPending: false }),
 }));
 vi.mock("@/services/resources.service", () => ({ resourcesService: { regenerateVariantImage: mocks.regenerate, removeVariantImage: mocks.remove, uploadMedia: mocks.upload } }));

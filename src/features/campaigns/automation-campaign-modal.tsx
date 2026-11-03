@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { FieldError, Input, Label, Select, Switch, Textarea } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
 import { automationCampaignSchema, type AutomationCampaignInput } from "@/schemas/campaign";
-import type { AiImageStatus, AiProviderOption, PlatformAccount } from "@/types/domain";
+import { aiImageProviderLabel, type AiImageStatus, type AiProviderOption, type PlatformAccount } from "@/types/domain";
 import { canAddAutomationAccount, countAutomationPlatforms, defaultAutomationAccountIds, getAutomationAccountBlocker, isAutomationAccountEligible, MAX_AUTOMATION_PLATFORMS } from "./campaign-utils";
 
 type AutomationCampaignModalProps = {
@@ -193,9 +193,9 @@ export function AutomationCampaignModal({
             <p id="automation-generate-images-label" className="text-sm font-semibold text-foreground">AI tạo ảnh cho kênh cần ảnh</p>
             <p className="mt-0.5 text-xs leading-5 text-muted">
               {imageGenerationPending ? "Đang kiểm tra cấu hình tạo ảnh…"
-                : !aiImagesAvailable ? "Máy chủ chưa bật tạo ảnh bằng VPSTTT AI (cần key có quyền tạo ảnh). Bài vẫn được tạo, chỉ không có ảnh AI."
+                : !aiImagesAvailable ? `Máy chủ chưa bật tạo ảnh bằng ${aiImageProviderLabel(imageGeneration)} (cần key có quyền tạo ảnh). Bài vẫn được tạo, chỉ không có ảnh AI.`
                   : chosenImage ? "Đã chọn ảnh của bạn: ảnh này dùng thay ảnh AI cho mọi kênh hỗ trợ ảnh."
-                    : "Mỗi kênh một ảnh riêng hợp khổ và phong cách của kênh, tạo bằng VPSTTT AI; mỗi ảnh mất khoảng 30 giây đến 2 phút. Bạn xem, tạo lại hoặc bỏ ảnh khi duyệt."}
+                    : `Mỗi kênh một ảnh riêng hợp khổ và phong cách của kênh, tạo bằng ${aiImageProviderLabel(imageGeneration)}; mỗi ảnh mất khoảng 30 giây đến 2 phút. Bạn xem, tạo lại hoặc bỏ ảnh khi duyệt.`}
             </p>
           </div>
           <div className="shrink-0 pt-0.5"><Controller

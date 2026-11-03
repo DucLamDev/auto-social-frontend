@@ -3,6 +3,19 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.9.0 · 03/11/2026
+### Tính năng
+- Xem trước bài như khi đăng lên từng mạng xã hội (cần backend 1.10.0)
+  Khung Review trong Content đợi duyệt có nút "Xem trước như trên mạng xã hội": mỗi kênh hiện bài dạng trang thật của nó
+  (bài ngắn kiểu Mastodon / Bluesky / LinkedIn, ảnh kiểu Pixelfed, chủ đề diễn đàn, câu hỏi Stack Overflow, bài viết dài
+  kiểu Medium / dev.to) với tên tài khoản, ảnh kèm, tag và số ký tự so với giới hạn của kênh. Nội dung lấy từ máy chủ,
+  đúng như sẽ gửi đi (Markdown đã đổi, hashtag đã đặt), kể cả phần đang sửa chưa lưu. Đây là bản mô phỏng.
+### Cải tiến
+- Nút duyệt luôn thấy khi cuộn
+  Duyệt đăng ngay, Hẹn lịch, Từ chối và Edit nội dung nằm trên một thanh bám đáy màn hình suốt lúc xem các kênh, kèm số
+  kênh AI đề nghị kiểm tra; nút mở khung đổi thành "Review & duyệt" khi lượt chờ duyệt.
+- Ghi đúng dịch vụ tạo ảnh (VPSTTT AI hoặc GPT Image của OpenAI) trong hộp tạo nội dung và khung ảnh.
+
 ## 1.8.0 · 03/11/2026
 ### Tính năng
 - Xem tiến độ AI tạo nội dung theo từng kênh và review trước các kênh đã xong (cần backend 1.9.0)
