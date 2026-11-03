@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { CalendarClock, Check, Pencil, RefreshCw, Save, Sparkles, X } from "lucide-react";
+import { CalendarClock, Check, CircleAlert, Clock3, LoaderCircle, Pencil, RefreshCw, Save, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import { PageHeader } from "@/components/layout/page-header";
+import { PlatformMark } from "@/components/platforms/platform-mark";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -13,11 +14,55 @@ import { Input, Label, Textarea } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/ui/states";
 import { useAccounts, useAiCampaigns, useMedia, useResourceMutation, useVariants } from "@/hooks/use-resources";
-import { formatDate } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import { resourcesService } from "@/services/resources.service";
 import type { Campaign, ContentVariant, PlatformAccount } from "@/types/domain";
 import { isAutomationAccountEligible } from "./campaign-utils";
 import { VariantImagePanel } from "./variant-image-panel";
+
+const isGenerating = (campaign: Campaign) => campaign.automationState === "QUEUED" || campaign.automationState === "PROCESSING";
+
+/** One row per platform of the selected accounts: which ones the AI has already written. */
+export function generationProgress(campaign: Campaign, accounts: PlatformAccount[], variants: ContentVariant[]) {
+  const saved = new Set(campaign.automationVariantIds ?? []);
+  const done = new Set(variants.filter((variant) => saved.has(variant.id)).map((variant) => variant.platformSlug));
+  const channels = new Map<string, { slug: string; name: string; accounts: string[] }>();
+  for (const id of campaign.automationAccountIds ?? []) {
+    const account = accounts.find((item) => item.id === id);
+    const slug = account?.platform?.slug;
+    if (!account || !slug) continue;
+    const channel = channels.get(slug) ?? { slug, name: account.platform?.name ?? slug, accounts: [] };
+    channel.accounts.push(account.name);
+    channels.set(slug, channel);
+  }
+  const rows = [...channels.values()].map((channel) => ({ ...channel, done: done.has(channel.slug) }));
+  return { rows, done: rows.filter((row) => row.done).length, total: rows.length };
+}
+
+function GenerationProgress({ campaign, accounts }: { campaign: Campaign; accounts: PlatformAccount[] }) {
+  const state = campaign.automationState;
+  const variants = useVariants(campaign.content?.id ?? "", isGenerating(campaign));
+  const { rows, done, total } = generationProgress(campaign, accounts, variants.data?.items ?? []);
+  if (!total) return null;
+  const pending = state === "QUEUED" ? { label: "Chờ tới lượt", icon: Clock3, tone: "text-slate-500" }
+    : state === "FAILED" ? { label: "Chưa tạo được", icon: CircleAlert, tone: "text-red-700" }
+      : { label: "AI đang viết…", icon: LoaderCircle, tone: "text-indigo-700" };
+  return <div className="mt-3 rounded-xl border border-border bg-slate-50/60 p-3" aria-label="Tiến độ tạo nội dung theo kênh">
+    <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold">
+      <span>Đã tạo {done}/{total} kênh</span>
+      {state === "PROCESSING" && done === total && <span className="text-indigo-700">Đã viết xong, đang tạo ảnh cho kênh cần ảnh…</span>}
+    </div>
+    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-label="Số kênh đã tạo" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done}><div className="h-full rounded-full bg-emerald-500 transition-[width] duration-500" style={{ width: `${Math.round((done / total) * 100)}%` }} /></div>
+    <ul className="mt-3 grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3">{rows.map((row) => {
+      const Icon = row.done ? Check : pending.icon;
+      return <li key={row.slug} className="flex min-w-0 items-center gap-2 rounded-lg bg-white px-2 py-1.5 text-xs">
+        <PlatformMark slug={row.slug} name={row.name} size="sm" />
+        <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{row.name}</span><span className="block truncate text-[11px] text-muted">{row.accounts.join(", ")}</span></span>
+        <span className={cn("inline-flex shrink-0 items-center gap-1 font-semibold", row.done ? "text-emerald-700" : pending.tone)}><Icon aria-hidden className={cn("size-3.5", !row.done && state === "PROCESSING" && "animate-spin motion-reduce:animate-none")} />{row.done ? "Đã tạo" : pending.label}</span>
+      </li>;
+    })}</ul>
+  </div>;
+}
 
 function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: PlatformAccount[] }) {
   const variants = useVariants(campaign.content?.id ?? "", true);
@@ -53,14 +98,17 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
     }
     await resourcesService.reviewAiCampaign(campaign.id, action, action === "approve" ? options : undefined);
   }, ["campaigns", "contents", "variants", "publish-jobs"]);
-  const editable = campaign.reviewMode !== "EXISTING_CAMPAIGN" && (campaign.automationState === "WAITING_REVIEW" || (standalone && campaign.automationState === "APPROVED"));
+  // Drafts already written can be read and edited while the AI finishes the other
+  // platforms; approving, scheduling or rejecting waits until every platform is done.
+  const generating = isGenerating(campaign);
+  const editable = campaign.reviewMode !== "EXISTING_CAMPAIGN" && (campaign.automationState === "WAITING_REVIEW" || generating || (standalone && campaign.automationState === "APPROVED"));
   const eligibleAccounts = accounts.filter((account) => isAutomationAccountEligible(account) && chosenVariants.some((variant) => variant.platformSlug === account.platform?.slug));
   const dirty = Object.keys(edits).length > 0;
   const busy = save.isPending || review.isPending;
   const change = (variant: ContentVariant, patch: { title?: string; body?: string }) => {
     setEdits((current) => ({ ...current, [variant.id]: { title: variant.title ?? "", body: variant.body, ...current[variant.id], ...patch } }));
   };
-  const ready = items.length > 0 && items.length === campaign.automationVariantIds?.length && !dirty && !busy && (!standalone || (accountIds.length > 0 && accountIds.every((id) => eligibleAccounts.some((account) => account.id === id))));
+  const ready = !generating && items.length > 0 && items.length === campaign.automationVariantIds?.length && !dirty && !busy && (!standalone || (accountIds.length > 0 && accountIds.every((id) => eligibleAccounts.some((account) => account.id === id))));
   const act = async (action: "approve" | "reject", schedule?: string) => {
     try {
       await review.mutateAsync({ action, schedule });
@@ -79,7 +127,7 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
       {variant.recommended === false && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">AI đề nghị kiểm tra: {variant.reason || "Nội dung cần được chỉnh sửa trước khi đăng."}</p>}
       <div><Label htmlFor={`title-${variant.id}`}>Tiêu đề</Label><Input id={`title-${variant.id}`} value={edits[variant.id]?.title ?? variant.title ?? ""} readOnly={!editable || !editing} disabled={busy} onChange={(event) => change(variant, { title: event.target.value })} /></div>
       <div><Label htmlFor={`body-${variant.id}`}>Nội dung · {variant.platform}</Label><Textarea id={`body-${variant.id}`} className="min-h-64" value={edits[variant.id]?.body ?? variant.body} readOnly={!editable || !editing} disabled={busy} onChange={(event) => change(variant, { body: event.target.value })} /></div>
-      <VariantImagePanel variant={variant} editable={editable && ["GENERATED", "APPROVED"].includes(variant.status)} />
+      <VariantImagePanel variant={variant} editable={editable && !generating && ["GENERATED", "APPROVED"].includes(variant.status)} />
       {!!variant.hashtags?.length && <p className="break-words text-sm text-muted">{variant.hashtags.map((tag) => `#${tag.replace(/^#/, "")}`).join(" ")}</p>}
       {variant.cta && <p className="text-sm text-muted">{variant.cta}</p>}
     </div>)}
@@ -90,8 +138,9 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
       {editing && <Button variant="secondary" disabled={!dirty || busy || Object.values(edits).some((edit) => !edit.body.trim())} loading={save.isPending} onClick={() => void save.mutateAsync().then(() => { setEdits({}); setEditing(false); toast.success("Đã lưu nội dung"); }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không thể lưu"))}><Save className="size-4" />Lưu chỉnh sửa</Button>}
       <Button variant="secondary" disabled={!ready} onClick={() => setScheduleOpen(true)}><CalendarClock className="size-4" />Hẹn lịch đăng</Button>
       <Button disabled={!ready} loading={review.isPending} onClick={() => void act("approve")}><Check className="size-4" />Duyệt đăng ngay</Button>
-      <Button variant="ghost" disabled={busy} onClick={() => void act("reject")}><X className="size-4" />Từ chối</Button>
+      <Button variant="ghost" disabled={busy || generating} onClick={() => void act("reject")}><X className="size-4" />Từ chối</Button>
       {dirty && <p className="text-xs text-amber-700">Lưu chỉnh sửa trước khi duyệt.</p>}
+      {generating && <p className="text-xs text-indigo-700">AI đang tạo các kênh còn lại. Bạn xem và sửa được các kênh đã xong; nút duyệt mở khi tạo xong tất cả.</p>}
     </div></PermissionGate>}
     <Modal open={scheduleOpen && editable} onClose={() => { if (!busy) setScheduleOpen(false); }} title="Hẹn lịch đăng" description="Duyệt toàn bộ nội dung của lượt này và đăng vào thời gian bạn chọn.">
       <form className="space-y-4" onSubmit={(event) => {
@@ -125,22 +174,23 @@ export function AiContentView() {
       const selectedAccounts = (campaign.automationAccountIds ?? []).map((id) => accounts.data?.items.find((account) => account.id === id)?.name ?? id);
       return <Card key={campaign.id} className="overflow-hidden">
         <div className="flex flex-wrap items-start justify-between gap-4 p-5">
-          <div className="min-w-0 flex-1"><h2 className="font-bold">{campaign.name}</h2><p className="mt-1 text-xs text-muted">{formatDate(campaign.createdAt)} · {selectedAccounts.length} tài khoản · {campaign.automationVariantIds?.length ?? 0} nội dung</p><p className="mt-2 break-words text-xs text-muted">{selectedAccounts.join(", ")}</p>
+          <div className="min-w-0 flex-1 basis-full sm:basis-80"><h2 className="font-bold">{campaign.name}</h2><p className="mt-1 text-xs text-muted">{formatDate(campaign.createdAt)} · {selectedAccounts.length} tài khoản · {campaign.automationVariantIds?.length ?? 0} nội dung</p><p className="mt-2 break-words text-xs text-muted">{selectedAccounts.join(", ")}</p>
             {state === "QUEUED" && <p className="mt-3 text-sm text-indigo-700">Đã nhận yêu cầu, đang chờ AI xử lý.</p>}
-            {state === "PROCESSING" && <p className="mt-3 text-sm text-indigo-700">AI đang tạo nội dung. Bạn có thể tiếp tục làm việc khác.</p>}
+            {state === "PROCESSING" && <p className="mt-3 text-sm text-indigo-700">AI đang tạo nội dung. Kênh nào xong sẽ hiện ngay để bạn xem trước.</p>}
             {state === "FAILED" && <p role="alert" className="mt-3 text-sm text-red-700">Chưa tạo được nội dung. Kiểm tra cấu hình AI và tài khoản rồi thử lại. ({campaign.automationErrorCode})</p>}
             {state === "DRAFT" && <p className="mt-3 text-sm text-muted">Lượt cũ chưa có biến thể. Mở Content Studio để tạo nội dung.</p>}
             {state === "WAITING_REVIEW" && campaign.reviewMode !== "EXISTING_CAMPAIGN" && <p className="mt-3 text-sm text-amber-700">Chưa đăng lên social. {campaign.scheduledAt && new Date(campaign.scheduledAt) > new Date() ? `Lịch đăng sau khi duyệt: ${formatDate(campaign.scheduledAt)}.` : "Bài sẽ vào hàng đợi đăng ngay sau khi bạn duyệt."}</p>}
             {campaign.reviewMode === "EXISTING_CAMPAIGN" && !!campaign.automationVariantIds?.length && <p className="mt-3 text-sm text-muted">Nội dung từ chiến dịch trước đây · trạng thái đăng: <Badge value={campaign.status} /></p>}
           </div>
           <div className="flex flex-wrap items-center gap-2"><Badge value={state === "PROCESSING" ? "AI_GENERATING" : state} />
-            {!!campaign.automationVariantIds?.length && <Button variant="secondary" size="sm" onClick={() => setExpanded(expanded === campaign.id ? null : campaign.id)}>{expanded === campaign.id ? "Thu gọn" : "Review nội dung"}</Button>}
+            {!!campaign.automationVariantIds?.length && <Button variant="secondary" size="sm" onClick={() => setExpanded(expanded === campaign.id ? null : campaign.id)}>{expanded === campaign.id ? "Thu gọn" : isGenerating(campaign) ? `Xem ${campaign.automationVariantIds?.length ?? 0} kênh đã tạo` : "Review nội dung"}</Button>}
             {state === "FAILED" && campaign.reviewMode !== "EXISTING_CAMPAIGN" && <PermissionGate allow={["ADMIN", "EDITOR"]}><Button size="sm" loading={retry.isPending} onClick={() => void retry.mutateAsync(campaign.id).then(() => toast.success("Đã đưa vào hàng đợi tạo lại")).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không thể thử lại"))}><RefreshCw className="size-4" />Thử lại</Button></PermissionGate>}
             {campaign.reviewMode === "EXISTING_CAMPAIGN" && !campaign.automationVariantIds?.length && campaign.content && <Link href={`/studio/${campaign.content.id}`} className={buttonVariants({ variant: "secondary", size: "sm" })}>Content Studio</Link>}
             {(state === "APPROVED" || campaign.reviewMode === "EXISTING_CAMPAIGN") && campaign.reviewMode !== "CONTENT" && !!campaign.automationVariantIds?.length && <Link href="/publishing" className={buttonVariants({ variant: "secondary", size: "sm" })}>Xem tiến độ đăng</Link>}
             {state === "APPROVED" && campaign.status === "DRAFT" && campaign.reviewMode === "AUTOMATION" && <PermissionGate allow={["ADMIN", "EDITOR"]}><Button size="sm" loading={resume.isPending} onClick={() => void resume.mutateAsync(campaign.id).then(() => toast.success("Đã tiếp tục đăng theo lịch đã duyệt")).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không thể tiếp tục"))}>Tiếp tục đăng</Button></PermissionGate>}
           </div>
         </div>
+        {(isGenerating(campaign) || state === "FAILED") && campaign.reviewMode === "AUTOMATION" && <div className="-mt-3 px-5 pb-5"><GenerationProgress campaign={campaign} accounts={accounts.data?.items ?? []} /></div>}
         {expanded === campaign.id && <ReviewContent campaign={campaign} accounts={accounts.data?.items ?? []} />}
       </Card>;
     })}</div>}

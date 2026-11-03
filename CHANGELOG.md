@@ -3,6 +3,13 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.8.0 · 03/11/2026
+### Tính năng
+- Xem tiến độ AI tạo nội dung theo từng kênh và review trước các kênh đã xong (cần backend 1.9.0)
+  Trong Content đợi duyệt, lượt đang tạo hiện "Đã tạo X/Y kênh", thanh tiến độ và từng kênh (logo, tài khoản, Đã tạo /
+  AI đang viết / Chờ tới lượt). Nút "Xem N kênh đã tạo" mở ngay các kênh đã xong để đọc và sửa trong lúc AI viết tiếp.
+  Duyệt, hẹn lịch hay từ chối vẫn chờ AI tạo xong tất cả. Lượt bị lỗi cho biết kênh nào chưa tạo được.
+
 ## 1.7.0 · 03/11/2026
 ### Tính năng
 - Cấu hình đăng daily.dev bằng tiện ích Chrome (cần backend 1.8.0)
