@@ -34,6 +34,7 @@ vi.mock("@/hooks/use-resources", () => ({
   useAccounts: () => ({
     data: { items: mocks.accounts },
     isPending: false,
+    isSuccess: true,
     isError: false,
     error: null,
     refetch: mocks.refetchAccounts,
@@ -176,6 +177,42 @@ describe("selected Chrome connections", () => {
     expect(screen.queryByRole("row", { name: /Selected VPSTTT/ })).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Lọc trạng thái kết nối"), { target: { value: "authenticated" } });
     expect(screen.getByRole("row", { name: /Selected VPSTTT/ })).toBeInTheDocument();
+  });
+  it("counts accounts per connection state in the filter and the summary chips", () => {
+    const pending = { ...account, id: "pending", name: "Pending Bluesky", settings: { extensionImport: { selected: true }, extensionSession: { deviceId: "chrome" } } };
+    const loggedIn = { ...account, id: "logged-in", name: "Logged in Tumblr", settings: { ...account.settings, delivery: undefined } };
+    const checking = { ...account, id: "checking", name: "Checking Medium" };
+    mocks.accounts = [account, pending, loggedIn, checking, { ...browserAccount, id: "old", name: "Old import", settings: { extensionImport: { selected: false } } }];
+    mocks.loginChecks = [
+      { ...mocks.loginChecks[0]! },
+      { id: pending.id, name: pending.name, platform: "Forum", configured: true, issues: [], check: { id: "c2", status: "NEEDS_ACTION", message: "Chưa đăng nhập" } },
+      { id: loggedIn.id, name: loggedIn.name, platform: "Forum", configured: true, issues: [], check: { id: "c3", status: "AUTHENTICATED", message: "Session verified" } },
+      { id: checking.id, name: checking.name, platform: "Forum", configured: true, issues: [], check: { id: "c4", status: "RUNNING", message: "Đang kiểm tra" } },
+    ];
+    render(<AccountsView />);
+    const filter = screen.getByLabelText("Lọc trạng thái kết nối");
+    expect(within(filter).getByRole("option", { name: "Mọi trạng thái (4)" })).toBeInTheDocument();
+    expect(within(filter).getByRole("option", { name: "Đã kết nối · có thể đăng (1)" })).toBeInTheDocument();
+    expect(within(filter).getByRole("option", { name: "Cần thao tác (1)" })).toBeInTheDocument();
+    expect(within(filter).getByRole("option", { name: "Đã đăng nhập · chưa cấu hình đăng (1)" })).toBeInTheDocument();
+    expect(within(filter).getByRole("option", { name: "Đang kết nối (1)" })).toBeInTheDocument();
+    expect(within(screen.getByLabelText("Lọc nền tảng")).getByRole("option", { name: "Voz Forums (4)" })).toBeInTheDocument();
+    expect(within(screen.getByLabelText("Phạm vi tài khoản")).getByRole("option", { name: "Toàn bộ tài khoản (5)" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cần thao tác 1 tài khoản" }));
+    expect(screen.getByRole("button", { name: "Cần thao tác 1 tài khoản" })).toHaveAttribute("aria-pressed", "true");
+    expect(filter).toHaveValue("needs_action");
+    expect(screen.getByRole("row", { name: /Pending Bluesky/ })).toBeInTheDocument();
+    expect(screen.queryByRole("row", { name: /Selected VPSTTT/ })).not.toBeInTheDocument();
+    // Platform counts follow the chosen state, the state counts follow the search box.
+    expect(within(screen.getByLabelText("Lọc nền tảng")).getByRole("option", { name: "Voz Forums (1)" })).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText("Tìm tài khoản…"), { target: { value: "tumblr" } });
+    expect(screen.getByRole("button", { name: "Tất cả 1 tài khoản" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Đã đăng nhập 1 tài khoản" })).toBeInTheDocument();
+    expect(screen.getByText("Không có tài khoản khớp bộ lọc")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Bỏ lọc" }));
+    expect(filter).toHaveValue("");
+    expect(screen.getAllByRole("row", { name: /VPSTTT|Bluesky|Tumblr|Medium/ })).toHaveLength(4);
   });
   it("keeps restricted accounts in the needs-action filter despite verified login", () => {
     mocks.accounts = [{ ...account, settings: { ...account.settings, extensionSetup: { status: "ACCESS_RESTRICTED", message: "Nền tảng trả 403: không có quyền tạo bài." } } }];

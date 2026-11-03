@@ -13,6 +13,18 @@ export function accountConnectionState(account: PlatformAccount, checkStatus?: s
   }
   return account.enabled && account.status === "CONNECTED" ? "connected" : "needs_action";
 }
+export type ConnectionState = ReturnType<typeof accountConnectionState>;
+// Restricted Chrome accounts and never-checked accounts are counted as needing action, like the filter.
+export type ConnectionCounts = Record<ConnectionState | "total", number>;
+/** Counts behind the status filter; `statusOf` gives the latest Chrome login-check status of an account. */
+export function countConnectionStates(accounts: PlatformAccount[], statusOf: (account: PlatformAccount) => string | undefined): ConnectionCounts {
+  const counts: ConnectionCounts = { total: 0, connected: 0, authenticated: 0, needs_action: 0, running: 0 };
+  for (const account of accounts) {
+    counts.total += 1;
+    counts[accountConnectionState(account, statusOf(account))] += 1;
+  }
+  return counts;
+}
 export function extensionSetupMessage(account: PlatformAccount) {
   if (record(account.settings?.extensionSetup).status === "ACCESS_RESTRICTED") return "Đã gán Chrome · quyền đăng bài bị hạn chế";
   if (account.settings?.delivery === "extension") return account.settings.extensionAutoSubmit === false ? "Chờ bạn bấm Đăng" : "Tự bấm Đăng";

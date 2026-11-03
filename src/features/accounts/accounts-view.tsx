@@ -18,7 +18,7 @@ import { EmptyState, ErrorState, TableSkeleton } from "@/components/ui/states";
 import { Table, TableWrap, Td, Th } from "@/components/ui/table";
 import { Toolbar } from "@/components/ui/toolbar";
 import { useAccounts, useExtensionLoginChecks, useInvalidate, useOAuthProviders, usePlatforms, useResourceMutation } from "@/hooks/use-resources";
-import { fromNow } from "@/lib/utils";
+import { cn, fromNow } from "@/lib/utils";
 import { ApiError } from "@/services/api/errors";
 import { resourcesService, type AccountConnectionTestResult } from "@/services/resources.service";
 import type { Platform, PlatformAccount } from "@/types/domain";
@@ -32,13 +32,19 @@ import { ExtensionSessionForm } from "./extension-session-form";
 import { ExtensionLoginCheckPanel } from "./extension-login-check-panel";
 import { AccountImportModal } from "./account-import-modal";
 import { ApiImportModal } from "./api-import-modal";
-import { accountConnectionState, chromeSession, extensionSetupMessage, isChromeBound, isSelectedExtensionAccount } from "./extension-account-state";
+import { accountConnectionState, chromeSession, countConnectionStates, extensionSetupMessage, isChromeBound, isSelectedExtensionAccount, type ConnectionState } from "./extension-account-state";
 import { ExtensionConnectionHelpModal } from "./extension-connection-help-modal";
 import { extensionConnectionHelp } from "./extension-connection-help";
 
 interface CredentialTarget { platform: Pick<Platform, "id" | "slug" | "name"> & Partial<Pick<Platform, "connectorKey" | "mode" | "defaultSettings">>; account?: PlatformAccount }
 
 const DESTINATION_PAGE_SIZE = 8;
+const CONNECTION_FILTERS: Array<{ value: ConnectionState; label: string; short: string; dot: string }> = [
+  { value: "connected", label: "Đã kết nối · có thể đăng", short: "Đã kết nối", dot: "bg-emerald-500" },
+  { value: "needs_action", label: "Cần thao tác", short: "Cần thao tác", dot: "bg-amber-500" },
+  { value: "authenticated", label: "Đã đăng nhập · chưa cấu hình đăng", short: "Đã đăng nhập", dot: "bg-teal-500" },
+  { value: "running", label: "Đang kết nối", short: "Đang kết nối", dot: "bg-sky-500" },
+];
 
 function hostOf(value: unknown) {
   try { return new URL(String(value)).host; } catch { return "—"; }
@@ -181,14 +187,24 @@ export function AccountsView() {
   const setPublishMode = useResourceMutation(({ id, publishImmediately }: { id: string; publishImmediately: boolean }) => resourcesService.updateAccountSettings(id, { publishImmediately }), ["accounts"]);
   const checkAll = useResourceMutation(() => resourcesService.runAccountCheck(), ["accounts", "account-health"]);
   const readyProviders = new Set((providers.data ?? []).filter((provider) => provider.status === "READY").map((provider) => provider.provider));
-  const selectedCount = (query.data?.items ?? []).filter(isSelectedExtensionAccount).length;
-  const items = (query.data?.items ?? []).filter(item => (!selectedCount || accountScope === "all" || isSelectedExtensionAccount(item))
-    && (!platformId || item.platformId === platformId)
-    // A successful login that only lacks a posting destination has its own filter
-    // ("Đã đăng nhập · chưa cấu hình đăng"); it is not listed as needing action.
-    && (!connectionFilter || accountConnectionState(item, checksByAccount.get(item.id)?.status) === connectionFilter)
-    && `${item.name} ${item.username ?? ""} ${item.platform?.name ?? ""}`.toLowerCase().includes(search.toLowerCase()));
+  const allAccounts = query.data?.items ?? [];
+  const selectedCount = allAccounts.filter(isSelectedExtensionAccount).length;
+  const checkStatusOf = (item: PlatformAccount) => checksByAccount.get(item.id)?.status;
+  const inScope = (item: PlatformAccount) => !selectedCount || accountScope === "all" || isSelectedExtensionAccount(item);
+  const matchesPlatform = (item: PlatformAccount) => !platformId || item.platformId === platformId;
+  // A successful login that only lacks a posting destination has its own filter
+  // ("Đã đăng nhập · chưa cấu hình đăng"); it is not listed as needing action.
+  const matchesConnection = (item: PlatformAccount) => !connectionFilter || accountConnectionState(item, checkStatusOf(item)) === connectionFilter;
+  const matchesSearch = (item: PlatformAccount) => `${item.name} ${item.username ?? ""} ${item.platform?.name ?? ""}`.toLowerCase().includes(search.toLowerCase());
+  const items = allAccounts.filter(item => inScope(item) && matchesPlatform(item) && matchesConnection(item) && matchesSearch(item));
+  // Each filter counts what it would show with the other filters kept as they are.
+  const connectionCounts = countConnectionStates(allAccounts.filter(item => inScope(item) && matchesPlatform(item) && matchesSearch(item)), checkStatusOf);
+  const platformCounts = new Map<string, number>();
+  for (const item of allAccounts) if (inScope(item) && matchesConnection(item) && matchesSearch(item)) platformCounts.set(item.platformId, (platformCounts.get(item.platformId) ?? 0) + 1);
+  const platformTotal = [...platformCounts.values()].reduce((sum, count) => sum + count, 0);
   const catalogPlatforms = useMemo(() => platforms.data?.items ?? [], [platforms.data?.items]);
+  // Platforms that have matching accounts come first; the rest keep catalogue order.
+  const platformOptions = [...catalogPlatforms].sort((a, b) => Number(platformCounts.has(b.id)) - Number(platformCounts.has(a.id)));
   const configurablePlatforms = useMemo(() => catalogPlatforms.filter((platform) => platform.enabled && getCredentialConfig(platform)), [catalogPlatforms]);
   const normalizedDestinationSearch = destinationSearch.trim().toLowerCase();
   const matchingPlatforms = configurablePlatforms.filter((platform) => !normalizedDestinationSearch
@@ -312,11 +328,19 @@ export function AccountsView() {
     <ExtensionLoginCheckPanel />
     <Card className="overflow-hidden">
       <Toolbar search={search} onSearch={setSearch} searchPlaceholder="Tìm tài khoản…" filters={<>
-        {selectedCount > 0 && <Select aria-label="Phạm vi tài khoản" value={accountScope} onChange={event => setAccountScope(event.target.value)}><option value="selected">{selectedCount} tài khoản đã chọn</option><option value="all">Toàn bộ tài khoản</option></Select>}
-        <Select aria-label="Lọc nền tảng" className="w-44" value={platformId} onChange={(event) => setPlatformId(event.target.value)}><option value="">Mọi nền tảng</option>{catalogPlatforms.map((platform) => <option value={platform.id} key={platform.id}>{platform.name}</option>)}</Select>
-        <Select aria-label="Lọc trạng thái kết nối" value={connectionFilter} onChange={event => setConnectionFilter(event.target.value)}><option value="">Mọi trạng thái</option><option value="connected">Đã kết nối · có thể đăng</option><option value="needs_action">Cần thao tác</option><option value="authenticated">Đã đăng nhập · chưa cấu hình đăng</option><option value="running">Đang kết nối</option></Select>
+        {selectedCount > 0 && <Select aria-label="Phạm vi tài khoản" value={accountScope} onChange={event => setAccountScope(event.target.value)}><option value="selected">{selectedCount} tài khoản đã chọn</option><option value="all">Toàn bộ tài khoản ({allAccounts.length})</option></Select>}
+        <Select aria-label="Lọc nền tảng" className="w-56" value={platformId} onChange={(event) => setPlatformId(event.target.value)}><option value="">Mọi nền tảng ({platformTotal})</option>{platformOptions.map((platform) => <option value={platform.id} key={platform.id}>{platform.name} ({platformCounts.get(platform.id) ?? 0})</option>)}</Select>
+        <Select aria-label="Lọc trạng thái kết nối" value={connectionFilter} onChange={event => setConnectionFilter(event.target.value)}><option value="">Mọi trạng thái ({connectionCounts.total})</option>{CONNECTION_FILTERS.map(filter => <option key={filter.value} value={filter.value}>{filter.label} ({connectionCounts[filter.value]})</option>)}</Select>
       </>} end={<div className="flex gap-1"><PermissionGate allow={["ADMIN"]}><Button variant="ghost" size="sm" loading={checkAll.isPending || testChrome.isPending} onClick={() => void runCheckAll()} title={items.some(isChromeBound) ? "Kiểm tra phiên Chrome của các tài khoản đang hiển thị" : "Gia hạn token đến hạn và kiểm tra kết nối mọi tài khoản ngay"}><HeartPulse className="size-4" />Kiểm tra tất cả</Button></PermissionGate><Button variant="ghost" size="sm" onClick={() => void query.refetch()}><RefreshCw className="size-4" />Refresh</Button></div>} />
-      {query.isPending ? <div className="p-5"><TableSkeleton /></div> : query.isError ? <ErrorState error={query.error} onRetry={() => void query.refetch()} /> : items.length === 0 ? <EmptyState title="Chưa có tài khoản" description="Kết nối API hoặc thêm điểm đến bàn giao thủ công đầu tiên." action={<PermissionGate allow={["ADMIN"]}><Button onClick={() => setConnectOpen(true)}><PlugZap className="size-4" />Cấu hình ngay</Button></PermissionGate>} /> : <TableWrap><Table><thead><tr><Th>Nền tảng / tài khoản</Th><Th>Trạng thái</Th><Th>Kiểu kết nối</Th><Th>Kiểm tra gần nhất</Th><Th>Đang bật</Th><Th className="text-right">Thao tác</Th></tr></thead><tbody>{items.map((account) => {
+      {query.isSuccess && allAccounts.length > 0 && <div role="group" aria-label="Số tài khoản theo trạng thái kết nối" className="flex flex-wrap gap-2 border-b border-border px-4 py-3">
+        {[{ value: "", label: "Tất cả", short: "Tất cả", dot: "bg-slate-400", count: connectionCounts.total }, ...CONNECTION_FILTERS.map(filter => ({ ...filter, count: connectionCounts[filter.value] }))].map(chip => {
+          const active = connectionFilter === chip.value;
+          return <button key={chip.value || "all"} type="button" aria-pressed={active} title={chip.label} onClick={() => setConnectionFilter(chip.value)} className={cn("inline-flex min-h-9 items-center gap-2 rounded-full border px-3 text-xs font-semibold transition", active ? "border-primary bg-primary-soft text-primary" : "border-border bg-white text-slate-600 hover:bg-slate-50")}>
+            <span aria-hidden className={cn("size-2 rounded-full", chip.dot)} />{chip.short}{" "}<span className={cn("min-w-6 rounded-full px-1.5 py-0.5 text-center text-[11px] tabular-nums", active ? "bg-white text-primary" : "bg-slate-100 text-slate-700")}>{chip.count}</span>{" "}<span className="sr-only">tài khoản</span>
+          </button>;
+        })}
+      </div>}
+      {query.isPending ? <div className="p-5"><TableSkeleton /></div> : query.isError ? <ErrorState error={query.error} onRetry={() => void query.refetch()} /> : items.length === 0 && allAccounts.length > 0 ? <EmptyState title="Không có tài khoản khớp bộ lọc" description="Đổi nền tảng, trạng thái hoặc từ khoá tìm để xem các tài khoản khác." action={<Button variant="secondary" onClick={() => { setPlatformId(""); setConnectionFilter(""); setSearch(""); }}>Bỏ lọc</Button>} /> : items.length === 0 ? <EmptyState title="Chưa có tài khoản" description="Kết nối API hoặc thêm điểm đến bàn giao thủ công đầu tiên." action={<PermissionGate allow={["ADMIN"]}><Button onClick={() => setConnectOpen(true)}><PlugZap className="size-4" />Cấu hình ngay</Button></PermissionGate>} /> : <TableWrap><Table><thead><tr><Th>Nền tảng / tài khoản</Th><Th>Trạng thái</Th><Th>Kiểu kết nối</Th><Th>Kiểm tra gần nhất</Th><Th>Đang bật</Th><Th className="text-right">Thao tác</Th></tr></thead><tbody>{items.map((account) => {
         const platform = catalogPlatforms.find((item) => item.id === account.platformId) ?? account.platform;
         const config = getCredentialConfig(platform);
         const viaExtension = isExtensionAccount(account);
