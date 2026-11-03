@@ -196,11 +196,8 @@ export const resourcesService = {
   accountHealth: () => apiRequest<AccountHealth>("/account-health"),
   runAccountCheck: () => apiRequest<MaintenanceRun>("/account-health/check", { method: "POST" }),
   extensionDevices: () => apiRequest<ExtensionDevice[]>("/extension/devices"),
-  importExtensionAccounts: (file: File, deviceId: string, googleEmail?: string, google: { password?: string; totpSecret?: string } = {}) => {
-    const body = new FormData(); body.set("file", file); body.set("deviceId", deviceId); if (googleEmail?.trim()) body.set("googleEmail", googleEmail.trim());
-    // Shared Google secrets go only to the backend, which stores them encrypted and never returns them.
-    if (google.password) body.set("googlePassword", google.password);
-    if (google.totpSecret?.trim()) body.set("googleTotpSecret", google.totpSecret.trim());
+  importExtensionAccounts: (file: File, deviceId: string) => {
+    const body = new FormData(); body.set("file", file); body.set("deviceId", deviceId);
     return apiRequest<AccountImportResult>("/extension/accounts/import", { method: "POST", body });
   },
   importApiAccounts: (file: File) => {

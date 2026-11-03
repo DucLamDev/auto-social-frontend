@@ -9,49 +9,28 @@ vi.mock("@/hooks/use-resources", () => ({
   useResourceMutation: (fn: () => Promise<unknown>) => ({ mutateAsync: fn, isPending: false }),
 }));
 
-const TOTP = "JBSWY3DPEHPK3PXP";
-
-function fill({ email = "", password = "", totp = "" }: { email?: string; password?: string; totp?: string }) {
+function upload() {
   const file = new File(["Social Network,User\nMedium,writer@example.test\n"], "accounts.csv", { type: "text/csv" });
   fireEvent.change(screen.getByLabelText("File tài khoản"), { target: { files: [file] } });
-  if (email) fireEvent.change(screen.getByLabelText("Google dùng chung (tùy chọn)"), { target: { value: email } });
-  if (password) fireEvent.change(screen.getByLabelText("Mật khẩu Google (tùy chọn)"), { target: { value: password } });
-  if (totp) fireEvent.change(screen.getByLabelText("Khoá TOTP Google (tùy chọn)"), { target: { value: totp } });
   fireEvent.click(screen.getByRole("button", { name: "Nhập file & kết nối" }));
   return file;
 }
 
-describe("account import with a shared Google account", () => {
+describe("account file import", () => {
   beforeEach(() => importExtensionAccounts.mockReset().mockResolvedValue({ imported: 1, queued: 1, batchId: "b", rows: [] }));
 
-  it("sends the Google password and TOTP key with the shared email, then clears both fields", async () => {
+  it("has no shared Google login: each row signs in with its own account", () => {
     render(<AccountImportModal open onClose={() => undefined} />);
-    const file = fill({ email: "company@example.test", password: "google-password", totp: ` ${TOTP} ` }); // vpsttt-secretscan: ignore (mật khẩu giả cho test)
-    await waitFor(() => expect(importExtensionAccounts).toHaveBeenCalledWith(file, "device-1", "company@example.test", { password: "google-password", totpSecret: ` ${TOTP} ` })); // vpsttt-secretscan: ignore (mật khẩu giả cho test)
+    expect(screen.queryByLabelText(/Google dùng chung/)).toBeNull();
+    expect(screen.queryByLabelText(/Mật khẩu Google/)).toBeNull();
+    expect(screen.queryByLabelText(/Khoá TOTP Google/)).toBeNull();
+    expect(screen.getByText(/của chính email Google ở dòng đó/)).toBeInTheDocument();
+  });
+
+  it("sends only the file and the chosen Chrome", async () => {
+    render(<AccountImportModal open onClose={() => undefined} />);
+    const file = upload();
+    await waitFor(() => expect(importExtensionAccounts).toHaveBeenCalledWith(file, "device-1"));
     await screen.findByText(/Đã nhập 1 tài khoản/);
-    expect(screen.getByLabelText("Mật khẩu Google (tùy chọn)")).toHaveValue("");
-    expect(screen.getByLabelText("Khoá TOTP Google (tùy chọn)")).toHaveValue("");
-    expect(screen.getByLabelText("Mật khẩu Google (tùy chọn)")).toHaveAttribute("type", "password");
-    expect(screen.getByLabelText("Khoá TOTP Google (tùy chọn)")).toHaveAttribute("type", "password");
-  });
-
-  it("refuses a six-digit code in place of the TOTP key", async () => {
-    render(<AccountImportModal open onClose={() => undefined} />);
-    fill({ email: "company@example.test", totp: "123 456" });
-    expect(await screen.findByRole("alert")).toHaveTextContent("không phải khoá TOTP");
-    expect(importExtensionAccounts).not.toHaveBeenCalled();
-  });
-
-  it("requires the shared Google email when Google secrets are entered", async () => {
-    render(<AccountImportModal open onClose={() => undefined} />);
-    fill({ password: "google-password" }); // vpsttt-secretscan: ignore (mật khẩu giả cho test)
-    expect(await screen.findByRole("alert")).toHaveTextContent("email Google dùng chung");
-    expect(importExtensionAccounts).not.toHaveBeenCalled();
-  });
-
-  it("keeps the previous request when no Google secrets are entered", async () => {
-    render(<AccountImportModal open onClose={() => undefined} />);
-    const file = fill({ email: "company@example.test" });
-    await waitFor(() => expect(importExtensionAccounts).toHaveBeenCalledWith(file, "device-1", "company@example.test", { password: "", totpSecret: "" }));
   });
 });

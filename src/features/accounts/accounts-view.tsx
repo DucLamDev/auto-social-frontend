@@ -184,8 +184,9 @@ export function AccountsView() {
   const selectedCount = (query.data?.items ?? []).filter(isSelectedExtensionAccount).length;
   const items = (query.data?.items ?? []).filter(item => (!selectedCount || accountScope === "all" || isSelectedExtensionAccount(item))
     && (!platformId || item.platformId === platformId)
-    && (!connectionFilter || accountConnectionState(item, checksByAccount.get(item.id)?.status) === connectionFilter
-      || (connectionFilter === "needs_action" && accountConnectionState(item, checksByAccount.get(item.id)?.status) === "authenticated"))
+    // A successful login that only lacks a posting destination has its own filter
+    // ("Đã đăng nhập · chưa cấu hình đăng"); it is not listed as needing action.
+    && (!connectionFilter || accountConnectionState(item, checksByAccount.get(item.id)?.status) === connectionFilter)
     && `${item.name} ${item.username ?? ""} ${item.platform?.name ?? ""}`.toLowerCase().includes(search.toLowerCase()));
   const catalogPlatforms = useMemo(() => platforms.data?.items ?? [], [platforms.data?.items]);
   const configurablePlatforms = useMemo(() => catalogPlatforms.filter((platform) => platform.enabled && getCredentialConfig(platform)), [catalogPlatforms]);

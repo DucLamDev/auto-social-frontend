@@ -3,6 +3,15 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.4.1 · 03/11/2026
+### Sửa lỗi
+- Bỏ ô "Google dùng chung" trong hộp Nhập file tài khoản
+  Các social trong một file thường dùng nhiều tài khoản Google khác nhau, nên ba ô email / mật khẩu / khoá TOTP Google
+  dùng chung bị gỡ. Mỗi dòng dùng đúng email, mật khẩu và 2FA của chính dòng đó (hướng dẫn ghi ngay trong hộp). Cần
+  backend 1.6.1.
+- Lọc "Cần thao tác" không còn lẫn tài khoản đã đăng nhập thành công
+  Tài khoản đăng nhập được nhưng chưa cấu hình nơi đăng chỉ hiện ở lọc "Đã đăng nhập · chưa cấu hình đăng".
+
 ## 1.4.0 · 03/11/2026
 ### Tính năng
 - Chọn "VPSTTT AI" (AI API của IDE công ty) khi tạo bài
