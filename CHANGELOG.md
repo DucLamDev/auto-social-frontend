@@ -3,6 +3,14 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.6.1 · 03/11/2026
+### Sửa lỗi
+- Nút Test, Kiểm tra tất cả và bật tài khoản tự đăng nhập khi Chrome chưa có phiên (cần backend 1.7.1)
+  Trước đây các nút này chỉ xem Chrome đã đăng nhập sẵn chưa: trên Chrome mới (ví dụ Chrome trên VPS) tab mở 2–3 giây
+  rồi đóng, báo "Lượt kiểm tra này không thử mật khẩu hoặc mã 2FA". Nay chúng chạy như Test đăng nhập hàng loạt: thử
+  mật khẩu đã lưu rồi Google, mỗi cách một lần. "Tôi đã đăng nhập · Kiểm tra" trong Hướng dẫn kết nối vẫn chỉ xem
+  phiên, dành cho lúc bạn vừa đăng nhập tay.
+
 ## 1.6.0 · 03/11/2026
 ### Tính năng
 - Công tắc "AI tạo ảnh cho kênh cần ảnh" trong hộp Tạo nội dung AI chạy ngầm (cần backend 1.7.0)
