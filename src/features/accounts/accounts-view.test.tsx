@@ -137,10 +137,12 @@ describe("selected Chrome connections", () => {
     expect(within(row).getByText("Tiện ích Chrome")).toBeInTheDocument();
     expect(screen.queryByText("Old import")).not.toBeInTheDocument();
     fireEvent.click(within(row).getByRole("button", { name: "Test" }));
-    await waitFor(() => expect(mocks.queueExtensionLoginChecks).toHaveBeenCalledWith(["selected"], true));
+    // The row Test logs in when needed (saved password, then Google), like the bulk test.
+    await waitFor(() => expect(mocks.queueExtensionLoginChecks).toHaveBeenCalledWith(["selected"], false, true));
     expect(mocks.testAccount).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Kiểm tra tất cả" }));
     await waitFor(() => expect(mocks.queueExtensionLoginChecks).toHaveBeenCalledTimes(2));
+    expect(mocks.queueExtensionLoginChecks).toHaveBeenLastCalledWith(["selected"], false, true);
     expect(mocks.runAccountCheck).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText("Phạm vi tài khoản"), { target: { value: "all" } });
     expect(screen.getByText("Old import")).toBeInTheDocument();

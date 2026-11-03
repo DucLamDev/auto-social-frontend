@@ -178,7 +178,10 @@ export function AccountsView() {
   const refetchAccounts = query.refetch;
   const loginChecks = useExtensionLoginChecks();
   const checksByAccount = new Map((loginChecks.data ?? []).map(row => [row.id, row.check]));
-  const testChrome = useResourceMutation((ids: string[]) => resourcesService.queueExtensionLoginChecks(ids, true), ["extension-login-checks", "accounts"]);
+  // Test, "Kiểm tra tất cả" and turning an account on log in when Chrome has no session yet
+  // (saved password first, then Google), like "Test đăng nhập hàng loạt". Only "Tôi đã đăng
+  // nhập · Kiểm tra" in the connection help stays a session-only check.
+  const testChrome = useResourceMutation((ids: string[]) => resourcesService.queueExtensionLoginChecks(ids, false, true), ["extension-login-checks", "accounts"]);
   const platforms = usePlatforms({ limit: 100 });
   const providers = useOAuthProviders();
   const update = useResourceMutation(({ id, enabled }: { id: string; enabled: boolean }) => resourcesService.updateAccount(id, { enabled }), ["accounts"]);
@@ -331,7 +334,7 @@ export function AccountsView() {
         {selectedCount > 0 && <Select aria-label="Phạm vi tài khoản" value={accountScope} onChange={event => setAccountScope(event.target.value)}><option value="selected">{selectedCount} tài khoản đã chọn</option><option value="all">Toàn bộ tài khoản ({allAccounts.length})</option></Select>}
         <Select aria-label="Lọc nền tảng" className="w-56" value={platformId} onChange={(event) => setPlatformId(event.target.value)}><option value="">Mọi nền tảng ({platformTotal})</option>{platformOptions.map((platform) => <option value={platform.id} key={platform.id}>{platform.name} ({platformCounts.get(platform.id) ?? 0})</option>)}</Select>
         <Select aria-label="Lọc trạng thái kết nối" value={connectionFilter} onChange={event => setConnectionFilter(event.target.value)}><option value="">Mọi trạng thái ({connectionCounts.total})</option>{CONNECTION_FILTERS.map(filter => <option key={filter.value} value={filter.value}>{filter.label} ({connectionCounts[filter.value]})</option>)}</Select>
-      </>} end={<div className="flex gap-1"><PermissionGate allow={["ADMIN"]}><Button variant="ghost" size="sm" loading={checkAll.isPending || testChrome.isPending} onClick={() => void runCheckAll()} title={items.some(isChromeBound) ? "Kiểm tra phiên Chrome của các tài khoản đang hiển thị" : "Gia hạn token đến hạn và kiểm tra kết nối mọi tài khoản ngay"}><HeartPulse className="size-4" />Kiểm tra tất cả</Button></PermissionGate><Button variant="ghost" size="sm" onClick={() => void query.refetch()}><RefreshCw className="size-4" />Refresh</Button></div>} />
+      </>} end={<div className="flex gap-1"><PermissionGate allow={["ADMIN"]}><Button variant="ghost" size="sm" loading={checkAll.isPending || testChrome.isPending} onClick={() => void runCheckAll()} title={items.some(isChromeBound) ? "Kiểm tra và tự đăng nhập Chrome cho các tài khoản đang hiển thị (thử mật khẩu đã lưu, rồi Google)" : "Gia hạn token đến hạn và kiểm tra kết nối mọi tài khoản ngay"}><HeartPulse className="size-4" />Kiểm tra tất cả</Button></PermissionGate><Button variant="ghost" size="sm" onClick={() => void query.refetch()}><RefreshCw className="size-4" />Refresh</Button></div>} />
       {query.isSuccess && allAccounts.length > 0 && <div role="group" aria-label="Số tài khoản theo trạng thái kết nối" className="flex flex-wrap gap-2 border-b border-border px-4 py-3">
         {[{ value: "", label: "Tất cả", short: "Tất cả", dot: "bg-slate-400", count: connectionCounts.total }, ...CONNECTION_FILTERS.map(filter => ({ ...filter, count: connectionCounts[filter.value] }))].map(chip => {
           const active = connectionFilter === chip.value;
