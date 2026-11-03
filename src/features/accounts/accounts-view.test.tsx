@@ -596,6 +596,25 @@ describe("AccountsView Chrome extension delivery", () => {
     }));
   });
 
+  it("configures daily.dev with its own composer page, help and engine", async () => {
+    const platform: Platform = { ...vozPlatform, id: "platform-daily", slug: "daily-dev", name: "daily.dev", mode: "MANUAL", connectorKey: "manual", defaultSettings: {
+      extensionFlowId: "daily-dev", extensionEngine: "dailydev", extensionTargetUrl: "https://daily.dev/squads/create", extensionSetupHint: "Đăng bài viết lên hồ sơ daily.dev.",
+    } };
+    mocks.platforms = [platform];
+    mocks.accounts = [{ id: "daily-account", platformId: platform.id, platform, name: "daily.dev · vpsttt", enabled: false, status: "RECONNECT_REQUIRED", settings: {} }];
+    render(<AccountsView />);
+    fireEvent.click(screen.getByRole("button", { name: /Tiện ích$/ }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByLabelText("Luồng đăng")).toHaveValue("dailydev");
+    expect(within(dialog).getByRole("option", { name: "daily.dev · hồ sơ cá nhân" })).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Trang tạo chủ đề")).toHaveValue("https://daily.dev/squads/create");
+    expect(within(dialog).getByText(/Chưa hỗ trợ đăng vào Squad\./)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Lưu" }));
+    await waitFor(() => expect(mocks.configureExtensionDelivery).toHaveBeenCalledWith("daily-account", {
+      enabled: true, engine: "dailydev", targetUrl: "https://daily.dev/squads/create", autoSubmit: true, tags: [], category: "", flair: "",
+    }));
+  });
+
   it("labels accounts already posting through the extension", () => {
     mocks.accounts = [{ ...mocks.accounts[0]!, settings: { delivery: "extension", extensionEngine: "xenforo", extensionTargetUrl: "https://voz.vn/f/a.17/post-thread", extensionAutoSubmit: false } }];
     render(<AccountsView />);

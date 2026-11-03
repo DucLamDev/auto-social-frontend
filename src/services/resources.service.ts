@@ -25,7 +25,7 @@ export type ExtensionLoginCheckRow = { id: string; name: string; platform: strin
   posting?: { status: string; implemented: boolean; engine?: string; message: string; url?: string };
   attempts?: Array<{ method: string; available: boolean; check: { status: string; message?: string | null; finishedAt?: string | null } | null }>;
   check: { id: string; status: string; message?: string | null; detectedUsername?: string | null; finishedAt?: string | null } | null };
-export type ExtensionEngine = "xenforo" | "discourse" | "phpbb" | "medium" | "substack" | "quora" | "reddit" | "slideshare" | "aws-builder" | "tinhte" | "pixelfed" | "mastodon" | "bluesky" | "tumblr" | "devto" | "minds" | "stackexchange" | "lemmy" | "discuit" | "linkedin" | "differ" | "dzone";
+export type ExtensionEngine = "xenforo" | "discourse" | "phpbb" | "medium" | "substack" | "quora" | "reddit" | "slideshare" | "aws-builder" | "tinhte" | "pixelfed" | "mastodon" | "bluesky" | "tumblr" | "devto" | "minds" | "stackexchange" | "lemmy" | "discuit" | "linkedin" | "differ" | "dzone" | "dailydev";
 export type ExtensionDeliveryInput = { enabled: boolean; engine?: ExtensionEngine; targetUrl?: string; autoSubmit?: boolean; tags?: string[]; category?: string; flair?: string };
 export type ExtensionSessionInput = { deviceId: string; expectedUsername: string; profileUrl?: string; identitySelector?: string; provider: "password" | "google"; autoLogin: boolean; autoTotp: boolean; loginUrl?: string; loginUsername?: string; password?: string; totpSecret?: string };
 

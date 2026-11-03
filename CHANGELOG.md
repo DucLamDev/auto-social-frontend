@@ -3,6 +3,12 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.7.0 · 03/11/2026
+### Tính năng
+- Cấu hình đăng daily.dev bằng tiện ích Chrome (cần backend 1.8.0)
+  Hộp **Tiện ích** của tài khoản daily.dev có luồng "daily.dev · hồ sơ cá nhân", điền sẵn trang tạo bài
+  `https://daily.dev/squads/create`; bài đăng lên hồ sơ daily.dev đang đăng nhập (chưa hỗ trợ đăng vào Squad).
+
 ## 1.6.1 · 03/11/2026
 ### Sửa lỗi
 - Nút Test, Kiểm tra tất cả và bật tài khoản tự đăng nhập khi Chrome chưa có phiên (cần backend 1.7.1)
