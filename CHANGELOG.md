@@ -3,6 +3,18 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.5.0 · 03/11/2026
+### Tính năng
+- Logo của từng mạng xã hội thay cho ô chữ cái
+  Ô nền tảng ở trang Tài khoản, Chiến dịch, Publishing, Nhật ký, Bài đã đăng, Studio và Prompt hiện logo thật của
+  mạng xã hội (daily.dev, Tumblr, Hugging Face, Bluesky, Reddit, Medium, dev.to, Stack Overflow, diễn đàn NGINX,
+  Caddy, MongoDB…). Nền tảng chưa có logo (LinkedIn, Tinhte, Voz, KubeBy, Level1Techs…) vẫn dùng ô chữ cái như cũ.
+- Hiện số lượng tài khoản theo từng trạng thái và từng nền tảng
+  Trang Tài khoản có hàng thẻ đếm Tất cả / Đã kết nối / Cần thao tác / Đã đăng nhập / Đang kết nối; bấm thẻ là lọc
+  ngay. Ô lọc trạng thái, ô lọc nền tảng và ô phạm vi ghi kèm số tài khoản, số đổi theo các bộ lọc còn lại và ô tìm.
+  Nền tảng đang có tài khoản được đưa lên đầu danh sách lọc. Khi bộ lọc không khớp tài khoản nào, trang báo rõ và có
+  nút Bỏ lọc thay vì báo "Chưa có tài khoản".
+
 ## 1.4.1 · 03/11/2026
 ### Sửa lỗi
 - Bỏ ô "Google dùng chung" trong hộp Nhập file tài khoản
