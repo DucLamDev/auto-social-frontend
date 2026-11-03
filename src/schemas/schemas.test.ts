@@ -28,6 +28,8 @@ describe("form schemas", () => {
     };
     expect(automationCampaignSchema.safeParse(base).success).toBe(true);
     expect(automationCampaignSchema.safeParse({ ...base, name: "" }).success).toBe(true);
+    expect(automationCampaignSchema.safeParse({ ...base, generateImages: false }).success).toBe(true);
+    expect(automationCampaignSchema.safeParse({ ...base, generateImages: "yes" }).success).toBe(false);
     expect(automationCampaignSchema.safeParse({ ...base, aiProvider: "unknown" }).success).toBe(false);
     expect(automationCampaignSchema.safeParse({ ...base, confirmAutoPublish: false }).success).toBe(false);
     expect(automationCampaignSchema.safeParse({

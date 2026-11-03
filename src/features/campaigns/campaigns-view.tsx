@@ -18,7 +18,7 @@ import { Modal } from "@/components/ui/modal";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/ui/states";
 import { Table, TableWrap, Td, Th } from "@/components/ui/table";
 import { StatusFilter, Toolbar } from "@/components/ui/toolbar";
-import { useAccounts, useAiProviders, useCampaigns, useContents, usePlatforms, useResourceMutation, useVariants } from "@/hooks/use-resources";
+import { useAccounts, useAiImageStatus, useAiProviders, useCampaigns, useContents, usePlatforms, useResourceMutation, useVariants } from "@/hooks/use-resources";
 import { formatDate } from "@/lib/utils";
 import { campaignSchema, type AutomationCampaignInput, type CampaignInput } from "@/schemas/campaign";
 import { getAiGenerationErrorMessage } from "@/services/api/errors";
@@ -47,6 +47,7 @@ export function CampaignsView({ initialAutomationOpen = false }: { initialAutoma
   const accounts = useAccounts({ limit: 100 });
   const platforms = usePlatforms({ limit: 100 });
   const aiProviders = useAiProviders();
+  const aiImageStatus = useAiImageStatus();
   const create = useResourceMutation((input: Parameters<typeof resourcesService.createCampaign>[0]) => resourcesService.createCampaign(input), ["campaigns", "publish-jobs"]);
   const automate = useResourceMutation(
     ({ input, idempotencyKey }: { input: Parameters<typeof resourcesService.automateCampaign>[0]; idempotencyKey: string }) => resourcesService.automateCampaign(input, idempotencyKey),
@@ -150,6 +151,8 @@ export function CampaignsView({ initialAutomationOpen = false }: { initialAutoma
         name: deriveAutomationCampaignName(values.name, values.brief),
         brief: includeImageAltText(values.brief, values.imageAltText),
         platformAccountIds: normalizeAutomationAccountIds(values.accountIds),
+        // Your own image replaces AI images; the backend ignores the switch then too.
+        generateImages: values.generateImages !== false && aiImageStatus.data?.configured === true && !values.image,
         aiProvider: values.aiProvider,
         scheduledAt: values.runMode === "SCHEDULED" && values.scheduledAt
           ? new Date(values.scheduledAt).toISOString()
@@ -218,6 +221,8 @@ export function CampaignsView({ initialAutomationOpen = false }: { initialAutoma
       aiProviders={aiProviders.data ?? []}
       aiProvidersPending={aiProviders.isPending}
       aiProvidersError={aiProviders.error}
+      imageGeneration={aiImageStatus.data}
+      imageGenerationPending={aiImageStatus.isPending}
       submitError={automationError}
       busy={automationUploadPending || automate.isPending}
       onClose={closeAutomation}

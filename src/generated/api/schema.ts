@@ -336,6 +336,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/image-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Ai_imageStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/gemini-keys": {
         parameters: {
             query?: never;
@@ -430,6 +446,54 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["ContentVariants_updateStatus"];
+        trace?: never;
+    };
+    "/api/v1/content-variants/{id}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContentVariants_regenerateImage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content-variants/{id}/image/{mediaId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["ContentVariants_removeImage"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Media_list"];
+        put?: never;
+        post: operations["Media_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/prompts": {
@@ -736,22 +800,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/media": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["Media_list"];
-        put?: never;
-        post: operations["Media_upload"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/logs": {
         parameters: {
             query?: never;
@@ -946,6 +994,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/extension/selector-suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Selectors the AI proposed after a composer was not found; approved ones run with automatic submit */
+        get: operations["Extension_selectorSuggestions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extension/selector-suggestions/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Extension_approveSelector"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extension/selector-suggestions/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Extension_rejectSelector"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/extension/accounts/{id}/session": {
         parameters: {
             query?: never;
@@ -1023,6 +1120,39 @@ export interface paths {
         put?: never;
         /** Operator confirmed nothing was posted: give the job back to the extension */
         post: operations["Extension_requeue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extension/agent/tasks/{id}/ui-hint": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask the AI which visible element is the missing composer control (answers within ~8 s or poll) */
+        post: operations["ExtensionAgent_uiHint"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extension/agent/tasks/{id}/ui-hint/{hintId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExtensionAgent_uiHintStatus"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1566,6 +1696,12 @@ export interface components {
             configured: boolean;
             isDefault: boolean;
         };
+        AiImageStatusContractDto: {
+            /** @description True when VPSTTT AI image generation is configured */
+            configured: boolean;
+            /** @example vpsttt-image */
+            model: string;
+        };
         GeminiKeyChangeDto: {
             slot: number;
             apiKey?: string;
@@ -1627,6 +1763,38 @@ export interface components {
         UpdateVariantStatusDto: {
             /** @enum {string} */
             status: "DRAFT" | "GENERATED" | "APPROVED" | "REJECTED";
+        };
+        RegenerateVariantImageDto: {
+            /** @description New image description; the stored one is reused when omitted. */
+            prompt?: string;
+        };
+        MediaAssetContractDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            contentId?: string | null;
+            /** Format: uuid */
+            variantId?: string | null;
+            /** @enum {string} */
+            type: "IMAGE" | "VIDEO" | "DOCUMENT";
+            storageKey: string;
+            /** Format: uri */
+            publicUrl?: string | null;
+            mimeType: string;
+            /** @description Decimal byte count serialized as a string */
+            sizeBytes: string;
+            checksum: string;
+            /**
+             * @description Media metadata. Uploaded accessible descriptions are returned as altText.
+             * @example {
+             *       "altText": "A dashboard showing campaign performance."
+             *     }
+             */
+            metadata: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            createdAt: string;
         };
         PromptTemplateContractDto: {
             /** Format: uuid */
@@ -1750,6 +1918,11 @@ export interface components {
             platformAccountIds: string[];
             /** @description Previously uploaded, unattached media assets to attach to the generated source content. */
             mediaAssetIds?: string[];
+            /**
+             * @description Let VPSTTT AI create one image per destination whose publishing route can attach it. Ignored when mediaAssetIds supplies your own image.
+             * @default true
+             */
+            generateImages: boolean;
             /**
              * @description AI provider for this automation run. Uses the backend default when omitted.
              * @enum {string}
@@ -1894,34 +2067,6 @@ export interface components {
             job?: {
                 [key: string]: unknown;
             };
-        };
-        MediaAssetContractDto: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            contentId?: string | null;
-            /** Format: uuid */
-            variantId?: string | null;
-            /** @enum {string} */
-            type: "IMAGE" | "VIDEO" | "DOCUMENT";
-            storageKey: string;
-            /** Format: uri */
-            publicUrl?: string | null;
-            mimeType: string;
-            /** @description Decimal byte count serialized as a string */
-            sizeBytes: string;
-            checksum: string;
-            /**
-             * @description Media metadata. Uploaded accessible descriptions are returned as altText.
-             * @example {
-             *       "altText": "A dashboard showing campaign performance."
-             *     }
-             */
-            metadata: {
-                [key: string]: unknown;
-            };
-            /** Format: date-time */
-            createdAt: string;
         };
         PublishAttemptLogContractDto: {
             /** Format: uuid */
@@ -2079,6 +2224,30 @@ export interface components {
             targetUrl?: string;
             /** @description false: fill the form and wait for the operator to click Post */
             autoSubmit?: boolean;
+        };
+        UiCandidateDto: {
+            index: number;
+            /** @enum {string} */
+            kind: "input" | "textarea" | "contenteditable" | "textbox" | "button" | "submit" | "link";
+            tag: string;
+            type?: string;
+            role?: string;
+            label?: string;
+            placeholder?: string;
+            text?: string;
+            name?: string;
+            id?: string;
+            inDialog: boolean;
+            inForm: boolean;
+            disabled: boolean;
+            /** @description Unique CSS path of the element in its document or shadow root */
+            selector: string;
+        };
+        UiHintRequestDto: {
+            missing: ("title" | "body" | "submit" | "opener")[];
+            /** @description Current page URL; must be on the task destination */
+            url: string;
+            candidates: components["schemas"]["UiCandidateDto"][];
         };
         ExtensionAuthStepDto: Record<string, never>;
         ClaimExtensionTaskDto: {
@@ -3443,6 +3612,52 @@ export interface operations {
             };
         };
     };
+    Ai_imageStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["AiImageStatusContractDto"];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
     GeminiKeys_get: {
         parameters: {
             query?: never;
@@ -3799,6 +4014,203 @@ export interface operations {
                         /** @example true */
                         success: boolean;
                         data: components["schemas"]["ContentVariantContractDto"];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ContentVariants_regenerateImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegenerateVariantImageDto"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ContentVariants_removeImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                mediaId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    Media_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                contentId?: string;
+                variantId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["MediaAssetContractDto"][];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    Media_upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    /** Format: uuid */
+                    contentId?: string;
+                    /** Format: uuid */
+                    variantId?: string;
+                    /** @description Accessible description stored with the media asset metadata. */
+                    altText?: string;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["MediaAssetContractDto"];
                         meta: components["schemas"]["ApiMetaContractDto"];
                     };
                 };
@@ -4874,116 +5286,6 @@ export interface operations {
             };
         };
     };
-    Media_list: {
-        parameters: {
-            query?: {
-                page?: number;
-                limit?: number;
-                contentId?: string;
-                variantId?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        data: components["schemas"]["MediaAssetContractDto"][];
-                        meta: components["schemas"]["ApiMetaContractDto"];
-                    };
-                };
-            };
-            /** @description Standard application error envelope */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example false */
-                        success: boolean;
-                        error: {
-                            code: string;
-                            message: string;
-                            details?: unknown;
-                        };
-                        meta: {
-                            requestId: string;
-                            /** Format: date-time */
-                            timestamp: string;
-                        };
-                    };
-                };
-            };
-        };
-    };
-    Media_upload: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": {
-                    /** Format: binary */
-                    file: string;
-                    /** Format: uuid */
-                    contentId?: string;
-                    /** Format: uuid */
-                    variantId?: string;
-                    /** @description Accessible description stored with the media asset metadata. */
-                    altText?: string;
-                };
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example true */
-                        success: boolean;
-                        data: components["schemas"]["MediaAssetContractDto"];
-                        meta: components["schemas"]["ApiMetaContractDto"];
-                    };
-                };
-            };
-            /** @description Standard application error envelope */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example false */
-                        success: boolean;
-                        error: {
-                            code: string;
-                            message: string;
-                            details?: unknown;
-                        };
-                        meta: {
-                            requestId: string;
-                            /** Format: date-time */
-                            timestamp: string;
-                        };
-                    };
-                };
-            };
-        };
-    };
     Logs_list: {
         parameters: {
             query?: never;
@@ -5543,6 +5845,130 @@ export interface operations {
             };
         };
     };
+    Extension_selectorSuggestions: {
+        parameters: {
+            query?: {
+                status?: "PENDING" | "APPROVED" | "REJECTED";
+                engine?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    Extension_approveSelector: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    Extension_rejectSelector: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
     Extension_configureSession: {
         parameters: {
             query?: never;
@@ -5762,6 +6188,93 @@ export interface operations {
             header?: never;
             path: {
                 id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ExtensionAgent_uiHint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UiHintRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ExtensionAgent_uiHintStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                hintId: string;
             };
             cookie?: never;
         };

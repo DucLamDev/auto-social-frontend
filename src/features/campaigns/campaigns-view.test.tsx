@@ -29,6 +29,7 @@ vi.mock("@/hooks/use-resources", () => ({
     isError: false,
     error: null,
   }),
+  useAiImageStatus: () => ({ data: { configured: true, model: "vpsttt-image" }, isPending: false }),
   useCampaigns: () => ({ data: { items: [] }, isPending: false, isError: false, error: null }),
   useContents: () => ({ data: { items: [] }, isPending: false, isError: false, error: null }),
   usePlatforms: () => ({
@@ -80,7 +81,7 @@ describe("CampaignsView automation media retries", () => {
     const brief = screen.getByLabelText("Mô tả bài đăng");
     const image = new File(["image"], "post.webp", { type: "image/webp" });
     fireEvent.change(brief, { target: { value: "Quảng bá VPS hiệu năng cao cho cộng đồng lập trình viên Việt Nam." } });
-    fireEvent.change(screen.getByLabelText("Ảnh minh hoạ (tuỳ chọn)"), { target: { files: [image] } });
+    fireEvent.change(screen.getByLabelText("Hoặc dùng ảnh của bạn (tuỳ chọn)"), { target: { files: [image] } });
     fireEvent.change(screen.getByLabelText("Mô tả ảnh / alt text (tuỳ chọn)"), { target: { value: "Dashboard VPS" } });
     const submit = screen.getByRole("button", { name: /Tạo bằng AI chạy ngầm/ });
 
@@ -91,7 +92,8 @@ describe("CampaignsView automation media retries", () => {
 
     expect(mocks.uploadMedia).toHaveBeenCalledTimes(1);
     expect(mocks.uploadMedia).toHaveBeenCalledWith(image, { altText: "Dashboard VPS" });
-    expect(mocks.automateCampaign.mock.calls[0]?.[0]).toEqual(expect.objectContaining({ mediaAssetIds: ["media-1"] }));
+    // Your own image replaces AI images.
+    expect(mocks.automateCampaign.mock.calls[0]?.[0]).toEqual(expect.objectContaining({ mediaAssetIds: ["media-1"], generateImages: false }));
     expect(mocks.automateCampaign.mock.calls[1]?.[1]).toBe(mocks.automateCampaign.mock.calls[0]?.[1]);
 
     fireEvent.change(brief, { target: { value: "Quảng bá VPS hiệu năng cao cho startup và đội ngũ kỹ thuật Việt Nam." } });
@@ -128,7 +130,7 @@ describe("CampaignsView automation media retries", () => {
     fireEvent.change(screen.getByLabelText("Mô tả bài đăng"), { target: { value: "Quảng bá VPS hiệu năng cao cho cộng đồng lập trình viên Việt Nam." } });
     fireEvent.click(screen.getByRole("button", { name: "Tạo bằng AI chạy ngầm" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(mocks.automateCampaign).toHaveBeenCalledWith(expect.objectContaining({ publishImmediately: false }), expect.any(String));
+    expect(mocks.automateCampaign).toHaveBeenCalledWith(expect.objectContaining({ publishImmediately: false, generateImages: true }), expect.any(String));
     expect(screen.getByRole("button", { name: "Tạo tự động" })).toBeEnabled();
   });
 });

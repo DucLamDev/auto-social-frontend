@@ -47,14 +47,40 @@ const accounts: PlatformAccount[] = [
 ];
 
 describe("AutomationCampaignModal", () => {
-  it("requires Pixelfed media before generating or submitting the campaign", async () => {
+  it("requires Pixelfed media before generating or submitting the campaign when AI images are unavailable", async () => {
     const onSubmit = vi.fn();
     const pixelfed: PlatformAccount = { ...accounts[0]!, id: "pixelfed", name: "Pixelfed", settings: { delivery: "extension", extensionEngine: "pixelfed", extensionAutoSubmit: true } };
-    render(<AutomationCampaignModal open accounts={[pixelfed]} aiProviders={aiProviders} onClose={vi.fn()} onSubmit={onSubmit} />);
+    render(<AutomationCampaignModal open accounts={[pixelfed]} aiProviders={aiProviders} imageGeneration={{ configured: false, model: "vpsttt-image" }} onClose={vi.fn()} onSubmit={onSubmit} />);
+    expect(screen.getByRole("switch", { name: "AI tạo ảnh cho kênh cần ảnh" })).toBeDisabled();
+    expect(screen.getByText(/Máy chủ chưa bật tạo ảnh bằng VPSTTT AI/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Mô tả bài đăng"), { target: { value: "Chia sẻ thông tin sản phẩm theo nội dung được cung cấp." } });
     fireEvent.click(screen.getByRole("button", { name: /Tạo bằng AI chạy ngầm/ }));
-    await screen.findByText(/Pixelfed cần ảnh đính kèm tối đa 20 MiB/);
+    await screen.findByText(/Pixelfed cần ảnh/);
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("lets AI create the Pixelfed photo, and can be switched off", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const pixelfed: PlatformAccount = { ...accounts[0]!, id: "pixelfed", name: "Pixelfed", settings: { delivery: "extension", extensionEngine: "pixelfed", extensionAutoSubmit: true } };
+    render(<AutomationCampaignModal open accounts={[pixelfed]} aiProviders={aiProviders} imageGeneration={{ configured: true, model: "vpsttt-image" }} onClose={vi.fn()} onSubmit={onSubmit} />);
+    const toggle = screen.getByRole("switch", { name: "AI tạo ảnh cho kênh cần ảnh" });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    fireEvent.change(screen.getByLabelText("Mô tả bài đăng"), { target: { value: "Chia sẻ thông tin sản phẩm theo nội dung được cung cấp." } });
+    fireEvent.click(screen.getByRole("button", { name: /Tạo bằng AI chạy ngầm/ }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ generateImages: true })));
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(screen.getByRole("button", { name: /Tạo bằng AI chạy ngầm/ }));
+    await screen.findByText(/Pixelfed cần ảnh/);
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses your own image instead of AI images", () => {
+    render(<AutomationCampaignModal open accounts={accounts} aiProviders={aiProviders} imageGeneration={{ configured: true, model: "vpsttt-image" }} onClose={vi.fn()} onSubmit={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Hoặc dùng ảnh của bạn (tuỳ chọn)"), { target: { files: [new File(["image"], "own.png", { type: "image/png" })] } });
+    expect(screen.getByRole("switch", { name: "AI tạo ảnh cho kênh cần ảnh" })).toBeDisabled();
+    expect(screen.getByText(/ảnh này dùng thay ảnh AI/)).toBeInTheDocument();
   });
 
   it("keeps an automation failure visible so the user can switch provider and retry", () => {
@@ -205,7 +231,7 @@ describe("AutomationCampaignModal", () => {
       onSubmit={onSubmit}
     />);
     const image = new File(["image"], "dashboard.webp", { type: "image/webp" });
-    fireEvent.change(screen.getByLabelText("Ảnh minh hoạ (tuỳ chọn)"), { target: { files: [image] } });
+    fireEvent.change(screen.getByLabelText("Hoặc dùng ảnh của bạn (tuỳ chọn)"), { target: { files: [image] } });
     fireEvent.change(screen.getByLabelText("Mô tả ảnh / alt text (tuỳ chọn)"), { target: { value: "Dashboard VPS" } });
     fireEvent.change(screen.getByLabelText("Mô tả bài đăng"), {
       target: { value: "Quảng bá VPS cho lập trình viên bằng hình ảnh dashboard thực tế." },
