@@ -2219,7 +2219,7 @@ export interface components {
             /** @description true: publish through the paired Chrome extension */
             enabled: boolean;
             /** @enum {string} */
-            engine?: "xenforo" | "discourse" | "phpbb" | "medium" | "substack" | "quora" | "reddit" | "slideshare" | "aws-builder" | "tinhte" | "pixelfed" | "mastodon" | "bluesky" | "tumblr" | "devto" | "minds" | "stackexchange" | "lemmy" | "discuit" | "linkedin" | "differ" | "dzone";
+            engine?: "xenforo" | "discourse" | "phpbb" | "medium" | "substack" | "quora" | "reddit" | "slideshare" | "aws-builder" | "tinhte" | "pixelfed" | "mastodon" | "bluesky" | "tumblr" | "devto" | "minds" | "stackexchange" | "lemmy" | "discuit" | "linkedin" | "differ" | "dzone" | "dailydev";
             /** @example https://voz.vn/f/chuyen-tro-linh-tinh.17/post-thread */
             targetUrl?: string;
             /** @description false: fill the form and wait for the operator to click Post */
