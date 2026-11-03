@@ -17,6 +17,7 @@ import { formatDate } from "@/lib/utils";
 import { resourcesService } from "@/services/resources.service";
 import type { Campaign, ContentVariant, PlatformAccount } from "@/types/domain";
 import { isAutomationAccountEligible } from "./campaign-utils";
+import { VariantImagePanel } from "./variant-image-panel";
 
 function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: PlatformAccount[] }) {
   const variants = useVariants(campaign.content?.id ?? "", true);
@@ -78,6 +79,7 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
       {variant.recommended === false && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">AI đề nghị kiểm tra: {variant.reason || "Nội dung cần được chỉnh sửa trước khi đăng."}</p>}
       <div><Label htmlFor={`title-${variant.id}`}>Tiêu đề</Label><Input id={`title-${variant.id}`} value={edits[variant.id]?.title ?? variant.title ?? ""} readOnly={!editable || !editing} disabled={busy} onChange={(event) => change(variant, { title: event.target.value })} /></div>
       <div><Label htmlFor={`body-${variant.id}`}>Nội dung · {variant.platform}</Label><Textarea id={`body-${variant.id}`} className="min-h-64" value={edits[variant.id]?.body ?? variant.body} readOnly={!editable || !editing} disabled={busy} onChange={(event) => change(variant, { body: event.target.value })} /></div>
+      <VariantImagePanel variant={variant} editable={editable && ["GENERATED", "APPROVED"].includes(variant.status)} />
       {!!variant.hashtags?.length && <p className="break-words text-sm text-muted">{variant.hashtags.map((tag) => `#${tag.replace(/^#/, "")}`).join(" ")}</p>}
       {variant.cta && <p className="text-sm text-muted">{variant.cta}</p>}
     </div>)}

@@ -5,6 +5,7 @@ import { env } from "@/config/env";
 
 export const resourceKeys = {
   aiProviders: ["ai-providers"] as const,
+  aiImageStatus: ["ai-image-status"] as const,
   platforms: (params?: ListParams) => ["platforms", params ?? {}] as const,
   accounts: (params?: ListParams) => ["accounts", params ?? {}] as const,
   sources: (params?: ListParams) => ["sources", params ?? {}] as const,
@@ -23,6 +24,7 @@ export const resourceKeys = {
   extensionDevices: ["extension-devices"] as const,
   media: (params?: ListParams) => ["media", params ?? {}] as const,
 };
+export function useAiImageStatus() { return useQuery({ queryKey: resourceKeys.aiImageStatus, queryFn: resourcesService.aiImageStatus, staleTime: 300_000 }); }
 export function useAiProviders() { return useQuery({ queryKey: resourceKeys.aiProviders, queryFn: resourcesService.aiProviders, staleTime: 300_000 }); }
 export function usePlatforms(params?: ListParams) { return useQuery({ queryKey: resourceKeys.platforms(params), queryFn: () => resourcesService.platforms(params) }); }
 export function useAccounts(params?: ListParams) { return useQuery({ queryKey: resourceKeys.accounts(params), queryFn: () => resourcesService.accounts(params) }); }
@@ -46,7 +48,7 @@ export function usePrompts() { return useQuery({ queryKey: resourceKeys.prompts,
 export function useLogs(params?: ListParams, enabled = true) { return useQuery({ queryKey: resourceKeys.publishLogs(params), queryFn: () => resourcesService.publishLogs(params), enabled }); }
 export function useAudit(params?: ListParams, enabled = true) { return useQuery({ queryKey: resourceKeys.logs(params), queryFn: () => resourcesService.logs(params), enabled }); }
 export const usePublishLogs = useLogs;
-export function useMedia(params?: ListParams) { return useQuery({ queryKey: resourceKeys.media(params), queryFn: () => resourcesService.media(params) }); }
+export function useMedia(params?: ListParams, refetchInterval?: number | false) { return useQuery({ queryKey: resourceKeys.media(params), queryFn: () => resourcesService.media(params), refetchInterval: refetchInterval ?? false }); }
 export function useSettings() { return useQuery({ queryKey: resourceKeys.settings, queryFn: resourcesService.settings }); }
 export function useGeminiKeys() { return useQuery({ queryKey: ["gemini-keys"], queryFn: resourcesService.geminiKeys, refetchInterval: 30_000 }); }
 export function useInvalidate() { const client = useQueryClient(); return (...keys: string[]) => Promise.all(keys.map((key) => client.invalidateQueries({ queryKey: [key] }))); }

@@ -1,6 +1,6 @@
 import { apiList, apiRequest } from "@/services/api/client";
 import type { ListResult } from "@/services/api/types";
-import type { AiProviderId, AiProviderOption, AuditLog, Campaign, Capability, ConnectorMode, Content, ContentSource, ContentVariant, MediaAsset, Platform, PlatformAccount, PlatformAvailability, PlatformGroup, PromptTemplate, PublishJob, SourceArticle, Status, SystemSettings } from "@/types/domain";
+import type { AiImageStatus, AiProviderId, AiProviderOption, AuditLog, Campaign, Capability, ConnectorMode, Content, ContentSource, ContentVariant, MediaAsset, Platform, PlatformAccount, PlatformAvailability, PlatformGroup, PromptTemplate, PublishJob, SourceArticle, Status, SystemSettings, VariantImagePlan } from "@/types/domain";
 import type { components } from "@/generated/api/schema";
 import type { PublishedPost } from "@/types/domain";
 
@@ -63,6 +63,8 @@ export type AutomateCampaignInput = {
   brief: string;
   platformAccountIds: string[];
   mediaAssetIds?: string[];
+  /** Let VPSTTT AI create one image per destination that can attach it (default on). */
+  generateImages?: boolean;
   aiProvider: AiProviderId;
   scheduledAt?: string;
   timezone: string;
@@ -81,7 +83,22 @@ const defaultCapability: Capability = { text: false, image: false, video: false,
 const mapPlatform = (item: RawPlatform): Platform => ({ id: item.id, name: item.name, slug: item.slug, mode: item.mode, groupKey: item.groupKey, connectorKey: item.connectorKey, enabled: item.enabled, connectorStatus: item.availability as Platform["connectorStatus"], docsUrl: item.docsUrl, defaultSettings: item.defaultSettings, capabilities: { ...defaultCapability, ...item.capability }, accountCount: item._count?.accounts ?? 0 });
 const mapAccount = (item: RawAccount): PlatformAccount => ({ id: item.id, platformId: item.platformId, platform: item.platform ? { id: item.platformId, name: item.platform.name, slug: item.platform.slug, mode: item.platform.mode, connectorStatus: item.platform.availability as Platform["connectorStatus"], connectorKey: item.platform.connectorKey, defaultSettings: item.platform.defaultSettings } : undefined, name: item.name, username: item.username, externalId: item.externalId, settings: item.settings ?? undefined, enabled: item.enabled, status: item.status, lastCheckedAt: item.lastTestedAt, browserSessionConfigured: item.browserSessionConfigured, credential: item.credential, oauthConfigured: Boolean(item.oauthToken), oauthToken: item.oauthToken });
 const mapSource = (item: RawSource): ContentSource => ({ id: item.id, name: item.name, type: item.type, url: item.url, enabled: item.enabled, status: item.enabled ? "ACTIVE" : "PAUSED", articleCount: item._count?.articles ?? 0, lastFetchedAt: item.lastFetchedAt });
-const mapVariant = (item: RawVariant): ContentVariant => ({ id: item.id, contentId: item.contentId, platform: item.platform?.name ?? item.platform?.slug ?? "Platform", platformSlug: item.platform?.slug ?? "unknown", title: item.title, body: item.body, summary: item.summary, hashtags: item.hashtags, cta: item.cta, status: item.status, recommended: item.recommended, reason: item.reason, updatedAt: item.updatedAt });
+const mapImagePlan = (value: unknown): VariantImagePlan | null => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const plan = value as Record<string, unknown>;
+  const text = (key: string) => typeof plan[key] === "string" ? plan[key] as string : undefined;
+  const type = text("type");
+  const status = text("status");
+  return {
+    type: type === "image" || type === "video" || type === "document" ? type : "none",
+    prompt: text("prompt") ?? null,
+    altText: text("altText") ?? "",
+    size: text("size"),
+    status: status === "generating" || status === "generated" || status === "failed" || status === "removed" ? status : undefined,
+    error: text("error") ?? null,
+  };
+};
+const mapVariant = (item: RawVariant): ContentVariant => ({ image: mapImagePlan(item.mediaRecommendation), id: item.id, contentId: item.contentId, platform: item.platform?.name ?? item.platform?.slug ?? "Platform", platformSlug: item.platform?.slug ?? "unknown", title: item.title, body: item.body, summary: item.summary, hashtags: item.hashtags, cta: item.cta, status: item.status, recommended: item.recommended, reason: item.reason, updatedAt: item.updatedAt });
 const mapContent = (item: RawContent): Content => ({ id: item.id, title: item.title, body: item.body, description: item.summary, canonicalUrl: item.canonicalUrl, status: item.status, source: item.sourceArticle?.source ?? null, variantsCount: item._count?.variants ?? item.variants?.length ?? 0, createdAt: item.createdAt, updatedAt: item.updatedAt });
 const mapMedia = (item: RawMedia): MediaAsset => {
   const metadata = item.metadata && typeof item.metadata === "object" && !Array.isArray(item.metadata)
@@ -91,6 +108,7 @@ const mapMedia = (item: RawMedia): MediaAsset => {
     ...item,
     sizeBytes: Number(item.sizeBytes),
     ...(typeof metadata.altText === "string" ? { altText: metadata.altText } : {}),
+    generated: metadata.generated === true,
   };
 };
 const mapCampaign = (item: RawCampaign): Campaign => { const jobs = item.targets?.flatMap((target) => target.publishJobs ?? []) ?? []; return { id: item.id, name: item.name, content: item.content, status: item.status, reviewMode: item.reviewMode, automationState: item.automationState, automationErrorCode: item.automationErrorCode, automationVariantIds: item.automationVariantIds, automationAccountIds: item.automationAccountIds, targetsCount: item.progress?.total ?? item._count?.targets ?? item.targets?.length ?? 0, publishedCount: item.progress?.published ?? jobs.filter((job) => job.status === "PUBLISHED").length, failedCount: item.progress?.failed ?? jobs.filter((job) => ["FAILED", "POSSIBLE_DUPLICATE"].includes(job.status)).length, needsActionCount: item.progress?.needsAction ?? jobs.filter((job) => job.status === "NEEDS_ACTION").length, activeCount: item.progress?.active ?? jobs.filter((job) => ["QUEUED", "PUBLISHING", "PROCESSING", "RETRY"].includes(job.status)).length, scheduledCount: item.progress?.scheduled ?? jobs.filter((job) => job.status === "SCHEDULED").length, scheduledAt: item.scheduledAt, createdAt: item.createdAt }; };
@@ -180,6 +198,10 @@ export const resourcesService = {
   extensionLoginChecks: () => apiRequest<ExtensionLoginCheckRow[]>("/extension/login-checks"),
   queueExtensionLoginChecks: (accountIds?: string[], verifyOnly = false, tryBoth = false) => apiRequest<{ batchId: string; queued: number }>("/extension/login-checks", { method: "POST", body: { accountIds, verifyOnly, tryBoth } }),
   aiProviders: () => apiRequest<AiProviderOption[]>("/ai/providers"),
+  aiImageStatus: () => apiRequest<AiImageStatus>("/ai/image-status"),
+  /** Starts a new AI image for a draft variant; the variant's image status follows it. */
+  regenerateVariantImage: (variantId: string, prompt?: string) => apiRequest<{ status: "generating" }>(`/content-variants/${variantId}/image`, { method: "POST", body: prompt?.trim() ? { prompt: prompt.trim() } : {} }),
+  removeVariantImage: (variantId: string, mediaId: string) => apiRequest<{ removed: boolean }>(`/content-variants/${variantId}/image/${mediaId}`, { method: "DELETE" }),
   geminiKeys: () => apiRequest<GeminiKeysSettings>("/ai/gemini-keys"),
   updateGeminiKeys: (input: GeminiKeysUpdate) => apiRequest<GeminiKeysSettings>("/ai/gemini-keys", { method: "PUT", body: input }),
   async platforms(params?: ListParams) { const raw = await apiList<RawPlatform>("/platforms", { query: { page: params?.page, limit: params?.limit, search: params?.search, group: params?.group, mode: params?.mode, availability: params?.availability, enabled: params?.enabled } }); return result(raw, raw.items.map(mapPlatform)); },

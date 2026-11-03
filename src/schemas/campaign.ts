@@ -27,6 +27,8 @@ export const automationCampaignSchema = z.object({
   brief: z.string().trim().min(20, "Mô tả cần ít nhất 20 ký tự để AI viết đúng ý.").max(20_000, "Mô tả tối đa 20.000 ký tự."),
   image: automationImageSchema.optional(),
   imageAltText: z.string().trim().max(500, "Mô tả ảnh tối đa 500 ký tự.").optional(),
+  /** AI creates images for destinations that can attach one; absent means on. */
+  generateImages: z.boolean().optional(),
   accountIds: z.array(z.string()).min(1, "Chọn ít nhất một tài khoản đích."),
   aiProvider: z.enum(["openai", "deepseek", "gemini", "vpsttt"]),
   runMode: z.enum(["NOW", "SCHEDULED"]),

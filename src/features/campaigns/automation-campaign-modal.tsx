@@ -6,10 +6,10 @@ import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { PlatformMark } from "@/components/platforms/platform-mark";
 import { Button } from "@/components/ui/button";
-import { FieldError, Input, Label, Select, Textarea } from "@/components/ui/form";
+import { FieldError, Input, Label, Select, Switch, Textarea } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
 import { automationCampaignSchema, type AutomationCampaignInput } from "@/schemas/campaign";
-import type { AiProviderOption, PlatformAccount } from "@/types/domain";
+import type { AiImageStatus, AiProviderOption, PlatformAccount } from "@/types/domain";
 import { canAddAutomationAccount, countAutomationPlatforms, defaultAutomationAccountIds, getAutomationAccountBlocker, isAutomationAccountEligible, MAX_AUTOMATION_PLATFORMS } from "./campaign-utils";
 
 type AutomationCampaignModalProps = {
@@ -20,6 +20,9 @@ type AutomationCampaignModalProps = {
   aiProviders: AiProviderOption[];
   aiProvidersPending?: boolean;
   aiProvidersError?: unknown;
+  /** Whether VPSTTT AI image generation is configured on the backend. */
+  imageGeneration?: AiImageStatus;
+  imageGenerationPending?: boolean;
   submitError?: string | null;
   busy?: boolean;
   onClose: () => void;
@@ -30,6 +33,7 @@ const defaultValues: AutomationCampaignInput = {
   name: "",
   brief: "",
   imageAltText: "",
+  generateImages: true,
   accountIds: [],
   aiProvider: "openai",
   runMode: "NOW",
@@ -45,6 +49,8 @@ export function AutomationCampaignModal({
   aiProviders,
   aiProvidersPending = false,
   aiProvidersError,
+  imageGeneration,
+  imageGenerationPending = false,
   submitError,
   busy = false,
   onClose,
@@ -57,6 +63,9 @@ export function AutomationCampaignModal({
   const runMode = useWatch({ control: form.control, name: "runMode" });
   const selectedAiProvider = useWatch({ control: form.control, name: "aiProvider" });
   const selectedAccountIds = useWatch({ control: form.control, name: "accountIds" });
+  const generateImages = useWatch({ control: form.control, name: "generateImages" });
+  const chosenImage = useWatch({ control: form.control, name: "image" });
+  const aiImagesAvailable = imageGeneration?.configured === true;
   const preferredAiProvider = aiProviders.find((provider) => provider.configured && provider.isDefault)
     ?? aiProviders.find((provider) => provider.configured);
   const selectedAiProviderOption = aiProviders.find((provider) => provider.id === selectedAiProvider);
@@ -100,8 +109,14 @@ export function AutomationCampaignModal({
   }, [accountKey, aiProviders, defaultAccountIds, form, open, preferredAiProvider]);
 
   const submit = form.handleSubmit(async (values) => {
-    if (accounts.some(account => values.accountIds.includes(account.id) && account.settings?.extensionEngine === "pixelfed") && (!values.image || values.image.size > 20 * 1024 * 1024)) {
-      form.setError("image", { type: "manual", message: "Pixelfed cần ảnh đính kèm tối đa 20 MiB. Thêm ảnh để đăng cùng các nền tảng đã chọn." });
+    // Pixelfed posts are photos: an uploaded image of at most 20 MiB, or one AI creates.
+    const pixelfed = accounts.some(account => values.accountIds.includes(account.id) && account.settings?.extensionEngine === "pixelfed");
+    if (pixelfed && values.image && values.image.size > 20 * 1024 * 1024) {
+      form.setError("image", { type: "manual", message: "Pixelfed nhận ảnh tối đa 20 MiB. Chọn ảnh nhỏ hơn." });
+      return;
+    }
+    if (pixelfed && !values.image && !(values.generateImages !== false && aiImagesAvailable)) {
+      form.setError("image", { type: "manual", message: "Pixelfed cần ảnh. Bật \"AI tạo ảnh\" hoặc thêm ảnh để đăng cùng các nền tảng đã chọn." });
       return;
     }
     const provider = aiProviders.find((item) => item.id === values.aiProvider);
@@ -169,10 +184,33 @@ export function AutomationCampaignModal({
         <div className="mb-3 flex items-start gap-3">
           <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-white text-indigo-600 shadow-sm"><ImagePlus className="size-4" /></span>
           <div>
-            <Label htmlFor="automation-image" className="mb-0">Ảnh minh hoạ (tuỳ chọn)</Label>
-            <p className="mt-1 text-xs leading-5 text-muted">JPEG, PNG hoặc WebP, tối đa 50 MiB; Pixelfed tối đa 20 MiB. Bắt buộc khi chọn Pixelfed. Ảnh được tải lên một lần và dùng chung cho các biến thể phù hợp.</p>
+            <p className="text-sm font-semibold text-slate-700">Ảnh cho bài đăng</p>
+            <p className="mt-1 text-xs leading-5 text-muted">Chỉ kênh gửi được ảnh mới có ảnh: Pixelfed, Bluesky, Mastodon, Tumblr, LinkedIn qua tiện ích Chrome; X, Discord, dev.to, Threads, Instagram qua API. Diễn đàn và các kênh khác chỉ đăng chữ.</p>
           </div>
         </div>
+        <div className="mb-4 flex items-start justify-between gap-4 rounded-xl border border-border bg-white p-3">
+          <div className="min-w-0">
+            <p id="automation-generate-images-label" className="text-sm font-semibold text-foreground">AI tạo ảnh cho kênh cần ảnh</p>
+            <p className="mt-0.5 text-xs leading-5 text-muted">
+              {imageGenerationPending ? "Đang kiểm tra cấu hình tạo ảnh…"
+                : !aiImagesAvailable ? "Máy chủ chưa bật tạo ảnh bằng VPSTTT AI (cần key có quyền tạo ảnh). Bài vẫn được tạo, chỉ không có ảnh AI."
+                  : chosenImage ? "Đã chọn ảnh của bạn: ảnh này dùng thay ảnh AI cho mọi kênh hỗ trợ ảnh."
+                    : "Mỗi kênh một ảnh riêng hợp khổ và phong cách của kênh, tạo bằng VPSTTT AI; mỗi ảnh mất khoảng 30 giây đến 2 phút. Bạn xem, tạo lại hoặc bỏ ảnh khi duyệt."}
+            </p>
+          </div>
+          <div className="shrink-0 pt-0.5"><Controller
+            control={form.control}
+            name="generateImages"
+            render={({ field }) => <Switch
+              checked={field.value !== false && aiImagesAvailable && !chosenImage}
+              disabled={!aiImagesAvailable || Boolean(chosenImage) || busy}
+              label="AI tạo ảnh cho kênh cần ảnh"
+              onChange={(checked) => { form.clearErrors("image"); field.onChange(checked); }}
+            />}
+          /></div>
+        </div>
+        <Label htmlFor="automation-image">Hoặc dùng ảnh của bạn (tuỳ chọn)</Label>
+        <p className="-mt-1 mb-2 text-xs leading-5 text-muted">JPEG, PNG hoặc WebP, tối đa 50 MiB; Pixelfed tối đa 20 MiB. Ảnh được tải lên một lần và dùng chung cho các kênh hỗ trợ ảnh.</p>
         <Controller
           control={form.control}
           name="image"
@@ -198,7 +236,9 @@ export function AutomationCampaignModal({
           <FieldError>{form.formState.errors.imageAltText?.message}</FieldError>
         </div>
         <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-800">
-          Ảnh được gửi tới các kênh hỗ trợ ảnh; các kênh còn lại đăng nội dung văn bản.
+          {generateImages !== false && aiImagesAvailable && !chosenImage
+            ? "Bài cho kênh không gửi được ảnh được viết chỉ bằng chữ và không nhắc tới ảnh."
+            : "Ảnh được gửi tới các kênh hỗ trợ ảnh; các kênh còn lại đăng nội dung văn bản."}
         </p>
       </div>
 

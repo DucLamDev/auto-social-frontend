@@ -6,6 +6,8 @@ export type PlatformAvailability = "READY" | "API_REVIEW_REQUIRED" | "CREDENTIAL
 export type SourceType = "MANUAL" | "URL" | "RSS" | "SITEMAP" | "WORDPRESS";
 export type AiProviderId = "openai" | "deepseek" | "gemini" | "vpsttt";
 export interface AiProviderOption { id: AiProviderId; label: string; model: string; configured: boolean; isDefault: boolean; }
+/** Whether the backend can create images with VPSTTT AI. */
+export interface AiImageStatus { configured: boolean; model: string; }
 export interface User { id: string; email: string; name: string; role: UserRole; avatarUrl?: string | null; }
 export type PlatformAutomationStatus = "READY_AFTER_CREDENTIALS" | "READY_AFTER_LOGIN" | "API_CONNECTOR_REQUIRED" | "BROWSER_RECIPE_REVIEW_REQUIRED" | "POLICY_BLOCKED" | "PLATFORM_RESEARCH_REQUIRED";
 export interface PlatformAutomationMetadata { status: PlatformAutomationStatus; route: "API" | "PLAYWRIGHT" | "NONE"; automaticPublishing: boolean; connectorKey?: string; browserRecipe?: string; browserRecipeRevision?: number; loginCaptureRequired?: boolean; permissionAttestationRequired?: boolean; autoSubmitDefault?: boolean; mediaUploadSupported?: boolean; requiredAccountSettings?: string[]; reasonCode?: string; }
@@ -15,8 +17,10 @@ export interface PlatformAccount { id: string; platformId: string; platform?: Pi
 export interface ContentSource { id: string; name: string; type: SourceType; url?: string | null; enabled: boolean; status: "ACTIVE" | "PAUSED" | "ERROR"; articleCount?: number; lastFetchedAt?: string | null; }
 export interface SourceArticle { id: string; sourceId: string; title: string; description?: string | null; canonicalUrl?: string | null; author?: string | null; publishedAt?: string | null; tags: string[]; status: "DISCOVERED" | "FETCHED" | "DUPLICATE" | "FAILED"; errorMessage?: string | null; createdAt: string; source: { id: string; name: string; type: SourceType }; content?: { id: string; status: Status } | null; }
 export interface Content { id: string; title: string; description?: string | null; body?: string; canonicalUrl?: string | null; status: Status; source?: { id: string; name: string; type?: SourceType } | null; tags?: string[]; imageUrl?: string | null; variantsCount?: number; createdAt: string; updatedAt?: string; }
-export interface ContentVariant { id: string; contentId: string; platform: string; platformSlug: string; title?: string | null; body: string; summary?: string | null; hashtags?: string[]; cta?: string | null; status: Status; recommended?: boolean; reason?: string | null; updatedAt?: string; }
-export interface MediaAsset { id: string; contentId?: string | null; variantId?: string | null; type: "IMAGE" | "VIDEO" | "DOCUMENT"; storageKey: string; publicUrl?: string | null; mimeType: string; sizeBytes: number; altText?: string | null; createdAt: string; }
+/** AI image plan of one variant: what to draw and how far the generation got. */
+export interface VariantImagePlan { type: "none" | "image" | "video" | "document"; prompt?: string | null; altText?: string; size?: string; status?: "generating" | "generated" | "failed" | "removed"; error?: string | null; }
+export interface ContentVariant { id: string; contentId: string; platform: string; platformSlug: string; title?: string | null; body: string; summary?: string | null; hashtags?: string[]; cta?: string | null; status: Status; recommended?: boolean; reason?: string | null; updatedAt?: string; image?: VariantImagePlan | null; }
+export interface MediaAsset { id: string; contentId?: string | null; variantId?: string | null; type: "IMAGE" | "VIDEO" | "DOCUMENT"; storageKey: string; publicUrl?: string | null; mimeType: string; sizeBytes: number; altText?: string | null; generated?: boolean; createdAt: string; }
 export interface Campaign { id: string; name: string; content?: Pick<Content, "id" | "title">; status: Status; reviewMode?: "AUTOMATION" | "EXISTING_CAMPAIGN" | "CONTENT"; automationState?: Status | null; automationErrorCode?: string | null; automationVariantIds?: string[]; automationAccountIds?: string[]; targetsCount?: number; publishedCount?: number; failedCount?: number; needsActionCount?: number; activeCount?: number; scheduledCount?: number; scheduledAt?: string | null; createdAt: string; }
 export interface PublishedPost {
   id: string;

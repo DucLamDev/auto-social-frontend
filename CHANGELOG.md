@@ -3,6 +3,14 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.6.0 · 03/11/2026
+### Tính năng
+- Công tắc "AI tạo ảnh cho kênh cần ảnh" trong hộp Tạo nội dung AI chạy ngầm (cần backend 1.7.0)
+  Mặc định bật khi máy chủ đã cấu hình tạo ảnh bằng VPSTTT AI; khoá kèm lý do khi chưa cấu hình. Bật công tắc thì Pixelfed
+  không còn bắt buộc tự tải ảnh. Ảnh bạn tải lên được dùng thay ảnh AI cho mọi kênh hỗ trợ ảnh.
+- Ảnh của từng kênh trong tab Content đợi duyệt
+  Mỗi bài hiện ảnh kèm mô tả ảnh, hoặc ghi rõ "Kênh này chỉ đăng chữ". Khi bài còn là bản nháp có thể tạo lại ảnh (sửa được
+  mô tả cho AI), bỏ ảnh hoặc tải ảnh khác. Hiện tiến độ khi AI đang tạo ảnh và lý do khi tạo ảnh lỗi.
 ## 1.5.0 · 03/11/2026
 ### Tính năng
 - Logo của từng mạng xã hội thay cho ô chữ cái
