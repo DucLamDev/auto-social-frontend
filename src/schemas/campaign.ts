@@ -28,7 +28,7 @@ export const automationCampaignSchema = z.object({
   image: automationImageSchema.optional(),
   imageAltText: z.string().trim().max(500, "Mô tả ảnh tối đa 500 ký tự.").optional(),
   accountIds: z.array(z.string()).min(1, "Chọn ít nhất một tài khoản đích."),
-  aiProvider: z.enum(["openai", "deepseek", "gemini"]),
+  aiProvider: z.enum(["openai", "deepseek", "gemini", "vpsttt"]),
   runMode: z.enum(["NOW", "SCHEDULED"]),
   scheduledAt: z.string().optional(),
   confirmAutoPublish: z.boolean().refine(Boolean, "Bạn cần xác nhận trước khi hệ thống đăng bài thật."),

@@ -25,6 +25,19 @@ describe("getAiGenerationErrorMessage", () => {
     expect(getAiGenerationErrorMessage(error)).toBe("DeepSeek đã hết số dư hoặc quota. Hãy nạp quota hoặc chọn AI khác.");
   });
 
+  it("tells the operator what to check when the IDE AI API refuses the key or the request", () => {
+    const refused = new ApiError(
+      "VPSTTT AI refused the key. Check VPSTTT_AI_API_KEY, the key's allowed IPs and that the IDE AI API is enabled for its owner",
+      "PLATFORM_AUTH_FAILED",
+      502,
+    );
+    expect(getAiGenerationErrorMessage(refused)).toContain("IP được phép của key");
+    const rejected = new ApiError("VPSTTT AI rejected the request (unsupported parameter, model or input size)", "PLATFORM_API_ERROR", 502);
+    expect(getAiGenerationErrorMessage(rejected)).toContain("VPSTTT_AI_MODEL");
+    const busy = new ApiError("VPSTTT AI rate limit was reached. Try again later", "PLATFORM_RATE_LIMITED", 429);
+    expect(getAiGenerationErrorMessage(busy)).toBe("VPSTTT AI đang giới hạn tốc độ. Hãy đợi một lúc hoặc chọn AI khác rồi thử lại.");
+  });
+
   it("preserves ordinary errors", () => {
     expect(getAiGenerationErrorMessage(new Error("Validation failed"))).toBe("Validation failed");
   });

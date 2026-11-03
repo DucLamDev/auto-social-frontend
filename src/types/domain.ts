@@ -4,7 +4,7 @@ export type ConnectorMode = "OFFICIAL_API" | "COMPATIBLE_API" | "BROWSER_ASSISTE
 export type PlatformGroup = "SOCIAL" | "BLOGGING" | "COMMUNITY" | "FORUM" | "DEVELOPER" | "MEDIA" | "COMMERCE" | "EVENT";
 export type PlatformAvailability = "READY" | "API_REVIEW_REQUIRED" | "CREDENTIAL_REQUIRED" | "API_RESEARCH_REQUIRED" | "MANUAL_ONLY";
 export type SourceType = "MANUAL" | "URL" | "RSS" | "SITEMAP" | "WORDPRESS";
-export type AiProviderId = "openai" | "deepseek" | "gemini";
+export type AiProviderId = "openai" | "deepseek" | "gemini" | "vpsttt";
 export interface AiProviderOption { id: AiProviderId; label: string; model: string; configured: boolean; isDefault: boolean; }
 export interface User { id: string; email: string; name: string; role: UserRole; avatarUrl?: string | null; }
 export type PlatformAutomationStatus = "READY_AFTER_CREDENTIALS" | "READY_AFTER_LOGIN" | "API_CONNECTOR_REQUIRED" | "BROWSER_RECIPE_REVIEW_REQUIRED" | "POLICY_BLOCKED" | "PLATFORM_RESEARCH_REQUIRED";
