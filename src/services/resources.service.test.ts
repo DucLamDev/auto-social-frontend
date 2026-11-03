@@ -783,22 +783,15 @@ describe("resourcesService contract adapters", () => {
     expect(result).toEqual(expect.objectContaining({ id: "media-1", sizeBytes: 5, altText: "Ảnh dashboard VPS" }));
   });
 
-  it("sends the shared Google password and TOTP key only when they are filled in", async () => {
+  it("uploads the account file with the chosen Chrome only", async () => {
     const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(apiResponse({ imported: 1, queued: 1, batchId: "b", rows: [] })));
     vi.stubGlobal("fetch", fetchMock);
     const file = new File(["Social Network,User"], "accounts.csv", { type: "text/csv" });
 
-    await resourcesService.importExtensionAccounts(file, "device-1", " company@example.test ", { password: "google-password", totpSecret: " JBSWY3DPEHPK3PXP " }); // vpsttt-secretscan: ignore (mật khẩu giả cho test)
-    let body = (fetchMock.mock.calls[0]?.[1] as RequestInit).body as FormData;
+    await resourcesService.importExtensionAccounts(file, "device-1");
+    const body = (fetchMock.mock.calls[0]?.[1] as RequestInit).body as FormData;
     expect(fetchMock.mock.calls[0]?.[0]).toBe("http://localhost:3001/api/v1/extension/accounts/import");
-    expect(body.get("googleEmail")).toBe("company@example.test");
-    expect(body.get("googlePassword")).toBe("google-password");
-    expect(body.get("googleTotpSecret")).toBe("JBSWY3DPEHPK3PXP");
-
-    await resourcesService.importExtensionAccounts(file, "device-1", "company@example.test", { password: "", totpSecret: "  " });
-    body = (fetchMock.mock.calls[1]?.[1] as RequestInit).body as FormData;
-    expect(body.has("googlePassword")).toBe(false);
-    expect(body.has("googleTotpSecret")).toBe(false);
+    expect([...body.keys()].sort()).toEqual(["deviceId", "file"]);
   });
 
   it("forwards content pagination and filters to the backend", async () => {

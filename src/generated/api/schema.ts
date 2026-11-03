@@ -1556,11 +1556,11 @@ export interface components {
              * @description AI provider for this generation run. Uses the backend default when omitted.
              * @enum {string}
              */
-            aiProvider?: "openai" | "deepseek" | "gemini";
+            aiProvider?: "openai" | "deepseek" | "gemini" | "vpsttt";
         };
         AiProviderContractDto: {
             /** @enum {string} */
-            id: "openai" | "deepseek" | "gemini";
+            id: "openai" | "deepseek" | "gemini" | "vpsttt";
             label: string;
             model: string;
             configured: boolean;
@@ -1754,7 +1754,7 @@ export interface components {
              * @description AI provider for this automation run. Uses the backend default when omitted.
              * @enum {string}
              */
-            aiProvider?: "openai" | "deepseek" | "gemini";
+            aiProvider?: "openai" | "deepseek" | "gemini" | "vpsttt";
             /** @description ISO-8601 timestamp with Z or an explicit UTC offset. */
             scheduledAt?: string;
             /**

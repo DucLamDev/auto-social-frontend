@@ -12,7 +12,9 @@ export function getAiGenerationErrorMessage(error: unknown) {
   if (!(error instanceof ApiError)) return getErrorMessage(error);
 
   const message = error.message.toLowerCase();
-  const provider = message.includes("gemini")
+  const provider = message.includes("vpsttt")
+    ? "VPSTTT AI"
+    : message.includes("gemini")
     ? "Google Gemini"
     : message.includes("deepseek")
       ? "DeepSeek"
@@ -30,6 +32,10 @@ export function getAiGenerationErrorMessage(error: unknown) {
     actionable = `${label} đã bị giới hạn quota. Hệ thống đã tự chuyển key nhưng chưa tạo được nội dung.${retryHint} Kiểm tra tại Cài đặt → API key Gemini. Các key cùng Google Cloud project dùng chung quota.`;
   } else if (message.includes("insufficient balance") || message.includes("insufficient quota")) {
     actionable = `${provider} đã hết số dư hoặc quota. Hãy nạp quota hoặc chọn AI khác.`;
+  } else if (provider === "VPSTTT AI" && (error.code === "PLATFORM_AUTH_FAILED" || message.includes("refused the key"))) {
+    actionable = "AI API của IDE từ chối key. Kiểm tra VPSTTT_AI_API_KEY trong backend, IP được phép của key (phải có IP của máy chạy backend) và AI API đã được bật cho người tạo key trong IDE.";
+  } else if (provider === "VPSTTT AI" && message.includes("rejected the request")) {
+    actionable = "AI API của IDE không nhận yêu cầu (model không được cấp hoặc nội dung quá dài). Kiểm tra VPSTTT_AI_MODEL hoặc rút ngắn mô tả rồi thử lại.";
   } else if (error.code === "PLATFORM_AUTH_FAILED" || message.includes("rejected the configured api credentials")) {
     actionable = `API key của ${provider} không hợp lệ hoặc không có quyền sử dụng model. Hãy cập nhật key ${provider === "Google Gemini" ? "tại Cài đặt → API key Gemini" : "trong backend"}.`;
   } else if (error.code === "PLATFORM_RATE_LIMITED" || error.status === 429) {

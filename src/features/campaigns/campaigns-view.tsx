@@ -178,8 +178,8 @@ export function CampaignsView({ initialAutomationOpen = false }: { initialAutoma
       automationMedia.current = null;
       setAutomationOpen(false);
     } catch (error) {
-      const message = error instanceof Error && error.message.includes("_API_KEY is not configured")
-        ? "Provider AI đã chọn chưa có API key trong backend. Hãy cấu hình key rồi khởi động lại API."
+      const message = error instanceof Error && /_API_KEY is not configured|VPSTTT_AI_BASE_URL is not configured/.test(error.message)
+        ? "Provider AI đã chọn chưa có API key (hoặc địa chỉ AI API của IDE) trong backend. Hãy cấu hình rồi khởi động lại API."
         : getAiGenerationErrorMessage(error);
       setAutomationError(message);
       toast.error(message);

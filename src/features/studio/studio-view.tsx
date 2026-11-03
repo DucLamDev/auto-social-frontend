@@ -22,6 +22,7 @@ const aiProviderOrder: Array<Pick<AiProviderOption, "id" | "label">> = [
   { id: "openai", label: "OpenAI" },
   { id: "deepseek", label: "DeepSeek" },
   { id: "gemini", label: "Gemini" },
+  { id: "vpsttt", label: "VPSTTT AI" },
 ];
 
 function AiProviderPicker({

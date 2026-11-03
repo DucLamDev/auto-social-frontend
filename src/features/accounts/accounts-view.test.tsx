@@ -169,6 +169,14 @@ describe("selected Chrome connections", () => {
     await waitFor(() => expect(mocks.queueExtensionLoginChecks).toHaveBeenCalledWith(["selected"], true));
     expect(mocks.testAccount).not.toHaveBeenCalled();
   });
+  it("lists a verified login without a posting destination as logged in, not as needing action", () => {
+    mocks.accounts = [{ ...account, status: "RECONNECT_REQUIRED", enabled: false, settings: { ...account.settings, delivery: undefined } }];
+    render(<AccountsView />);
+    fireEvent.change(screen.getByLabelText("Lọc trạng thái kết nối"), { target: { value: "needs_action" } });
+    expect(screen.queryByRole("row", { name: /Selected VPSTTT/ })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Lọc trạng thái kết nối"), { target: { value: "authenticated" } });
+    expect(screen.getByRole("row", { name: /Selected VPSTTT/ })).toBeInTheDocument();
+  });
   it("keeps restricted accounts in the needs-action filter despite verified login", () => {
     mocks.accounts = [{ ...account, settings: { ...account.settings, extensionSetup: { status: "ACCESS_RESTRICTED", message: "Nền tảng trả 403: không có quyền tạo bài." } } }];
     render(<AccountsView />);
