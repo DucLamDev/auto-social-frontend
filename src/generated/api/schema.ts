@@ -480,6 +480,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/content-variants/{id}/rewrite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContentVariants_rewrite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/content-variants/{id}/image/{mediaId}": {
         parameters: {
             query?: never;
@@ -1742,6 +1758,10 @@ export interface components {
             mediaRecommendation?: {
                 [key: string]: unknown;
             } | null;
+            /** @description Last "rewrite with AI" request: status generating | done | failed, instruction, startedAt, finishedAt, error. */
+            aiRevision?: {
+                [key: string]: unknown;
+            } | null;
             /** @enum {string} */
             status: "DRAFT" | "GENERATED" | "APPROVED" | "REJECTED";
             version: number;
@@ -1870,8 +1890,17 @@ export interface components {
             status: "DRAFT" | "GENERATED" | "APPROVED" | "REJECTED";
         };
         RegenerateVariantImageDto: {
-            /** @description New image description; the stored one is reused when omitted. */
+            /** @description New image description; the stored one is reused when omitted, and the AI designs one from the post when there is none. */
             prompt?: string;
+        };
+        RewriteVariantDto: {
+            /** @description What to change, in the operator's words; the last review notes are added automatically. */
+            instruction?: string;
+            /**
+             * @description AI provider; the default one when omitted.
+             * @enum {string}
+             */
+            aiProvider?: "openai" | "deepseek" | "gemini" | "vpsttt";
         };
         MediaAssetContractDto: {
             /** Format: uuid */
@@ -4231,6 +4260,51 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RegenerateVariantImageDto"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ContentVariants_rewrite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RewriteVariantDto"];
             };
         };
         responses: {

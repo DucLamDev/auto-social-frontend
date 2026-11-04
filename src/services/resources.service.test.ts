@@ -29,6 +29,24 @@ describe("resourcesService contract adapters", () => {
     for (const call of fetchMock.mock.calls) expect(call[1]).toMatchObject({ method: "POST" });
   });
 
+  it("starts an AI rewrite with or without an instruction and maps its status on the variant", async () => {
+    const variant = { id: "variant-1", contentId: "content-1", platformId: "p-1", title: null, body: "Bài", hashtags: [], recommended: false, status: "GENERATED", version: 1,
+      createdAt: "2026-11-04T00:00:00.000Z", updatedAt: "2026-11-04T00:00:00.000Z", aiRevision: { status: "failed", instruction: "Ngắn hơn", startedAt: "2026-11-04T00:00:00.000Z", error: "Hết lượt" } };
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => Promise.resolve(apiResponse({ status: "generating" })))
+      .mockImplementationOnce(() => Promise.resolve(apiResponse({ status: "generating" })))
+      .mockImplementationOnce(() => Promise.resolve(apiResponse([variant, { ...variant, id: "variant-2", aiRevision: { status: "weird" } }])));
+    vi.stubGlobal("fetch", fetchMock);
+    await resourcesService.rewriteVariant("variant-1", "  Ngắn hơn  ");
+    await resourcesService.rewriteVariant("variant-1");
+    expect(new URL(String(fetchMock.mock.calls[0]?.[0])).pathname).toBe("/api/v1/content-variants/variant-1/rewrite");
+    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toEqual({ instruction: "Ngắn hơn" });
+    expect(JSON.parse(String((fetchMock.mock.calls[1]?.[1] as RequestInit).body))).toEqual({});
+    const listed = await resourcesService.variants("content-1");
+    expect(listed.items[0]?.aiRevision).toEqual({ status: "failed", instruction: "Ngắn hơn", startedAt: "2026-11-04T00:00:00.000Z", finishedAt: null, error: "Hết lượt" });
+    expect(listed.items[1]?.aiRevision).toBeNull();
+  });
+
   it("forwards the moderation filter and keeps destination links separate from published URLs", async () => {
     const fetchMock = vi.fn().mockResolvedValue(apiResponse([
       { id: "pending", status: "NEEDS_ACTION", reviewUrl: "https://forum.example/my/activity/pending", reviewUrlKind: "pending_queue", lastErrorCode: "EXTENSION_MODERATION_PENDING", attemptCount: 1, maxAttempts: 3 },

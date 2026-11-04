@@ -1,6 +1,6 @@
 "use client";
 
-import { ImageOff, ImagePlus, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { ImageOff, ImagePlus, Loader2, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/auth/permission-gate";
@@ -42,16 +42,17 @@ export function VariantImagePanel({ variant, editable }: { variant: ContentVaria
   }, ["variants", "media"]);
   const busy = regenerate.isPending || remove.isPending || replace.isPending || generating;
 
-  if (!plan || plan.type === "none") {
-    if (!images.length) return <p className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-muted"><ImageOff className="size-4 shrink-0" />Kênh này chỉ đăng chữ, không kèm ảnh.</p>;
-  }
+  const noPlan = !plan || plan.type === "none";
+  if (noPlan && !images.length && !editable) return <p className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-muted"><ImageOff className="size-4 shrink-0" />Kênh này chỉ đăng chữ, không kèm ảnh.</p>;
 
-  const startRegenerate = async () => {
+  // An empty description lets the AI design the image from the post itself.
+  const startRegenerate = async (text: string) => {
     try {
-      await regenerate.mutateAsync(prompt);
+      await regenerate.mutateAsync(text);
       setPromptOpen(false);
-      toast.success(`Đang tạo ảnh mới bằng ${provider}. Ảnh sẽ tự hiện khi xong.`);
-    } catch (error) { toast.error(errorText(error, "Không thể tạo lại ảnh")); }
+      toast.success(text.trim() ? `Đang tạo ảnh mới bằng ${provider}. Ảnh sẽ tự hiện khi xong.`
+        : `AI đang thiết kế ảnh từ nội dung bài rồi tạo bằng ${provider}. Ảnh sẽ tự hiện khi xong.`);
+    } catch (error) { toast.error(errorText(error, "Không thể tạo ảnh")); }
   };
 
   return <section aria-label={`Ảnh · ${variant.platform}`} className="space-y-2 rounded-xl border border-border bg-slate-50/70 p-3">
@@ -66,18 +67,21 @@ export function VariantImagePanel({ variant, editable }: { variant: ContentVaria
             <img src={current.publicUrl} alt={current.altText || plan?.altText || `Ảnh kèm bài ${variant.platform}`} className="max-h-72 w-auto rounded-lg border border-border bg-white object-contain" />
             {(current.altText || plan?.altText) && <figcaption className="text-xs text-muted">Mô tả ảnh: {current.altText || plan?.altText}</figcaption>}
           </figure>
-            : <p className="rounded-lg bg-white p-3 text-sm text-muted">{plan?.status === "removed" ? "Đã bỏ ảnh: bài sẽ đăng chỉ có chữ." : "Chưa có ảnh cho bài này."}</p>}
+            : <p className="rounded-lg bg-white p-3 text-sm text-muted">{plan?.status === "removed" ? "Đã bỏ ảnh: bài sẽ đăng chỉ có chữ."
+              : noPlan ? "Bài này chưa có ảnh. Ảnh tạo thêm chỉ được đăng kèm ở kênh có hỗ trợ ảnh." : "Chưa có ảnh cho bài này."}</p>}
     {plan?.status === "failed" && !generating && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Chưa tạo được ảnh: {plan.error || "VPSTTT AI không trả về ảnh."}</p>}
     {editable && <PermissionGate allow={["ADMIN", "EDITOR"]}>
       {promptOpen && <div className="space-y-2">
         <Label htmlFor={`image-prompt-${variant.id}`}>Mô tả ảnh cho AI (tiếng Anh cho kết quả tốt nhất)</Label>
-        <Textarea id={`image-prompt-${variant.id}`} className="min-h-24" maxLength={4000} value={prompt} disabled={busy} onChange={(event) => setPrompt(event.target.value)} />
+        <Textarea id={`image-prompt-${variant.id}`} className="min-h-24" maxLength={4000} value={prompt} disabled={busy} placeholder="Để trống: AI tự thiết kế ảnh từ nội dung bài." onChange={(event) => setPrompt(event.target.value)} />
       </div>}
       <div className="flex flex-wrap gap-2">
         {promptOpen
-          ? <><Button size="sm" disabled={busy || !prompt.trim()} loading={regenerate.isPending} onClick={() => void startRegenerate()}><RefreshCw className="size-4" />Tạo ảnh mới</Button><Button size="sm" variant="ghost" disabled={regenerate.isPending} onClick={() => setPromptOpen(false)}>Huỷ</Button></>
-          : <Button size="sm" variant="secondary" disabled={busy} onClick={() => { setPrompt(plan?.prompt ?? ""); setPromptOpen(true); }}><RefreshCw className="size-4" />Tạo lại ảnh</Button>}
-        <Button size="sm" variant="secondary" disabled={busy} loading={replace.isPending} onClick={() => fileInput.current?.click()}><ImagePlus className="size-4" />Tải ảnh khác</Button>
+          ? <><Button size="sm" disabled={busy} loading={regenerate.isPending} onClick={() => void startRegenerate(prompt)}><RefreshCw className="size-4" />Tạo ảnh mới</Button><Button size="sm" variant="ghost" disabled={regenerate.isPending} onClick={() => setPromptOpen(false)}>Huỷ</Button></>
+          : noPlan && !current
+            ? <Button size="sm" disabled={busy} loading={regenerate.isPending} onClick={() => void startRegenerate("")}><Sparkles className="size-4" />Tạo ảnh bằng AI</Button>
+            : <Button size="sm" variant="secondary" disabled={busy} onClick={() => { setPrompt(plan?.prompt ?? ""); setPromptOpen(true); }}><RefreshCw className="size-4" />Tạo lại ảnh</Button>}
+        <Button size="sm" variant="secondary" disabled={busy} loading={replace.isPending} onClick={() => fileInput.current?.click()}><ImagePlus className="size-4" />{current ? "Tải ảnh khác" : "Tải ảnh lên"}</Button>
         {current && <Button size="sm" variant="ghost" disabled={busy} loading={remove.isPending} onClick={() => void remove.mutateAsync(current.id).then(() => toast.success("Đã bỏ ảnh: bài sẽ đăng chỉ có chữ.")).catch((error: unknown) => toast.error(errorText(error, "Không thể bỏ ảnh")))}><Trash2 className="size-4" />Bỏ ảnh</Button>}
         <input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" aria-label={`Chọn ảnh khác cho ${variant.platform}`} onChange={(event) => {
           const file = event.target.files?.[0];
