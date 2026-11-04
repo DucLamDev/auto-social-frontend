@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,11 @@ export const isRewriting = (variant: Pick<ContentVariant, "aiRevision">) => vari
  * instruction and its last review notes, scores it again and replaces it in
  * place. It runs on the server for a minute or two; the list follows its status.
  */
-export function VariantRewritePanel({ variant, editable, unsaved }: { variant: ContentVariant; editable: boolean; unsaved: boolean }) {
+export function VariantRewritePanel({ variant, editable, unsaved, actions }: {
+  variant: ContentVariant; editable: boolean; unsaved: boolean;
+  /** The post's other editing buttons ("Sửa bài"…), kept on the same row as "Viết lại bằng AI". */
+  actions?: ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const [instruction, setInstruction] = useState("");
   const rewrite = useResourceMutation((text: string) => resourcesService.rewriteVariant(variant.id, text), ["variants"]);
@@ -47,6 +51,7 @@ export function VariantRewritePanel({ variant, editable, unsaved }: { variant: C
   return <div className="space-y-2">
     {revision?.status === "failed" && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">Chưa viết lại được: {revision.error || "AI không trả về bài mới."}</p>}
     {revision?.status === "done" && <p className="text-xs text-emerald-700">AI đã viết lại bài này{revision.instruction ? ` theo hướng dẫn “${revision.instruction}”` : ""} và chấm lại.</p>}
+    {!editable && actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     {editable && <PermissionGate allow={["ADMIN", "EDITOR"]}>
       {open ? <div className="space-y-2 rounded-lg border border-border bg-white p-3">
         <Label htmlFor={`rewrite-${variant.id}`}>Hướng dẫn cho AI (không bắt buộc)</Label>
@@ -60,7 +65,9 @@ export function VariantRewritePanel({ variant, editable, unsaved }: { variant: C
         </div>
       </div>
         : <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant={lowScore ? "primary" : "secondary"} disabled={unsaved} onClick={() => setOpen(true)}><Sparkles className="size-4" />Viết lại bằng AI</Button>
+          {actions}
+          {/* Secondary on purpose: the card's only filled button is "Duyệt & đăng". */}
+          <Button size="sm" variant="secondary" disabled={unsaved} onClick={() => setOpen(true)}><Sparkles className="size-4" />Viết lại bằng AI</Button>
           {unsaved ? <span className="text-xs text-amber-700">Lưu hoặc bỏ phần đang sửa của bài này trước khi viết lại.</span>
             : lowScore && <span className="text-xs text-muted">AI viết lại theo ghi chú chấm điểm để đạt điểm cao hơn.</span>}
         </div>}

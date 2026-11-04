@@ -3,7 +3,7 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
-## 1.16.0 · 04/11/2026
+## 1.17.0 · 04/11/2026
 ### Tính năng
 - Trang Tài khoản chia 2 tab, bỏ trang Nền tảng (cần backend 1.15.0)
   - Tab **Đăng bằng tiện ích Chrome** gồm: Chrome đã ghép nối, **Thêm social**, **Nhập file tài khoản**, **Kết nối /
@@ -24,6 +24,24 @@ danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số k�
 ### Gỡ bỏ
 - Bỏ 2 nút **Kiểm tra tất cả** và **Test đăng nhập hàng loạt**: bấm nhầm là Chrome đăng nhập lại cả loạt. Kiểm tra từng
   tài khoản bằng nút **Test** ở dòng của tài khoản đó.
+
+## 1.16.0 · 04/11/2026
+### Tính năng
+- Thiết kế lại thẻ bài ở trang Content đợi duyệt: nhìn là biết nút nào của bài nào
+  - Mỗi bài là một thẻ riêng, nền trắng trên vùng xám, có viền màu bên trái theo trạng thái (vàng: chờ duyệt, xanh:
+    đã duyệt, xám: đã từ chối). Đầu thẻ có logo nền tảng, tên kênh, "Bài 3/13", tài khoản sẽ đăng, điểm AI và
+    trạng thái.
+  - Nút quyết định của từng bài ("Từ chối", "Hẹn lịch", "Duyệt & đăng") chuyển xuống cuối thẻ, kèm logo và dòng
+    "Bài <tên kênh>". Đọc xong bài là quyết định ngay ở đó. Trong mỗi thẻ chỉ còn nút này có nền màu; "Viết lại bằng AI",
+    "Tạo ảnh bằng AI" chuyển sang kiểu viền.
+  - Nút "Edit nội dung" chung bị bỏ. Mỗi bài có nút "Sửa bài" riêng, lúc sửa có "Lưu bài này" và "Huỷ sửa" (bỏ phần
+    vừa gõ). Sửa bài này không mở khoá bài khác. Duyệt vẫn tự lưu phần đã sửa như trước.
+  - Ghi chú dài của AI chỉ hiện 3 dòng, bấm "Xem đủ ghi chú" để đọc hết.
+  - Đầu danh sách có hàng "Đi tới bài của từng kênh": mỗi kênh một nút kèm chấm trạng thái, bấm là cuộn tới bài đó.
+  - Thanh dưới cùng ghi rõ "Cả lượt · N bài" và đổi sang nền tím nhạt, để phân biệt với nút của từng bài.
+- Chế độ "Xem trước như trên mạng xã hội" vẫn tạo được ảnh
+  Trước đây bật xem trước thì khung ảnh và các nút "Tạo ảnh bằng AI", "Tạo lại ảnh", "Tải ảnh lên", "Bỏ ảnh" biến mất.
+  Nay các nút này nằm ngay dưới bản xem trước; ảnh mới tạo hiện thẳng trong bản xem trước.
 
 ## 1.15.0 · 04/11/2026
 ### Tính năng
