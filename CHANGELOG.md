@@ -3,6 +3,14 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.19.0 · 04/11/2026
+### Tính năng
+- Logo VPSTTT thay chữ "S" ở thanh menu bên trái và trang đăng nhập, và thay hình tam giác mặc định ở tab trình duyệt.
+- Thêm logo cho 15 nền tảng trước đây chỉ hiện chữ cái: LinkedIn, AWS Community, Tinhte, Voz, discuit, DZone, Differ,
+  Level1Techs, Scoop.it, DirectAdmin Forums, Warrior Forum, Eventbrite, HestiaCP, aaPanel, CloudPanel. Logo lấy từ biểu
+  tượng trên trang của chính nền tảng (LinkedIn, AWS lấy từ Wikimedia Commons), lưu sẵn trong ứng dụng nên không tải ảnh
+  từ trang ngoài. Hub (danh mục chưa có địa chỉ trang) và KubeBy (tên miền không còn hoạt động) vẫn hiện chữ cái.
+
 ## 1.18.0 · 04/11/2026
 ### Tính năng
 - Sửa bài theo khuyến nghị của AI ngay trong khung ghi chú
