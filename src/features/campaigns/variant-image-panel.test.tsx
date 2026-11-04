@@ -50,6 +50,9 @@ describe("image of a post under review", () => {
     const { rerender } = render(<VariantImagePanel variant={variant({ type: "image", prompt: "p", status: "generating" })} editable />);
     expect(screen.getByRole("status")).toHaveTextContent("VPSTTT AI đang tạo ảnh");
     expect(screen.getByRole("button", { name: /Tạo lại ảnh/ })).toBeDisabled();
+    // A post just written whose image is next in line shows the same progress.
+    rerender(<VariantImagePanel variant={variant({ type: "image", prompt: "p", status: "pending" })} editable />);
+    expect(screen.getByRole("status")).toHaveTextContent("đang tạo ảnh");
     rerender(<VariantImagePanel variant={variant({ type: "image", prompt: "p", status: "failed", error: "Key VPSTTT AI chưa có quyền tạo ảnh." })} editable />);
     expect(screen.getByRole("alert")).toHaveTextContent("Chưa tạo được ảnh: Key VPSTTT AI chưa có quyền tạo ảnh.");
   });

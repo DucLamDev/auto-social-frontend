@@ -182,6 +182,7 @@ export function AccountsView() {
   // (saved password first, then Google), like "Test đăng nhập hàng loạt". Only "Tôi đã đăng
   // nhập · Kiểm tra" in the connection help stays a session-only check.
   const testChrome = useResourceMutation((ids: string[]) => resourcesService.queueExtensionLoginChecks(ids, false, true), ["extension-login-checks", "accounts"]);
+  const testChromeBulk = useResourceMutation((ids: string[]) => resourcesService.queueExtensionLoginChecks(ids, false, true, true), ["extension-login-checks", "accounts"]);
   const platforms = usePlatforms({ limit: 100 });
   const providers = useOAuthProviders();
   const update = useResourceMutation(({ id, enabled }: { id: string; enabled: boolean }) => resourcesService.updateAccount(id, { enabled }), ["accounts"]);
@@ -272,8 +273,11 @@ export function AccountsView() {
     try {
       const chromeAccounts = items.filter(isChromeBound);
       if (chromeAccounts.length) {
-        const result = await testChrome.mutateAsync(chromeAccounts.map(account => account.id));
-        toast.success(`Đã giao Chrome kiểm tra ${result.queued} tài khoản trong danh sách đang hiển thị.`);
+        // Accounts already signed in are left out; "Test" on a row still checks that one again.
+        const result = await testChromeBulk.mutateAsync(chromeAccounts.map(account => account.id));
+        const skipped = result.skipped ? `, bỏ qua ${result.skipped} tài khoản đã đăng nhập thành công` : "";
+        if (result.queued) toast.success(`Đã giao Chrome kiểm tra ${result.queued} tài khoản trong danh sách đang hiển thị${skipped}.`);
+        else toast.info(`Không có tài khoản nào cần kiểm tra${skipped}.`);
         return;
       }
       const { tokens, connections } = await checkAll.mutateAsync(undefined);
@@ -334,7 +338,7 @@ export function AccountsView() {
         {selectedCount > 0 && <Select aria-label="Phạm vi tài khoản" value={accountScope} onChange={event => setAccountScope(event.target.value)}><option value="selected">{selectedCount} tài khoản đã chọn</option><option value="all">Toàn bộ tài khoản ({allAccounts.length})</option></Select>}
         <Select aria-label="Lọc nền tảng" className="w-56" value={platformId} onChange={(event) => setPlatformId(event.target.value)}><option value="">Mọi nền tảng ({platformTotal})</option>{platformOptions.map((platform) => <option value={platform.id} key={platform.id}>{platform.name} ({platformCounts.get(platform.id) ?? 0})</option>)}</Select>
         <Select aria-label="Lọc trạng thái kết nối" value={connectionFilter} onChange={event => setConnectionFilter(event.target.value)}><option value="">Mọi trạng thái ({connectionCounts.total})</option>{CONNECTION_FILTERS.map(filter => <option key={filter.value} value={filter.value}>{filter.label} ({connectionCounts[filter.value]})</option>)}</Select>
-      </>} end={<div className="flex gap-1"><PermissionGate allow={["ADMIN"]}><Button variant="ghost" size="sm" loading={checkAll.isPending || testChrome.isPending} onClick={() => void runCheckAll()} title={items.some(isChromeBound) ? "Kiểm tra và tự đăng nhập Chrome cho các tài khoản đang hiển thị (thử mật khẩu đã lưu, rồi Google)" : "Gia hạn token đến hạn và kiểm tra kết nối mọi tài khoản ngay"}><HeartPulse className="size-4" />Kiểm tra tất cả</Button></PermissionGate><Button variant="ghost" size="sm" onClick={() => void query.refetch()}><RefreshCw className="size-4" />Refresh</Button></div>} />
+      </>} end={<div className="flex gap-1"><PermissionGate allow={["ADMIN"]}><Button variant="ghost" size="sm" loading={checkAll.isPending || testChromeBulk.isPending} onClick={() => void runCheckAll()} title={items.some(isChromeBound) ? "Kiểm tra và tự đăng nhập Chrome cho các tài khoản đang hiển thị chưa đăng nhập (thử mật khẩu đã lưu, rồi Google); tài khoản đã đăng nhập được bỏ qua" : "Gia hạn token đến hạn và kiểm tra kết nối mọi tài khoản ngay"}><HeartPulse className="size-4" />Kiểm tra tất cả</Button></PermissionGate><Button variant="ghost" size="sm" onClick={() => void query.refetch()}><RefreshCw className="size-4" />Refresh</Button></div>} />
       {query.isSuccess && allAccounts.length > 0 && <div role="group" aria-label="Số tài khoản theo trạng thái kết nối" className="flex flex-wrap gap-2 border-b border-border px-4 py-3">
         {[{ value: "", label: "Tất cả", short: "Tất cả", dot: "bg-slate-400", count: connectionCounts.total }, ...CONNECTION_FILTERS.map(filter => ({ ...filter, count: connectionCounts[filter.value] }))].map(chip => {
           const active = connectionFilter === chip.value;
@@ -358,8 +362,8 @@ export function AccountsView() {
         const oauthProvider = oauthProviderForPlatform(account.platform?.slug);
         const canReconnectOAuth = Boolean(oauthProvider && readyProviders.has(oauthProvider));
         const autoRefresh = account.oauthConfigured && isAutoRefreshPlatform(account.platform?.slug);
-        // Blogger and Tumblr can save drafts instead of publishing; the connector publishes unless this is false.
-        const draftCapable = ["blogger", "tumblr"].includes(account.platform?.slug ?? "");
+        // Blogger, Tumblr and dev.to can save drafts instead of publishing; the connector publishes unless this is false.
+        const draftCapable = ["blogger", "tumblr", "devto"].includes(account.platform?.slug ?? "");
         const publishImmediately = account.settings?.publishImmediately !== false;
         return <tr key={account.id} className="group hover:bg-slate-50/70">
           <Td><div className="flex items-center gap-3"><PlatformMark slug={account.platform?.slug} name={account.platform?.name ?? "Platform"} /><div><p className="font-bold text-foreground">{account.name}</p><p className="mt-0.5 text-xs text-muted">{account.platform?.name ?? "—"}{account.username ? ` · @${account.username}` : ""}</p></div></div></Td>

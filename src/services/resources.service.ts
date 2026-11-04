@@ -66,6 +66,8 @@ export type AutomateCampaignInput = {
   mediaAssetIds?: string[];
   /** Let VPSTTT AI create one image per destination that can attach it (default on). */
   generateImages?: boolean;
+  /** Publish posts the AI quality check passed as soon as they are ready, without review. */
+  autoPublish?: boolean;
   aiProvider: AiProviderId;
   scheduledAt?: string;
   timezone: string;
@@ -95,7 +97,7 @@ const mapImagePlan = (value: unknown): VariantImagePlan | null => {
     prompt: text("prompt") ?? null,
     altText: text("altText") ?? "",
     size: text("size"),
-    status: status === "generating" || status === "generated" || status === "failed" || status === "removed" ? status : undefined,
+    status: status === "pending" || status === "generating" || status === "generated" || status === "failed" || status === "removed" ? status : undefined,
     error: text("error") ?? null,
   };
 };
@@ -197,7 +199,8 @@ const result = <T, U>(raw: ListResult<T>, items: U[]): ListResult<U> => ({ items
 
 export const resourcesService = {
   extensionLoginChecks: () => apiRequest<ExtensionLoginCheckRow[]>("/extension/login-checks"),
-  queueExtensionLoginChecks: (accountIds?: string[], verifyOnly = false, tryBoth = false) => apiRequest<{ batchId: string; queued: number }>("/extension/login-checks", { method: "POST", body: { accountIds, verifyOnly, tryBoth } }),
+  /** `skipAuthenticated`: bulk runs leave out accounts whose latest login check succeeded. */
+  queueExtensionLoginChecks: (accountIds?: string[], verifyOnly = false, tryBoth = false, skipAuthenticated = false) => apiRequest<{ batchId: string; queued: number; skipped?: number }>("/extension/login-checks", { method: "POST", body: { accountIds, verifyOnly, tryBoth, ...(skipAuthenticated ? { skipAuthenticated: true } : {}) } }),
   aiProviders: () => apiRequest<AiProviderOption[]>("/ai/providers"),
   aiImageStatus: () => apiRequest<AiImageStatus>("/ai/image-status"),
   /** Starts a new AI image for a draft variant; the variant's image status follows it. */

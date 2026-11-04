@@ -34,6 +34,7 @@ const defaultValues: AutomationCampaignInput = {
   brief: "",
   imageAltText: "",
   generateImages: true,
+  autoPublish: false,
   accountIds: [],
   aiProvider: "openai",
   runMode: "NOW",
@@ -64,6 +65,7 @@ export function AutomationCampaignModal({
   const selectedAiProvider = useWatch({ control: form.control, name: "aiProvider" });
   const selectedAccountIds = useWatch({ control: form.control, name: "accountIds" });
   const generateImages = useWatch({ control: form.control, name: "generateImages" });
+  const autoPublish = useWatch({ control: form.control, name: "autoPublish" }) === true;
   const chosenImage = useWatch({ control: form.control, name: "image" });
   const aiImagesAvailable = imageGeneration?.configured === true;
   const preferredAiProvider = aiProviders.find((provider) => provider.configured && provider.isDefault)
@@ -144,14 +146,14 @@ export function AutomationCampaignModal({
     open={open}
     onClose={safeClose}
     title="Tạo nội dung AI chạy ngầm"
-    description="Nhập mô tả và chọn tài khoản. AI tạo nội dung ở chế độ nền; bạn xem, chỉnh sửa và duyệt trong tab Content đợi duyệt trước khi đăng."
+    description="Nhập mô tả và chọn tài khoản. AI viết bài ở chế độ nền; bạn duyệt một lần trong tab Content đợi duyệt là bài tự đăng lên social."
     className="max-w-3xl"
   >
     <form className="space-y-6" onSubmit={submit}>
       <div className="grid gap-2 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-violet-50 p-4 sm:grid-cols-3">
         <FlowStep icon={<Bot className="size-4" />} number="1" label="AI viết bài" />
-        <FlowStep icon={<CheckCircle2 className="size-4" />} number="2" label="Bạn xem và duyệt" />
-        <FlowStep icon={<Send className="size-4" />} number="3" label="Đăng sau khi duyệt" />
+        <FlowStep icon={<CheckCircle2 className="size-4" />} number="2" label={autoPublish ? "Bài đạt tự duyệt" : "Bạn duyệt một lần"} />
+        <FlowStep icon={<Send className="size-4" />} number="3" label="Tự đăng lên social" />
       </div>
 
       <div>
@@ -364,18 +366,34 @@ export function AutomationCampaignModal({
         </div>}
       </div>
 
+      <div className="flex items-start justify-between gap-4 rounded-2xl border border-border bg-slate-50/70 p-4">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-foreground">Tự đăng bài AI chấm đạt, không cần duyệt</p>
+          <p className="mt-0.5 text-xs leading-5 text-muted">
+            {autoPublish
+              ? "Kênh nào AI viết xong (kèm ảnh) và tự chấm đạt thì đăng luôn. Bài chưa đạt vẫn chờ bạn duyệt trong Content đợi duyệt."
+              : "Tắt: mọi bài chờ bạn duyệt một lần; kênh nào xong là duyệt được ngay, duyệt xong bài tự đăng."}
+          </p>
+        </div>
+        <div className="shrink-0 pt-0.5"><Controller
+          control={form.control}
+          name="autoPublish"
+          render={({ field }) => <Switch checked={field.value === true} disabled={busy} label="Tự đăng bài AI chấm đạt, không cần duyệt" onChange={field.onChange} />}
+        /></div>
+      </div>
+
       <fieldset>
-        <legend className="mb-2 text-sm font-semibold text-slate-700">Thời điểm đăng sau khi duyệt</legend>
+        <legend className="mb-2 text-sm font-semibold text-slate-700">Thời điểm đăng</legend>
         <div className="grid gap-2 sm:grid-cols-2">
           <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${runMode === "NOW" ? "border-indigo-300 bg-indigo-50/60 ring-2 ring-indigo-100" : "border-border"}`}>
             <input type="radio" value="NOW" className="mt-1 accent-indigo-600" {...form.register("runMode")} />
             <Zap className="mt-0.5 size-4 shrink-0 text-indigo-600" />
-            <span><span className="block text-sm font-bold">Sau khi duyệt</span><span className="mt-0.5 block text-xs leading-5 text-muted">Tạo nội dung ngay, chỉ đăng khi bạn duyệt.</span></span>
+            <span><span className="block text-sm font-bold">Ngay khi duyệt</span><span className="mt-0.5 block text-xs leading-5 text-muted">{autoPublish ? "Bài đạt đăng ngay khi viết xong; bài khác đăng ngay khi bạn duyệt." : "Bài đăng ngay khi bạn bấm duyệt."}</span></span>
           </label>
           <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition ${runMode === "SCHEDULED" ? "border-indigo-300 bg-indigo-50/60 ring-2 ring-indigo-100" : "border-border"}`}>
             <input type="radio" value="SCHEDULED" className="mt-1 accent-indigo-600" {...form.register("runMode")} />
             <Clock3 className="mt-0.5 size-4 shrink-0 text-indigo-600" />
-            <span><span className="block text-sm font-bold">Lên lịch</span><span className="mt-0.5 block text-xs leading-5 text-muted">Chỉ đăng khi đã duyệt và đến giờ hẹn.</span></span>
+            <span><span className="block text-sm font-bold">Lên lịch</span><span className="mt-0.5 block text-xs leading-5 text-muted">Bài đã duyệt tự đăng khi đến giờ hẹn.</span></span>
           </label>
         </div>
         {runMode === "SCHEDULED" && <div className="mt-3">
@@ -385,7 +403,7 @@ export function AutomationCampaignModal({
         </div>}
       </fieldset>
 
-      <p className="rounded-xl bg-indigo-50 p-3 text-sm text-indigo-950">AI sẽ tạo nội dung chạy ngầm cho {selectedAccountIds.length} tài khoản đã chọn. Bạn có thể tiếp tục làm việc hoặc đóng trang. Bài chỉ được đăng sau khi bạn duyệt trong tab Content đợi duyệt.</p>
+      <p className="rounded-xl bg-indigo-50 p-3 text-sm text-indigo-950">AI sẽ tạo nội dung chạy ngầm cho {selectedAccountIds.length} tài khoản đã chọn. Bạn có thể tiếp tục làm việc hoặc đóng trang. {autoPublish ? "Bài AI chấm đạt tự đăng; bài chưa đạt chờ bạn duyệt trong tab Content đợi duyệt." : "Duyệt một lần trong tab Content đợi duyệt là bài tự đăng, không cần bấm thêm."}</p>
 
       {submitError && (
         <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-800">

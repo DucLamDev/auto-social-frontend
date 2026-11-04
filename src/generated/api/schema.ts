@@ -2029,6 +2029,11 @@ export interface components {
              */
             generateImages: boolean;
             /**
+             * @description Publish each post the AI quality check passed as soon as it (and its image) is ready, without waiting for review. Posts that did not pass still wait for review.
+             * @default false
+             */
+            autoPublish: boolean;
+            /**
              * @description AI provider for this automation run. Uses the backend default when omitted.
              * @enum {string}
              */
