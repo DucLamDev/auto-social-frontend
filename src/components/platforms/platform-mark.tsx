@@ -48,10 +48,10 @@ export function glyphColor(hex: string) {
   return luminance > 0.4 ? "#0f172a" : "#ffffff";
 }
 
-export function PlatformMark({ slug, name, size = "md" }: { slug?: string; name: string; size?: "sm" | "md" | "lg" }) {
+export function PlatformMark({ slug, name, size = "md" }: { slug?: string; name: string; size?: "xs" | "sm" | "md" | "lg" }) {
   const key = platformKey(slug || name);
   const brand = platformBrand(slug, name);
-  const box = cn("grid shrink-0 place-items-center rounded-xl shadow-sm", size === "sm" && "size-8 text-[10px]", size === "md" && "size-10 text-xs", size === "lg" && "size-12 text-sm");
+  const box = cn("grid shrink-0 place-items-center shadow-sm", size === "xs" ? "size-6 rounded-lg text-[9px]" : "rounded-xl", size === "sm" && "size-8 text-[10px]", size === "md" && "size-10 text-xs", size === "lg" && "size-12 text-sm");
   if (brand) {
     return <span aria-hidden data-platform-logo={brand.slug} className={cn(box, "ring-1 ring-inset ring-black/10")} style={{ backgroundColor: `#${brand.hex}`, color: glyphColor(brand.hex) }}>
       <svg viewBox="0 0 24 24" fill="currentColor" className="size-[55%]" focusable="false"><path d={brand.path} /></svg>
