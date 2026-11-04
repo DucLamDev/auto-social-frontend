@@ -19,7 +19,8 @@ const errorText = (error: unknown, fallback: string) => error instanceof Error ?
  */
 export function VariantImagePanel({ variant, editable }: { variant: ContentVariant; editable: boolean }) {
   const plan = variant.image;
-  const generating = plan?.status === "generating";
+  // "pending": the post is written and its image is next in line.
+  const generating = plan?.status === "generating" || plan?.status === "pending";
   const media = useMedia({ variantId: variant.id, limit: 10 }, generating ? 3_000 : false);
   const provider = aiImageProviderLabel(useAiImageStatus().data);
   const refetchMedia = media.refetch;

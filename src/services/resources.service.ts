@@ -66,6 +66,8 @@ export type AutomateCampaignInput = {
   mediaAssetIds?: string[];
   /** Let VPSTTT AI create one image per destination that can attach it (default on). */
   generateImages?: boolean;
+  /** Publish posts the AI quality check passed as soon as they are ready, without review. */
+  autoPublish?: boolean;
   aiProvider: AiProviderId;
   scheduledAt?: string;
   timezone: string;
@@ -95,7 +97,7 @@ const mapImagePlan = (value: unknown): VariantImagePlan | null => {
     prompt: text("prompt") ?? null,
     altText: text("altText") ?? "",
     size: text("size"),
-    status: status === "generating" || status === "generated" || status === "failed" || status === "removed" ? status : undefined,
+    status: status === "pending" || status === "generating" || status === "generated" || status === "failed" || status === "removed" ? status : undefined,
     error: text("error") ?? null,
   };
 };

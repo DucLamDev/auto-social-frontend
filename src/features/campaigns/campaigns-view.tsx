@@ -153,6 +153,7 @@ export function CampaignsView({ initialAutomationOpen = false }: { initialAutoma
         platformAccountIds: normalizeAutomationAccountIds(values.accountIds),
         // Your own image replaces AI images; the backend ignores the switch then too.
         generateImages: values.generateImages !== false && aiImageStatus.data?.configured === true && !values.image,
+        ...(values.autoPublish ? { autoPublish: true } : {}),
         aiProvider: values.aiProvider,
         scheduledAt: values.runMode === "SCHEDULED" && values.scheduledAt
           ? new Date(values.scheduledAt).toISOString()

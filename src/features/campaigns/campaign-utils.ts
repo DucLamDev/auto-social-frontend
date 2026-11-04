@@ -94,3 +94,6 @@ export function includeImageAltText(brief: string, altText?: string) {
     ? `${normalizedBrief}\n\nNgữ cảnh ảnh để tạo caption/alt text chính xác (không viết nội dung phụ thuộc vào việc ảnh xuất hiện vì một số kênh có thể dùng bản chỉ có văn bản): ${normalizedAltText}`
     : normalizedBrief;
 }
+
+/** A planned image not created yet: the post is not ready to approve. */
+export const imagePending = (variant: Pick<ContentVariant, "image">) => variant.image?.status === "pending" || variant.image?.status === "generating";

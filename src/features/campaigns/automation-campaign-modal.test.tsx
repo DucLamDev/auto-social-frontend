@@ -76,6 +76,23 @@ describe("AutomationCampaignModal", () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
+  it("publishes posts the AI check passed without review only when that switch is turned on", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<AutomationCampaignModal open accounts={accounts} aiProviders={aiProviders} onClose={vi.fn()} onSubmit={onSubmit} />);
+    const toggle = screen.getByRole("switch", { name: "Tự đăng bài AI chấm đạt, không cần duyệt" });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByText("Bạn duyệt một lần")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Mô tả bài đăng"), { target: { value: "Quảng bá VPS cho lập trình viên Việt Nam, hỗ trợ 24/7." } });
+    fireEvent.click(screen.getByRole("button", { name: /Tạo bằng AI chạy ngầm/ }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ autoPublish: false })));
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText("Bài đạt tự duyệt")).toBeInTheDocument();
+    expect(screen.getByText(/Bài chưa đạt vẫn chờ bạn duyệt/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Tạo bằng AI chạy ngầm/ }));
+    await waitFor(() => expect(onSubmit).toHaveBeenLastCalledWith(expect.objectContaining({ autoPublish: true })));
+  });
+
   it("uses your own image instead of AI images", () => {
     render(<AutomationCampaignModal open accounts={accounts} aiProviders={aiProviders} imageGeneration={{ configured: true, model: "vpsttt-image" }} onClose={vi.fn()} onSubmit={vi.fn()} />);
     fireEvent.change(screen.getByLabelText("Hoặc dùng ảnh của bạn (tuỳ chọn)"), { target: { files: [new File(["image"], "own.png", { type: "image/png" })] } });
