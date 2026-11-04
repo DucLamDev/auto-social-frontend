@@ -3,6 +3,18 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.20.0 · 04/11/2026
+### Tính năng
+- Content đợi duyệt: thu gọn từng bài, xem trước theo từng bài
+  - Mọi bài mặc định thu gọn: thẻ chỉ còn logo, tên kênh, một dòng tiêu đề, điểm AI, trạng thái và các nút
+    "Từ chối / Hẹn lịch / Duyệt & đăng" (bài đã duyệt hoặc đã từ chối thì còn dòng trạng thái). Bấm "Xem nội dung"
+    để mở bài đó, "Thu gọn" để đóng lại.
+  - Phía trên danh sách có "Mở hết" và "Thu gọn hết". Bấm tên kênh trong hàng "Đi tới bài" thì bài đó mở ra và trang
+    cuộn tới.
+  - Công tắc chung "Nội dung / Xem trước như trên mạng xã hội" bị bỏ. Bài đang mở có công tắc riêng "Nội dung /
+    Xem trước" ở đầu thẻ, nên xem trước bài này không đổi cách xem các bài khác. Bấm "Sửa bài" thì bài đó tự về chế
+    độ "Nội dung".
+
 ## 1.19.0 · 04/11/2026
 ### Tính năng
 - Logo VPSTTT thay chữ "S" ở thanh menu bên trái và trang đăng nhập, và thay hình tam giác mặc định ở tab trình duyệt.

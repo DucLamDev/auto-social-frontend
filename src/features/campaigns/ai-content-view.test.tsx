@@ -19,6 +19,10 @@ vi.mock("@/hooks/use-resources", () => ({
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: mocks.error, warning: mocks.warning } }));
 vi.mock("@/services/resources.service", () => ({ resourcesService: { reviewAiCampaign: mocks.review, updateVariant: mocks.update, reviewExistingContent: mocks.reviewExisting, previewVariant: mocks.preview, reviewAiVariant: mocks.reviewVariant, rewriteVariant: mocks.rewrite } }));
 
+/** Posts start folded to their header and decision buttons: open them to read, edit or preview. */
+const openPost = (platform = "DEV") => fireEvent.click(screen.getByRole("button", { name: `Xem nội dung bài ${platform}` }));
+const openAll = () => fireEvent.click(screen.getByRole("button", { name: "Mở hết" }));
+
 describe("AI content waiting for review", () => {
   beforeEach(() => {
     mocks.role = "ADMIN";
@@ -47,6 +51,7 @@ describe("AI content waiting for review", () => {
     mocks.state = "APPROVED";
     render(<AiContentView />);
     fireEvent.click(screen.getByRole("button", { name: "Review nội dung" }));
+    openPost();
     expect(screen.getByLabelText("Nội dung · DEV")).toHaveValue("Original body");
     expect(screen.getByLabelText("Nội dung · DEV")).toHaveAttribute("readonly");
     expect(screen.queryByRole("button", { name: "Duyệt đăng ngay" })).not.toBeInTheDocument();
@@ -71,6 +76,7 @@ describe("AI content waiting for review", () => {
     mocks.ids = ["variant-1", "variant-2"];
     render(<AiContentView />);
     fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    openAll();
     expect(screen.getByDisplayValue("Original body")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Older body")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("radio", { name: /Older version/ }));
@@ -89,6 +95,7 @@ describe("AI content waiting for review", () => {
     mocks.ids = ["variant-1"];
     rerender(<AiContentView />);
     fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    openPost();
     expect(screen.getByLabelText("Nội dung · DEV")).toHaveValue("Original body");
     expect(mocks.review).not.toHaveBeenCalled();
   });
@@ -96,6 +103,7 @@ describe("AI content waiting for review", () => {
   it("saves unsaved edits as part of approving, so publishing needs no separate save", async () => {
     render(<AiContentView />);
     fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    openPost();
     fireEvent.click(screen.getByRole("button", { name: "Sửa bài DEV" }));
     fireEvent.change(screen.getByLabelText("Nội dung · DEV"), { target: { value: "Edited body" } });
     expect(screen.getAllByText("Duyệt sẽ lưu luôn phần bạn đã sửa.").length).toBeGreaterThan(0);
@@ -108,6 +116,7 @@ describe("AI content waiting for review", () => {
   it("saves the edit of one post when approving that post alone, and refuses an emptied post", async () => {
     render(<AiContentView />);
     fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    openPost();
     fireEvent.click(screen.getByRole("button", { name: "Sửa bài DEV" }));
     const card = screen.getByRole("group", { name: "Duyệt bài DEV" });
     fireEvent.change(screen.getByLabelText("Nội dung · DEV"), { target: { value: "   " } });
@@ -142,6 +151,7 @@ describe("AI content waiting for review", () => {
     expect(within(progress).getByText("DEV").closest("li")).toHaveTextContent("Đã tạo");
     expect(within(progress).getByText("Tumblr").closest("li")).toHaveTextContent("AI đang viết…");
     fireEvent.click(screen.getByRole("button", { name: "Xem 1 kênh đã tạo" }));
+    openPost();
     expect(screen.getByLabelText("Nội dung · DEV")).toHaveValue("Original body");
     fireEvent.click(screen.getByRole("button", { name: "Sửa bài DEV" }));
     fireEvent.change(screen.getByLabelText("Nội dung · DEV"), { target: { value: "Edited early" } });
@@ -178,10 +188,11 @@ describe("AI content waiting for review", () => {
   it("keeps the approval buttons in a bar that stays visible and previews each post as its platform shows it", async () => {
     render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><AiContentView /></QueryClientProvider>);
     fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    openPost();
     const bar = screen.getByRole("region", { name: "Duyệt nội dung" });
     expect(bar).toHaveClass("sticky");
     expect(within(bar).getByRole("button", { name: "Duyệt & đăng bài đã xong (1)" })).toBeEnabled();
-    fireEvent.click(screen.getByRole("tab", { name: "Xem trước như trên mạng xã hội" }));
+    fireEvent.click(within(screen.getByRole("tablist", { name: "Cách xem bài DEV" })).getByRole("tab", { name: "Xem trước" }));
     expect(await screen.findByRole("heading", { name: "Original title" })).toBeInTheDocument();
     expect(mocks.preview).toHaveBeenCalledWith("variant-1", { title: "Original title", body: "Original body", platformAccountId: "account-1" });
     expect(screen.getByText(/18 ký tự · 1 tag gửi riêng/)).toBeInTheDocument();
@@ -224,6 +235,7 @@ describe("AI content waiting for review", () => {
     mocks.review_ = { recommended: false, reason: "Cần xem lại (AI chấm 5/10): Mở bài chung chung" };
     render(<AiContentView />);
     fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    openPost();
     expect(screen.getByText("AI chấm 5/10")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Viết lại bằng AI" }));
     fireEvent.change(screen.getByLabelText("Hướng dẫn cho AI (không bắt buộc)"), { target: { value: "Mở bài bằng số liệu" } });
@@ -235,6 +247,7 @@ describe("AI content waiting for review", () => {
     mocks.revision = { status: "generating", instruction: "Ngắn hơn" };
     const { unmount } = render(<AiContentView />);
     fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    openPost();
     expect(screen.getByRole("status")).toHaveTextContent("AI đang viết lại bài này theo hướng dẫn “Ngắn hơn”");
     const card = screen.getByRole("group", { name: "Duyệt bài DEV" });
     expect(within(card).getByRole("button", { name: "Duyệt & đăng bài DEV" })).toBeDisabled();
@@ -244,6 +257,7 @@ describe("AI content waiting for review", () => {
     mocks.revision = { status: "failed", error: "VPSTTT AI đang giới hạn lượt." };
     render(<AiContentView />);
     fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    openPost();
     expect(screen.getByRole("alert")).toHaveTextContent("Chưa viết lại được: VPSTTT AI đang giới hạn lượt.");
     expect(screen.getByRole("button", { name: "Viết lại bằng AI" })).toBeEnabled();
   });
@@ -295,6 +309,7 @@ describe("AI content waiting for review", () => {
     await waitFor(() => expect(mocks.review).toHaveBeenCalledWith("campaign-1", "restore"));
     rerender(<AiContentView />);
     expect(screen.getByRole("tab", { name: "Chờ duyệt" })).toHaveAttribute("aria-selected", "true");
+    openPost();
     expect(screen.getByLabelText("Nội dung · DEV")).toHaveValue("Original body");
     expect(screen.getByRole("button", { name: "Duyệt & đăng bài DEV" })).toBeEnabled();
     expect(mocks.update).not.toHaveBeenCalled();
@@ -309,6 +324,7 @@ describe("AI content waiting for review", () => {
     fireEvent.click(screen.getByRole("button", { name: "Khôi phục bài này" }));
     await waitFor(() => expect(mocks.reviewVariant).toHaveBeenCalledWith("campaign-1", "variant-1", "restore", undefined));
     expect(mocks.review).not.toHaveBeenCalled();
+    openPost();
     expect(screen.getByLabelText("Nội dung · DEV")).toHaveValue("Original body");
   });
 
@@ -335,7 +351,8 @@ describe("AI content waiting for review", () => {
   it("keeps the AI image buttons usable under the social-media preview", async () => {
     render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><AiContentView /></QueryClientProvider>);
     fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Xem trước như trên mạng xã hội" }));
+    openPost();
+    fireEvent.click(within(screen.getByRole("tablist", { name: "Cách xem bài DEV" })).getByRole("tab", { name: "Xem trước" }));
     expect(await screen.findByRole("heading", { name: "Original title" })).toBeInTheDocument();
     const images = screen.getByRole("region", { name: "Ảnh · DEV" });
     expect(within(images).getByRole("button", { name: "Tạo ảnh bằng AI" })).toBeEnabled();
@@ -347,6 +364,7 @@ describe("AI content waiting for review", () => {
     mocks.extra = [{ id: "variant-3", platform: "Tumblr", platformSlug: "tumblr", title: "T", body: "Tumblr body", status: "GENERATED" }];
     render(<AiContentView />);
     fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    openAll();
     const dev = screen.getByRole("article", { name: "DEV" });
     const tumblr = screen.getByRole("article", { name: "Tumblr" });
     expect(within(dev).getByRole("group", { name: "Duyệt bài DEV" })).toHaveTextContent("Bài DEV");
@@ -383,6 +401,7 @@ describe("AI content waiting for review", () => {
     mocks.review_ = { recommended: false, reason: `Cần xem lại (AI chấm 6/10): ${"Câu này cần kiểm chứng lại. ".repeat(12)}` };
     render(<AiContentView />);
     fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    openPost();
     const point = () => screen.getByText(/^Câu này cần kiểm chứng lại/);
     expect(point()).toHaveClass("line-clamp-2");
     fireEvent.click(screen.getByRole("button", { name: "Xem đủ ghi chú" }));
@@ -394,6 +413,7 @@ describe("AI content waiting for review", () => {
     mocks.review_ = { recommended: false, reason: "Cần xem lại (AI chấm 7/10): Thông tin chưa có căn cứ: I write for vpsttt; Lời mở đầu hơi chung chung; Thêm một ví dụ cụ thể" };
     render(<AiContentView />);
     fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    openPost();
     const advice = screen.getByRole("region", { name: "Khuyến nghị của AI · DEV" });
     expect(advice).toHaveTextContent("AI đề nghị kiểm tra (3 điểm)");
     expect(within(advice).getAllByRole("checkbox").every((box) => (box as HTMLInputElement).checked)).toBe(true);
@@ -407,6 +427,7 @@ describe("AI content waiting for review", () => {
     mocks.review_ = { recommended: false, reason: "Cần xem lại (AI chấm 6/10): Lời mở đầu hơi chung chung" };
     render(<AiContentView />);
     fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    openPost();
     const advice = screen.getByRole("region", { name: "Khuyến nghị của AI · DEV" });
     fireEvent.click(within(advice).getByRole("checkbox", { name: "Lời mở đầu hơi chung chung" }));
     expect(within(advice).getByRole("button", { name: "Sửa theo 0 khuyến nghị đã chọn" })).toBeDisabled();
@@ -424,6 +445,7 @@ describe("AI content waiting for review", () => {
     mocks.role = "VIEWER";
     const { unmount } = render(<AiContentView />);
     fireEvent.click(screen.getByRole("button", { name: /Review/ }));
+    openPost();
     let advice = screen.getByRole("region", { name: "Khuyến nghị của AI · DEV" });
     expect(advice).toHaveTextContent("Lời mở đầu hơi chung chung");
     expect(within(advice).queryByRole("checkbox")).not.toBeInTheDocument();
@@ -433,9 +455,60 @@ describe("AI content waiting for review", () => {
     mocks.revision = { status: "generating", notes: ["Lời mở đầu hơi chung chung"] } as typeof mocks.revision;
     render(<AiContentView />);
     fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    openPost();
     advice = screen.getByRole("region", { name: "Khuyến nghị của AI · DEV" });
     expect(within(advice).queryByRole("button")).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("AI đang viết lại bài này theo 1 khuyến nghị đã chọn");
+  });
+
+  it("starts every post folded to its header and decision buttons, and opens one post at a time", () => {
+    mocks.ids = ["variant-1", "variant-3"];
+    mocks.extra = [{ id: "variant-3", platform: "Tumblr", platformSlug: "tumblr", title: "Tiêu đề Tumblr", body: "Tumblr body", status: "GENERATED" }];
+    render(<AiContentView />);
+    fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    const tumblr = screen.getByRole("article", { name: "Tumblr" });
+    // Folded: a one-line excerpt and the decision stay visible, the text does not.
+    expect(within(tumblr).getByText("Tiêu đề Tumblr")).toBeInTheDocument();
+    expect(within(tumblr).getByRole("button", { name: "Duyệt & đăng bài Tumblr" })).toBeEnabled();
+    expect(screen.queryByLabelText("Nội dung · Tumblr")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Nội dung · DEV")).not.toBeInTheDocument();
+    fireEvent.click(within(tumblr).getByRole("button", { name: "Xem nội dung bài Tumblr" }));
+    expect(screen.getByLabelText("Nội dung · Tumblr")).toHaveValue("Tumblr body");
+    expect(screen.queryByLabelText("Nội dung · DEV")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Mở hết" }));
+    expect(screen.getByLabelText("Nội dung · DEV")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Thu gọn hết" }));
+    expect(screen.queryByLabelText("Nội dung · Tumblr")).not.toBeInTheDocument();
+  });
+
+  it("switches one post to its social-media preview without changing the others", async () => {
+    mocks.ids = ["variant-1", "variant-3"];
+    mocks.extra = [{ id: "variant-3", platform: "Tumblr", platformSlug: "tumblr", title: "T", body: "Tumblr body", status: "GENERATED" }];
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><AiContentView /></QueryClientProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    openAll();
+    expect(screen.queryByRole("tablist", { name: "Cách xem nội dung" })).not.toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole("tablist", { name: "Cách xem bài DEV" })).getByRole("tab", { name: "Xem trước" }));
+    expect(await screen.findByRole("heading", { name: "Original title" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Nội dung · DEV")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Nội dung · Tumblr")).toHaveValue("Tumblr body");
+    // "Sửa bài" brings that post back to its text.
+    fireEvent.click(screen.getByRole("button", { name: "Sửa bài DEV" }));
+    expect(screen.getByLabelText("Nội dung · DEV")).not.toHaveAttribute("readonly");
+  });
+
+  it("opens the post picked in the jump list", () => {
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = vi.fn();
+    try {
+      mocks.ids = ["variant-1", "variant-3"];
+      mocks.extra = [{ id: "variant-3", platform: "Tumblr", platformSlug: "tumblr", title: "T", body: "Tumblr body", status: "GENERATED" }];
+      render(<AiContentView />);
+      fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+      fireEvent.click(within(screen.getByRole("navigation", { name: "Đi tới bài của từng kênh" })).getByRole("button", { name: /Tumblr/ }));
+      expect(screen.getByLabelText("Nội dung · Tumblr")).toHaveValue("Tumblr body");
+      expect(screen.queryByLabelText("Nội dung · DEV")).not.toBeInTheDocument();
+    } finally { Element.prototype.scrollIntoView = original; }
   });
 
 });
