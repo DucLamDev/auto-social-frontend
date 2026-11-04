@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ContentVariant, PlatformAccount } from "@/types/domain";
-import { canAddAutomationAccount, countAutomationPlatforms, defaultAutomationAccountIds, deriveAutomationCampaignName, getApprovedVariantForAccount, getAutomationAccountBlocker, getEligibleAccounts, includeImageAltText, isAutomationAccountEligible, isCampaignReadyContent, MAX_AUTOMATION_PLATFORMS, normalizeAutomationAccountIds, reviewOutcomeWarning, aiScore } from "./campaign-utils";
+import { canAddAutomationAccount, countAutomationPlatforms, defaultAutomationAccountIds, deriveAutomationCampaignName, getApprovedVariantForAccount, getAutomationAccountBlocker, getEligibleAccounts, includeImageAltText, isAutomationAccountEligible, isCampaignReadyContent, MAX_AUTOMATION_PLATFORMS, normalizeAutomationAccountIds, reviewOutcomeWarning, aiScore, normalizeMinScore } from "./campaign-utils";
 
 const account: PlatformAccount = { id: "a1", platformId: "p1", platform: { id: "p1", name: "LinkedIn", slug: "linkedin" }, name: "Company", enabled: true, status: "CONNECTED" };
 const variants: ContentVariant[] = [
@@ -102,5 +102,14 @@ describe("AI score in a review note", () => {
     expect(aiScore("Cần xem lại (AI chấm 5/10): Mở bài chung chung")).toBe(5);
     expect(aiScore("Hợp người đọc (AI chưa chấm được)")).toBeNull();
     expect(aiScore(null)).toBeNull();
+  });
+});
+
+describe("minimum AI score to approve", () => {
+  it("keeps a whole score from 1 to 10 and falls back to 7 otherwise", () => {
+    expect(normalizeMinScore("8")).toBe(8);
+    expect(normalizeMinScore(10)).toBe(10);
+    expect(normalizeMinScore("6.6")).toBe(7);
+    for (const bad of ["", "0", "11", "abc", null]) expect(normalizeMinScore(bad)).toBe(7);
   });
 });

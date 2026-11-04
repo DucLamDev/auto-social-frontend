@@ -3,6 +3,15 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.15.0 · 04/11/2026
+### Tính năng
+- Duyệt & đăng các bài từ N điểm AI, bài đã duyệt được thu gọn
+  - Thanh duyệt ở Content đợi duyệt có ô điểm (mặc định 7, chỉnh từ 1 đến 10; trình duyệt nhớ lựa chọn) và nút
+    **Duyệt & đăng bài từ N điểm (số bài)**.
+  - Nút duyệt lần lượt các bài đã sẵn sàng có điểm AI từ N trở lên. Bài chưa được AI chấm, đang tạo ảnh hoặc đang được
+    viết lại thì bỏ qua. Bài nào lỗi thì báo riêng, không làm dừng các bài khác.
+  - Bài đã duyệt chỉ còn một dòng "Đã duyệt…", bấm **Xem nội dung** để mở lại.
+
 ## 1.14.0 · 04/11/2026
 ### Tính năng
 - Viết lại bài bằng AI ngay trên từng bài (cần backend 1.13.0)

@@ -4,14 +4,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AiContentView } from "./ai-content-view";
 
 const mocks = vi.hoisted(() => ({
-  role: "ADMIN", review: vi.fn(), reviewExisting: vi.fn(), update: vi.fn(), preview: vi.fn(), reviewVariant: vi.fn(), rewrite: vi.fn(), revision: null as null | { status: string; instruction?: string; error?: string }, review_: { recommended: true as boolean, reason: "" }, warning: vi.fn(), error: vi.fn(), variantStatus: "GENERATED", image: null as null | { type: string; status: string }, state: "WAITING_REVIEW", ids: ["variant-1"], mode: "AUTOMATION", multipleVersions: false, secondAccount: false,
+  role: "ADMIN", review: vi.fn(), reviewExisting: vi.fn(), update: vi.fn(), preview: vi.fn(), reviewVariant: vi.fn(), rewrite: vi.fn(), extra: [] as Array<Record<string, unknown>>, revision: null as null | { status: string; instruction?: string; error?: string }, review_: { recommended: true as boolean, reason: "" }, warning: vi.fn(), error: vi.fn(), variantStatus: "GENERATED", image: null as null | { type: string; status: string }, state: "WAITING_REVIEW", ids: ["variant-1"], mode: "AUTOMATION", multipleVersions: false, secondAccount: false,
 }));
 vi.mock("@/hooks/use-auth", () => ({ useCurrentUser: () => ({ data: { role: mocks.role } }) }));
 vi.mock("@/hooks/use-resources", () => ({
   useAiCampaigns: () => ({ data: { items: [{ id: "campaign-1", name: "Launch", reviewMode: mocks.mode, status: "DRAFT", content: { id: "content-1" }, automationState: mocks.state, automationVariantIds: mocks.ids, automationAccountIds: mocks.secondAccount ? ["account-1", "account-2"] : ["account-1"], createdAt: "2026-11-02T00:00:00Z" }] } }),
   useAccounts: () => ({ data: { items: [{ id: "account-1", name: "DEV account", enabled: true, status: "CONNECTED", platform: { slug: "devto", name: "DEV", mode: "OFFICIAL_API" } },
     ...(mocks.secondAccount ? [{ id: "account-2", name: "Tumblr vpsttt", enabled: true, status: "CONNECTED", platform: { slug: "tumblr", name: "Tumblr", mode: "OFFICIAL_API" } }] : [])] } }),
-  useVariants: () => ({ data: { items: [{ id: "variant-1", platform: "DEV", platformSlug: "devto", title: "Original title", body: "Original body", status: mocks.variantStatus, image: mocks.image, aiRevision: mocks.revision, recommended: mocks.review_.recommended, reason: mocks.review_.reason }, ...(mocks.multipleVersions ? [{ id: "variant-2", platform: "DEV", platformSlug: "devto", title: "Older version", body: "Older body", status: "APPROVED" }] : [])] } }),
+  useVariants: () => ({ data: { items: [{ id: "variant-1", platform: "DEV", platformSlug: "devto", title: "Original title", body: "Original body", status: mocks.variantStatus, image: mocks.image, aiRevision: mocks.revision, recommended: mocks.review_.recommended, reason: mocks.review_.reason }, ...(mocks.multipleVersions ? [{ id: "variant-2", platform: "DEV", platformSlug: "devto", title: "Older version", body: "Older body", status: "APPROVED" }] : []), ...mocks.extra] } }),
   useMedia: () => ({ data: { items: [] } }),
   useAiImageStatus: () => ({ data: { configured: true, model: "vpsttt-image", provider: "vpsttt" } }),
   useResourceMutation: (fn: (...args: unknown[]) => unknown) => ({ mutateAsync: (...args: unknown[]) => fn(...args), isPending: false }),
@@ -36,6 +36,7 @@ describe("AI content waiting for review", () => {
     mocks.variantStatus = "GENERATED";
     mocks.image = null;
     mocks.revision = null;
+    mocks.extra = [];
     mocks.review_ = { recommended: true, reason: "" };
     mocks.rewrite.mockReset().mockResolvedValue({ status: "generating" });
     mocks.preview.mockReset().mockResolvedValue({ title: "Original title", body: "Original body #vps", format: "markdown", tags: ["vps"], group: "DEVELOPER", engine: "devto", maxChars: null, length: 18, overLimit: false });
@@ -255,8 +256,35 @@ describe("AI content waiting for review", () => {
     expect(screen.getByText(/Đã duyệt: bài vào hàng đợi đăng/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Khôi phục/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Duyệt & đăng bài đã xong (0)" })).toBeDisabled();
+    // An approved post is folded to one line until opened.
+    expect(screen.queryByLabelText("Nội dung · DEV")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Xem nội dung bài DEV" }));
     fireEvent.click(screen.getByRole("button", { name: "Edit nội dung" }));
     expect(screen.getByLabelText("Nội dung · DEV")).toHaveAttribute("readonly");
+    fireEvent.click(screen.getByRole("button", { name: "Thu gọn bài DEV" }));
+    expect(screen.queryByLabelText("Nội dung · DEV")).not.toBeInTheDocument();
+  });
+
+  it("approves and publishes only the ready posts scoring at least the chosen score, and remembers that score", async () => {
+    window.localStorage.removeItem("auto-social:approve-min-score");
+    mocks.review_ = { recommended: true, reason: "Hợp người đọc (AI chấm 8/10)" };
+    mocks.ids = ["variant-1", "variant-3", "variant-4"];
+    mocks.extra = [
+      { id: "variant-3", platform: "Tumblr", platformSlug: "tumblr", title: "T", body: "Tumblr body", status: "GENERATED", recommended: false, reason: "Cần xem lại (AI chấm 5/10): Nhạt" },
+      { id: "variant-4", platform: "Bluesky", platformSlug: "bluesky", title: null, body: "Bluesky body", status: "GENERATED", recommended: true, reason: "Hợp người đọc (AI chưa chấm được)" },
+    ];
+    render(<AiContentView />);
+    fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    fireEvent.click(screen.getByRole("button", { name: "Duyệt & đăng bài từ 7 điểm (1)" }));
+    await waitFor(() => expect(mocks.reviewVariant).toHaveBeenCalledTimes(1));
+    expect(mocks.reviewVariant).toHaveBeenCalledWith("campaign-1", "variant-1", "approve", { publishMode: "NOW" });
+    const score = screen.getByLabelText("Điểm AI tối thiểu để duyệt");
+    fireEvent.change(score, { target: { value: "" } });
+    expect(score).toHaveValue(null);
+    fireEvent.change(score, { target: { value: "5" } });
+    // Unscored posts are never included.
+    expect(screen.getByRole("button", { name: "Duyệt & đăng bài từ 5 điểm (2)" })).toBeEnabled();
+    expect(window.localStorage.getItem("auto-social:approve-min-score")).toBe("5");
   });
   it("restores a rejected campaign and opens its unchanged content for review", async () => {
     mocks.state = "REJECTED";

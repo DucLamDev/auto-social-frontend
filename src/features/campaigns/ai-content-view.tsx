@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { CalendarClock, Check, CircleAlert, Clock3, Eye, LoaderCircle, Pencil, RefreshCw, Save, Sparkles, Undo2, X } from "lucide-react";
+import { CalendarClock, Check, ChevronDown, ChevronUp, CircleAlert, Clock3, Eye, LoaderCircle, Pencil, RefreshCw, Save, Sparkles, Star, Undo2, X } from "lucide-react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import { PageHeader } from "@/components/layout/page-header";
@@ -17,7 +17,7 @@ import { useAccounts, useAiCampaigns, useMedia, useResourceMutation, useVariants
 import { cn, formatDate } from "@/lib/utils";
 import { resourcesService } from "@/services/resources.service";
 import type { Campaign, ContentVariant, PlatformAccount } from "@/types/domain";
-import { aiScore, imagePending, isAutomationAccountEligible, reviewOutcomeWarning } from "./campaign-utils";
+import { aiScore, imagePending, isAutomationAccountEligible, normalizeMinScore, readApproveMinScore, reviewOutcomeWarning, saveApproveMinScore } from "./campaign-utils";
 import { isRewriting, VariantRewritePanel } from "./variant-rewrite-panel";
 import { VariantImagePanel } from "./variant-image-panel";
 import { useSlow, VariantPreviewCard } from "./variant-preview-card";
@@ -78,6 +78,12 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
   const setScheduleOpen = (open: boolean) => setScheduleTarget(open ? "all" : null);
   const [accountIds, setAccountIds] = useState<string[]>([]);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
+  // Approved posts are folded to one line; the operator can open one to read it again.
+  const [openApproved, setOpenApproved] = useState<Record<string, boolean>>({});
+  const [minScore, setMinScore] = useState(readApproveMinScore);
+  // What is typed; it becomes the threshold only when it is a whole score from 1 to 10.
+  const [minScoreText, setMinScoreText] = useState(() => String(minScore));
+  const [scoredRunning, setScoredRunning] = useState(false);
   const standalone = campaign.reviewMode === "CONTENT";
   const [scheduledAt, setScheduledAt] = useState(() => {
     const date = new Date(campaign.scheduledAt ?? "");
@@ -129,11 +135,13 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
   // …and while the AI rewrites a post, approving it would send the old text.
   const readyToApprove = (variant: ContentVariant) => waiting(variant) && !imagePending(variant) && !isRewriting(variant);
   const readyCount = items.filter(readyToApprove).length;
+  // "Duyệt & đăng bài từ N điểm": ready posts the AI editor scored at least N (unscored ones are left out).
+  const scoredReady = items.filter((variant) => readyToApprove(variant) && (aiScore(variant.reason) ?? 0) >= minScore);
   const generating = isGenerating(campaign);
   const editable = campaign.reviewMode !== "EXISTING_CAMPAIGN" && (campaign.automationState === "WAITING_REVIEW" || generating || (standalone && campaign.automationState === "APPROVED"));
   const eligibleAccounts = accounts.filter((account) => isAutomationAccountEligible(account) && chosenVariants.some((variant) => variant.platformSlug === account.platform?.slug));
   const dirty = Object.keys(edits).length > 0;
-  const busy = save.isPending || review.isPending || decide.isPending;
+  const busy = save.isPending || review.isPending || decide.isPending || scoredRunning;
   const change = (variant: ContentVariant, patch: { title?: string; body?: string }) => {
     setEdits((current) => ({ ...current, [variant.id]: { title: variant.title ?? "", body: variant.body, ...current[variant.id], ...patch } }));
   };
@@ -155,6 +163,21 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
       warnSkipped(outcome);
     } catch (error) { toast.error(error instanceof Error ? error.message : "Không thể xử lý bài này"); }
   };
+  /** Approves the high-scoring posts one by one; a failure on one does not stop the others. */
+  const approveScored = async () => {
+    const chosen = scoredReady;
+    const failures: string[] = [];
+    setScoredRunning(true);
+    try {
+      for (const variant of chosen) {
+        try { warnSkipped(await decide.mutateAsync({ variantId: variant.id, action: "approve" })); }
+        catch (error) { failures.push(`${variant.platform}: ${error instanceof Error ? error.message : "không duyệt được"}`); }
+      }
+    } finally { setScoredRunning(false); }
+    const approved = chosen.length - failures.length;
+    if (approved) toast.success(`Đã duyệt và đưa vào hàng đợi đăng ${approved} bài từ ${minScore} điểm trở lên.`);
+    if (failures.length) toast.error(`Chưa duyệt được ${failures.length} bài: ${failures.join("; ")}`);
+  };
   const act = async (action: "approve" | "reject", schedule?: string) => {
     try {
       const outcome = await review.mutateAsync({ action, schedule });
@@ -174,7 +197,7 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
         className={cn("inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold transition", view === value ? "bg-white text-primary shadow-sm" : "text-slate-600 hover:text-slate-900")}><Icon aria-hidden className="size-4" />{label}</button>)}
     </div>
     {media.data?.items.map((asset) => <p key={asset.id} className="text-sm">{asset.publicUrl ? <a href={asset.publicUrl} target="_blank" rel="noreferrer" className="font-semibold text-primary underline">Xem tệp đính kèm{asset.altText ? `: ${asset.altText}` : ""}</a> : `Tệp đính kèm: ${asset.mimeType}`}</p>)}
-    {items.map((variant) => <div key={variant.id} className={cn("space-y-3 rounded-xl border border-border p-4", perPost && variant.status === "REJECTED" && "bg-slate-50")}>
+    {items.map((variant) => { const folded = perPost && variant.status === "APPROVED" && !openApproved[variant.id]; return <div key={variant.id} className={cn("space-y-3 rounded-xl border border-border p-4", perPost && variant.status === "REJECTED" && "bg-slate-50", folded && "py-3")}>
       <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap items-center gap-2"><h3 className="font-bold">{variant.platform}</h3>{aiScore(variant.reason) !== null && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", variant.recommended === false ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-700")}>AI chấm {aiScore(variant.reason)}/10</span>}</div><Badge value={perPost && waiting(variant) ? "WAITING_REVIEW" : variant.status} /></div>
       {perPost && editable && waiting(variant) && <PermissionGate allow={["ADMIN", "EDITOR"]}><div role="group" aria-label={`Duyệt bài ${variant.platform}`} className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-2">
         <Button size="sm" disabled={busy || !readyToApprove(variant) || edits[variant.id]?.body.trim() === ""} loading={decide.isPending && decide.variables?.variantId === variant.id && decide.variables.action === "approve"} onClick={() => void actOn(variant, "approve")}><Check className="size-4" />Duyệt & đăng bài này</Button>
@@ -184,7 +207,11 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
           : imagePending(variant) ? <span className="text-xs text-indigo-700">Đang tạo ảnh cho bài này; duyệt được ngay khi ảnh xong.</span>
           : edits[variant.id] && <span className="text-xs text-muted">Duyệt sẽ lưu luôn phần bạn đã sửa.</span>}
       </div></PermissionGate>}
-      {perPost && variant.status === "APPROVED" && <p className="text-xs text-emerald-700">Đã duyệt: bài vào hàng đợi đăng. Theo dõi ở <Link href="/publishing" className="font-semibold underline">Publishing</Link>.</p>}
+      {perPost && variant.status === "APPROVED" && <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-emerald-700">Đã duyệt: bài vào hàng đợi đăng. Theo dõi ở <Link href="/publishing" className="font-semibold underline">Publishing</Link>.</p>
+        <Button size="sm" variant="ghost" aria-expanded={!folded} aria-label={folded ? `Xem nội dung bài ${variant.platform}` : `Thu gọn bài ${variant.platform}`} onClick={() => setOpenApproved((current) => ({ ...current, [variant.id]: folded }))}>{folded ? <><ChevronDown className="size-4" />Xem nội dung</> : <><ChevronUp className="size-4" />Thu gọn</>}</Button>
+      </div>}
+      {!folded && <>
       {perPost && variant.status === "REJECTED" && <div className="space-y-2">
         <p className="text-sm text-muted">Đã từ chối. Khôi phục để sửa và duyệt lại; bài chỉ đăng sau khi bạn duyệt.</p>
         {["REJECTED", "WAITING_REVIEW", "APPROVED"].includes(campaign.automationState ?? "") && <PermissionGate allow={["ADMIN", "EDITOR"]}><Button variant="secondary" className="min-h-11" disabled={busy} loading={decide.isPending && decide.variables?.variantId === variant.id && decide.variables.action === "restore"} onClick={() => void actOn(variant, "restore")}><Undo2 className="size-4" />Khôi phục bài này</Button></PermissionGate>}
@@ -200,7 +227,8 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
         {!!variant.hashtags?.length && <p className="break-words text-sm text-muted">{variant.hashtags.map((tag) => `#${tag.replace(/^#/, "")}`).join(" ")}</p>}
         {variant.cta && <p className="text-sm text-muted">{variant.cta}</p>}
       </>}
-    </div>)}
+      </>}
+    </div>; })}
     {editable && <PermissionGate allow={["ADMIN", "EDITOR"]}>
       {standalone && <fieldset className="rounded-xl border border-border p-4"><legend className="px-2 text-sm font-semibold">Chọn tài khoản để đăng biến thể đã có</legend><div className="grid gap-3 sm:grid-cols-2">{eligibleAccounts.map((account) => <label key={account.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={accountIds.includes(account.id)} disabled={busy} onChange={(event) => setAccountIds((current) => event.target.checked ? [...current, account.id] : current.filter((id) => id !== account.id))} />{account.name} · {account.platform?.name}</label>)}</div>{!eligibleAccounts.length && <p className="text-sm text-amber-700">Chưa có tài khoản sẵn sàng khớp với nền tảng của biến thể. Kiểm tra tại trang Tài khoản.</p>}</fieldset>}
       {/* Long reviews (13 platforms) pushed these buttons far below the fold: keep them in view while scrolling. */}
@@ -209,6 +237,16 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
       {!editing && <Button size="sm" variant="secondary" disabled={busy} onClick={() => { setEditing(true); setView("content"); }}><Pencil className="size-4" />Edit nội dung</Button>}
       {editing && <Button size="sm" variant="secondary" disabled={!dirty || busy || Object.values(edits).some((edit) => !edit.body.trim())} loading={save.isPending} onClick={() => void save.mutateAsync().then(() => { setEdits({}); setEditing(false); toast.success("Đã lưu nội dung"); }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không thể lưu"))}><Save className="size-4" />Lưu chỉnh sửa</Button>}
       <Button size="sm" variant="secondary" className={perPost ? "hidden sm:inline-flex" : undefined} disabled={!ready} onClick={() => setScheduleOpen(true)}><CalendarClock className="size-4" />{perPost ? "Hẹn lịch bài còn chờ" : "Hẹn lịch đăng"}</Button>
+      {perPost && <div role="group" aria-label="Duyệt theo điểm AI" className="flex items-center gap-1.5">
+        <label htmlFor={`min-score-${campaign.id}`} className="text-xs font-semibold text-slate-600">Từ</label>
+        <Input id={`min-score-${campaign.id}`} type="number" inputMode="numeric" min={1} max={10} step={1} className="h-9 w-16 px-2 text-center" value={minScoreText} disabled={busy}
+          aria-label="Điểm AI tối thiểu để duyệt" onBlur={() => setMinScoreText(String(minScore))}
+          onChange={(event) => {
+            setMinScoreText(event.target.value);
+            if (/^(?:[1-9]|10)$/.test(event.target.value.trim())) { const score = normalizeMinScore(event.target.value); setMinScore(score); saveApproveMinScore(score); }
+          }} />
+        <Button size="sm" variant="secondary" disabled={busy || !scoredReady.length || emptyEdit} loading={scoredRunning} onClick={() => void approveScored()}><Star className="size-4" />Duyệt & đăng bài từ {minScore} điểm ({scoredReady.length})</Button>
+      </div>}
       <Button size="sm" disabled={!ready} loading={review.isPending} onClick={() => void act("approve")}><Check className="size-4" />{perPost ? `Duyệt & đăng bài đã xong (${readyCount})` : "Duyệt đăng ngay"}</Button>
       <Button size="sm" variant="ghost" className={perPost ? "hidden sm:inline-flex" : undefined} disabled={busy || (perPost ? !pendingCount : generating)} onClick={() => void act("reject")}><X className="size-4" />{perPost ? "Từ chối bài còn chờ" : "Từ chối"}</Button>
       {dirty && !perPost && <p className="text-xs text-amber-700">Lưu chỉnh sửa trước khi duyệt.</p>}
