@@ -19,6 +19,16 @@ afterEach(() => {
 });
 
 describe("resourcesService contract adapters", () => {
+  it("posts restoration separately from approval for a campaign and one platform", async () => {
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(apiResponse({})));
+    vi.stubGlobal("fetch", fetchMock);
+    await resourcesService.reviewAiCampaign("campaign-1", "restore");
+    await resourcesService.reviewAiVariant("campaign-1", "variant-1", "restore");
+    expect(new URL(String(fetchMock.mock.calls[0]?.[0])).pathname).toBe("/api/v1/campaigns/campaign-1/restore");
+    expect(new URL(String(fetchMock.mock.calls[1]?.[0])).pathname).toBe("/api/v1/campaigns/campaign-1/variants/variant-1/restore");
+    for (const call of fetchMock.mock.calls) expect(call[1]).toMatchObject({ method: "POST" });
+  });
+
   it("forwards the moderation filter and keeps destination links separate from published URLs", async () => {
     const fetchMock = vi.fn().mockResolvedValue(apiResponse([
       { id: "pending", status: "NEEDS_ACTION", reviewUrl: "https://forum.example/my/activity/pending", reviewUrlKind: "pending_queue", lastErrorCode: "EXTENSION_MODERATION_PENDING", attemptCount: 1, maxAttempts: 3 },

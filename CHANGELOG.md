@@ -3,6 +3,11 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.11.0 · 04/11/2026
+### Tính năng
+- Khôi phục nội dung đã từ chối
+  Thêm nút “Khôi phục để duyệt” trên lượt AI bị từ chối và “Khôi phục bài này” trên từng bài bị từ chối. Sau khi khôi phục có thể sửa, duyệt hoặc hẹn lịch lại; nội dung chỉ đăng khi duyệt. Cần backend có API khôi phục (bản 1.12.0 trở lên).
+
 ## 1.10.0 · 04/11/2026
 ### Tính năng
 - Duyệt, hẹn lịch hoặc từ chối từng bài theo nền tảng (cần backend 1.11.0)

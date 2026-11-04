@@ -4,9 +4,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AiContentView } from "./ai-content-view";
 
 const mocks = vi.hoisted(() => ({
-  review: vi.fn(), reviewExisting: vi.fn(), update: vi.fn(), preview: vi.fn(), reviewVariant: vi.fn(), variantStatus: "GENERATED", state: "WAITING_REVIEW", ids: ["variant-1"], mode: "AUTOMATION", multipleVersions: false, secondAccount: false,
+  role: "ADMIN", review: vi.fn(), reviewExisting: vi.fn(), update: vi.fn(), preview: vi.fn(), reviewVariant: vi.fn(), variantStatus: "GENERATED", state: "WAITING_REVIEW", ids: ["variant-1"], mode: "AUTOMATION", multipleVersions: false, secondAccount: false,
 }));
-vi.mock("@/hooks/use-auth", () => ({ useCurrentUser: () => ({ data: { role: "ADMIN" } }) }));
+vi.mock("@/hooks/use-auth", () => ({ useCurrentUser: () => ({ data: { role: mocks.role } }) }));
 vi.mock("@/hooks/use-resources", () => ({
   useAiCampaigns: () => ({ data: { items: [{ id: "campaign-1", name: "Launch", reviewMode: mocks.mode, status: "DRAFT", content: { id: "content-1" }, automationState: mocks.state, automationVariantIds: mocks.ids, automationAccountIds: mocks.secondAccount ? ["account-1", "account-2"] : ["account-1"], createdAt: "2026-11-02T00:00:00Z" }] } }),
   useAccounts: () => ({ data: { items: [{ id: "account-1", name: "DEV account", enabled: true, status: "CONNECTED", platform: { slug: "devto", name: "DEV", mode: "OFFICIAL_API" } },
@@ -20,6 +20,7 @@ vi.mock("@/services/resources.service", () => ({ resourcesService: { reviewAiCam
 
 describe("AI content waiting for review", () => {
   beforeEach(() => {
+    mocks.role = "ADMIN";
     mocks.state = "WAITING_REVIEW";
     mocks.mode = "AUTOMATION";
     mocks.multipleVersions = false;
@@ -181,8 +182,55 @@ describe("AI content waiting for review", () => {
     fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
     expect(screen.queryByRole("group", { name: "Duyệt bài DEV" })).not.toBeInTheDocument();
     expect(screen.getByText(/Đã duyệt: bài vào hàng đợi đăng/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Khôi phục/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Duyệt hết bài còn chờ (0)" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "Edit nội dung" }));
     expect(screen.getByLabelText("Nội dung · DEV")).toHaveAttribute("readonly");
   });
+  it("restores a rejected campaign and opens its unchanged content for review", async () => {
+    mocks.state = "REJECTED";
+    const { rerender } = render(<AiContentView />);
+    fireEvent.click(screen.getByRole("tab", { name: "Đã từ chối" }));
+    mocks.review.mockImplementation(async () => { mocks.state = "WAITING_REVIEW"; });
+    fireEvent.click(screen.getByRole("button", { name: "Khôi phục để duyệt" }));
+    await waitFor(() => expect(mocks.review).toHaveBeenCalledWith("campaign-1", "restore"));
+    rerender(<AiContentView />);
+    expect(screen.getByRole("tab", { name: "Chờ duyệt" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByLabelText("Nội dung · DEV")).toHaveValue("Original body");
+    expect(screen.getByRole("button", { name: "Duyệt bài này" })).toBeEnabled();
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.reviewVariant).not.toHaveBeenCalled();
+  });
+
+  it.each(["REJECTED", "WAITING_REVIEW", "APPROVED"])("restores one rejected post in a %s campaign", async (state) => {
+    mocks.state = state;
+    mocks.variantStatus = "REJECTED";
+    render(<AiContentView />);
+    fireEvent.click(screen.getByRole("button", { name: state === "WAITING_REVIEW" ? "Review & duyệt" : "Review nội dung" }));
+    fireEvent.click(screen.getByRole("button", { name: "Khôi phục bài này" }));
+    await waitFor(() => expect(mocks.reviewVariant).toHaveBeenCalledWith("campaign-1", "variant-1", "restore", undefined));
+    expect(mocks.review).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Nội dung · DEV")).toHaveValue("Original body");
+  });
+
+  it("keeps the rejected item visible when restoration fails", async () => {
+    mocks.state = "REJECTED";
+    mocks.review.mockRejectedValue(new Error("Không thể khôi phục"));
+    render(<AiContentView />);
+    fireEvent.click(screen.getByRole("tab", { name: "Đã từ chối" }));
+    fireEvent.click(screen.getByRole("button", { name: "Khôi phục để duyệt" }));
+    await waitFor(() => expect(mocks.review).toHaveBeenCalled());
+    expect(screen.getByRole("tab", { name: "Đã từ chối" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Khôi phục để duyệt" })).toBeEnabled();
+  });
+
+  it("does not offer restoration to viewers or for approved posts", () => {
+    mocks.role = "VIEWER";
+    mocks.state = "REJECTED";
+    mocks.variantStatus = "REJECTED";
+    render(<AiContentView />);
+    fireEvent.click(screen.getByRole("button", { name: "Review nội dung" }));
+    expect(screen.queryByRole("button", { name: /Khôi phục/ })).not.toBeInTheDocument();
+  });
+
 });
