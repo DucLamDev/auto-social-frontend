@@ -8,6 +8,14 @@ vi.mock("next/navigation", () => ({ usePathname: () => nav.pathname }));
 const renderSidebar = () => render(<Sidebar collapsed={false} mobileOpen={false} onCollapse={() => {}} onMobileClose={() => {}} />);
 
 describe("Sidebar", () => {
+  it("shows the VPSTTT logo, named only when the menu is collapsed and no app name is shown", () => {
+    const { container, rerender } = renderSidebar();
+    expect(container.querySelector('img[src="/logo_light(100x100).png"]')).toHaveAttribute("alt", "");
+    rerender(<Sidebar collapsed mobileOpen={false} onCollapse={() => {}} onMobileClose={() => {}} />);
+    expect(screen.getByRole("img", { name: "Social Publisher" })).toHaveAttribute("src", "/logo_light(100x100).png");
+  });
+
+
   it("has no separate Content Studio entry", () => {
     renderSidebar();
     expect(screen.queryByRole("link", { name: "Content Studio" })).not.toBeInTheDocument();

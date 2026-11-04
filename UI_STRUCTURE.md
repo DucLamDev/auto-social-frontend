@@ -24,7 +24,8 @@
 - `components/ui`: repository-owned shadcn-style buttons, cards, form controls, badges, tables, modal, pagination, skeleton and async states.
 - `components/layout`: responsive sidebar/topbar shell and page headings.
 - `components/auth`: authentication guard and role-aware control visibility.
-- `components/platforms`: consistent platform marks without external image dependencies.
+- `components/platforms`: consistent platform marks without external image requests: simple-icons logos, saved site logos in `public/platform-logos/` for the rest, a letter when neither exists.
+- `components/layout/app-logo.tsx`: VPSTTT logo (`public/logo_light(100x100).png`) for the sidebar and login page; `app/icon.png` is the same file for the browser tab.
 
 Desktop has a collapsible sidebar and dense tables. On tablet/mobile the sidebar becomes an overlay, page actions stack, modals fit the viewport, grids collapse, and operational tables scroll horizontally.
 

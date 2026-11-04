@@ -8,7 +8,7 @@ import {
 } from "simple-icons";
 import { cn } from "@/lib/utils";
 
-/** Letters are kept for platforms without a brand logo (LinkedIn, Tinhte, Voz…). */
+/** Letters are kept for platforms with no logo at all (Hub, KubeBy…). */
 const colors: Record<string, string> = { instagram: "from-fuchsia-500 to-orange-400", threads: "from-slate-800 to-black", x: "from-slate-800 to-black", linkedin: "from-blue-600 to-blue-500", wordpress: "from-sky-700 to-sky-500", blogger: "from-orange-500 to-amber-400", devto: "from-slate-800 to-slate-600", discord: "from-indigo-600 to-violet-500", discourse: "from-cyan-600 to-blue-600", reddit: "from-orange-600 to-orange-400", bluesky: "from-sky-500 to-cyan-400", mastodon: "from-indigo-600 to-purple-500", tiktok: "from-slate-950 to-pink-500" };
 
 /**
@@ -31,7 +31,26 @@ const brands: Record<string, SimpleIcon> = {
   rediscommunityforum: siRedis, tiktok: siTiktok, discourse: siDiscourse,
 };
 
+/**
+ * Logos not in simple-icons, saved from each platform's own site icon (LinkedIn and
+ * AWS from Wikimedia Commons, aaPanel from its favicon) as 96px PNGs in
+ * `public/platform-logos/`. Same keys as `brands`.
+ */
+const LOGO_FILES: Record<string, string> = {
+  linkedin: "linkedin", awscommunity: "aws-community", tinhte: "tinhte", tinhtevn: "tinhte", vozforums: "voz-forums",
+  voz: "voz-forums", discuit: "discuit", discuitorg: "discuit", dzone: "dzone", differ: "differ",
+  level1techsforum: "level1techs-forum", scoopit: "scoop-it", directadminforums: "directadmin-forums",
+  warriorforum: "warrior-forum", eventbrite: "eventbrite", hestiacpforum: "hestiacp-forum", aapanelforum: "aapanel-forum",
+  cloudpanelforum: "cloudpanel-forum",
+};
+
 export const platformKey = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/** Image logo for a platform slug (preferred) or display name; undefined when none is saved. */
+export function platformLogoUrl(slug: string | undefined, name: string): string | undefined {
+  const file = (slug ? LOGO_FILES[platformKey(slug)] : undefined) ?? LOGO_FILES[platformKey(name)];
+  return file ? `/platform-logos/${file}.png` : undefined;
+}
 
 /** Brand logo for a platform slug (preferred) or display name; undefined when none is bundled. */
 export function platformBrand(slug: string | undefined, name: string): SimpleIcon | undefined {
@@ -52,6 +71,11 @@ export function PlatformMark({ slug, name, size = "md" }: { slug?: string; name:
   const key = platformKey(slug || name);
   const brand = platformBrand(slug, name);
   const box = cn("grid shrink-0 place-items-center shadow-sm", size === "xs" ? "size-6 rounded-lg text-[9px]" : "rounded-xl", size === "sm" && "size-8 text-[10px]", size === "md" && "size-10 text-xs", size === "lg" && "size-12 text-sm");
+  const logoUrl = brand ? undefined : platformLogoUrl(slug, name);
+  if (logoUrl) {
+    // eslint-disable-next-line @next/next/no-img-element -- small static file, no resizing needed
+    return <span aria-hidden data-platform-logo={key} className={cn(box, "overflow-hidden bg-white p-[3px] ring-1 ring-inset ring-black/10")}><img src={logoUrl} alt="" width={96} height={96} loading="lazy" decoding="async" className="size-full object-contain" /></span>;
+  }
   if (brand) {
     return <span aria-hidden data-platform-logo={brand.slug} className={cn(box, "ring-1 ring-inset ring-black/10")} style={{ backgroundColor: `#${brand.hex}`, color: glyphColor(brand.hex) }}>
       <svg viewBox="0 0 24 24" fill="currentColor" className="size-[55%]" focusable="false"><path d={brand.path} /></svg>
