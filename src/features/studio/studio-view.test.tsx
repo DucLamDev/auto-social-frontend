@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AiProviderOption } from "@/types/domain";
 import { StudioView } from "./studio-view";
@@ -9,7 +10,10 @@ const mocks = vi.hoisted(() => ({
   contentRefetch: vi.fn(),
   variantsRefetch: vi.fn(),
   useAiProviders: vi.fn(),
+  variants: [] as Array<Record<string, unknown>>,
+  preview: vi.fn(),
 }));
+vi.mock("@/services/resources.service", () => ({ resourcesService: { previewVariant: mocks.preview } }));
 
 vi.mock("@/hooks/use-auth", () => ({
   useCurrentUser: () => ({ data: { role: "ADMIN" } }),
@@ -35,7 +39,7 @@ vi.mock("@/hooks/use-resources", () => ({
   usePlatforms: () => ({ data: { items: [] }, isPending: false, isError: false }),
   useResourceMutation: () => ({ isPending: false, mutateAsync: mocks.mutateAsync }),
   useVariants: () => ({
-    data: { items: [] },
+    data: { items: mocks.variants },
     isPending: false,
     isError: false,
     error: null,
@@ -67,6 +71,7 @@ describe("StudioView AI provider state", () => {
     mocks.contentRefetch.mockReset();
     mocks.variantsRefetch.mockReset();
     mocks.useAiProviders.mockReset().mockReturnValue(providerQuery());
+    mocks.variants = [];
   });
 
   it("keeps the provider area visible while the catalog is loading", () => {
@@ -139,5 +144,22 @@ describe("StudioView AI provider state", () => {
     expect(screen.getByRole("radio", { name: "DeepSeek" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "Gemini (chưa cấu hình)" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Mở thư viện" })).toBeInTheDocument();
+  });
+});
+
+describe("StudioView platform preview", () => {
+  it("previews a variant as its platform shows it, including unsaved edits", async () => {
+    mocks.useAiProviders.mockReturnValue(providerQuery());
+    mocks.variants = [{ id: "variant-1", contentId: "content-1", platform: "Mastodon", platformSlug: "mastodon", title: null, body: "Saved body", status: "GENERATED", updatedAt: "2026-11-04T00:00:00Z" }];
+    mocks.preview.mockReset().mockResolvedValue({ title: "", body: "Edited body #VPS", format: "plain", tags: [], group: "SOCIAL", engine: "mastodon", maxChars: 500, length: 16, overLimit: false });
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><StudioView contentId="content-1" /></QueryClientProvider>);
+    fireEvent.change(screen.getByLabelText("Nội dung biến thể"), { target: { value: "Edited body #VPS" } });
+    fireEvent.click(screen.getByRole("tab", { name: "Xem trước" }));
+    expect(await screen.findByText("#VPS")).toBeInTheDocument();
+    expect(screen.getByText(/16\/500 ký tự/)).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    expect(mocks.preview).toHaveBeenLastCalledWith("variant-1", { title: "", body: "Edited body #VPS" });
+    fireEvent.click(screen.getByRole("tab", { name: "Sửa" }));
+    expect(screen.getByLabelText("Nội dung biến thể")).toHaveValue("Edited body #VPS");
   });
 });

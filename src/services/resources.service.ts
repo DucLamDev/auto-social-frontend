@@ -282,6 +282,10 @@ export const resourcesService = {
   async reviewAiCampaign(id: string, action: "approve" | "reject" | "retry-generation", options?: { publishMode: "NOW" | "SCHEDULED"; scheduledAt?: string }) {
     return apiRequest<RawAutomateCampaignResult>(`/campaigns/${id}/${action}`, { method: "POST", ...(options ? { body: options } : {}) });
   },
+  /** Approves (now or at a time) or rejects one platform's draft of an AI review; the other platforms keep waiting. */
+  async reviewAiVariant(campaignId: string, variantId: string, action: "approve" | "reject", options?: { publishMode: "NOW" | "SCHEDULED"; scheduledAt?: string }) {
+    return apiRequest<RawAutomateCampaignResult>(`/campaigns/${campaignId}/variants/${variantId}/${action}`, { method: "POST", ...(options ? { body: options } : {}) });
+  },
   async aiReviewContents() {
     const raw = await apiList<RawCampaign>("/campaigns/ai-review");
     return result(raw, raw.items.map(mapCampaign));
