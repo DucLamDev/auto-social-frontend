@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { ArrowLeft, Bot, Check, Copy, ExternalLink, Eye, FilePenLine, FileText, Paperclip, Pencil, RefreshCw, Save, Sparkles, Upload } from "lucide-react";
+import { ArrowLeft, Bot, Check, Copy, ExternalLink, Eye, FilePenLine, Paperclip, Pencil, RefreshCw, Save, Sparkles, Upload } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/auth/permission-gate";
@@ -132,14 +132,14 @@ function VariantEditor({ variant, account }: { variant: ContentVariant; account?
   </div>}<PermissionGate allow={["ADMIN", "EDITOR"]}><div className="flex justify-end gap-2 border-t border-border px-5 py-4"><Button variant="secondary" loading={save.isPending} onClick={() => void saveVariant()}><Save className="size-4" />Lưu</Button><Button loading={approve.isPending} onClick={() => void approve.mutateAsync(undefined).then(() => toast.success("Đã duyệt biến thể")).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không thể duyệt"))}><Check className="size-4" />Duyệt</Button></div></PermissionGate></div>;
 }
 
-export function StudioView({ contentId }: { contentId?: string }) {
-  const content = useContent(contentId ?? ""); const variants = useVariants(contentId ?? ""); const [activeId, setActiveId] = useState<string | null>(null);
+export function StudioView({ contentId }: { contentId: string }) {
+  const content = useContent(contentId); const variants = useVariants(contentId); const [activeId, setActiveId] = useState<string | null>(null);
   const platforms = usePlatforms({ limit: 100 }); const accounts = useAccounts({ limit: 200, status: "CONNECTED" });
   const aiProviders = useAiProviders(); const [aiProvider, setAiProvider] = useState<AiProviderId | "">("");
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false); const [manualPlatform, setManualPlatform] = useState("");
   const [manualTitle, setManualTitle] = useState(""); const [manualBody, setManualBody] = useState(""); const [manualHashtags, setManualHashtags] = useState("");
-  const generate = useResourceMutation((provider: AiProviderId) => resourcesService.generateVariants(contentId ?? "", undefined, provider), ["variants", "contents", "content"]);
+  const generate = useResourceMutation((provider: AiProviderId) => resourcesService.generateVariants(contentId, undefined, provider), ["variants", "contents", "content"]);
   const createManual = useResourceMutation((input: { contentId: string; platformSlug: string; title?: string; body: string; hashtags?: string[] }) => resourcesService.createVariant(input), ["variants", "contents", "content"]);
   const configuredAiProviders = (aiProviders.data ?? []).filter((provider) => provider.configured);
   const effectiveAiProvider = configuredAiProviders.find((provider) => provider.id === aiProvider)?.id
@@ -147,9 +147,9 @@ export function StudioView({ contentId }: { contentId?: string }) {
     || configuredAiProviders[0]?.id
     || "";
   const providerPicker = <AiProviderPicker providers={aiProviders.data} selected={effectiveAiProvider} onSelect={(provider) => { setAiProvider(provider); setGenerationError(null); }} pending={aiProviders.isPending} error={aiProviders.isError ? aiProviders.error : null} generationError={generationError} onRetry={() => void aiProviders.refetch()} />;
-  if (!contentId) return <div className="animate-enter"><PageHeader eyebrow="AI Workspace" title="Content Studio" description="Các provider AI khả dụng hiển thị bên dưới. Mở một nội dung để bắt đầu tạo biến thể." />{providerPicker}<Card><EmptyState title="Chọn một nội dung để bắt đầu" description="Content Studio làm việc trên một canonical content tại một thời điểm." action={<Link href="/contents" className={buttonVariants({ variant: "primary" })}><FileText className="size-4" />Mở thư viện</Link>} /></Card></div>;
+  const backToLibrary = <Link href="/contents" className={buttonVariants({ variant: "secondary" })}><ArrowLeft className="size-4" />Thư viện</Link>;
   if (content.isPending || variants.isPending) return <PageLoader />;
-  if (content.isError || variants.isError) return <><PageHeader title="Content Studio" />{providerPicker}<Card><ErrorState error={content.error || variants.error} onRetry={() => { void content.refetch(); void variants.refetch(); }} /></Card></>;
+  if (content.isError || variants.isError) return <><PageHeader eyebrow="Thư viện nội dung" title="Content Studio" action={backToLibrary} />{providerPicker}<Card><ErrorState error={content.error || variants.error} onRetry={() => { void content.refetch(); void variants.refetch(); }} /></Card></>;
   const item = content.data; const variantItems = variants.data?.items ?? []; const selected = variantItems.find((variant) => variant.id === activeId) ?? variantItems[0];
   const enabledPlatforms = (platforms.data?.items ?? []).filter((platform) => platform.enabled);
   const connectedPlatformIds = new Set((accounts.data?.items ?? []).filter((account) => account.enabled && account.status === "CONNECTED").map((account) => account.platformId));
@@ -172,7 +172,7 @@ export function StudioView({ contentId }: { contentId?: string }) {
       setActiveId(created.id); setManualOpen(false); toast.success("Đã tạo biến thể thủ công");
     } catch (error) { toast.error(error instanceof Error ? error.message : "Không thể tạo biến thể thủ công"); }
   };
-  return <div className="animate-enter"><PageHeader eyebrow="AI Workspace" title="Content Studio" description="So sánh nội dung gốc và tinh chỉnh biến thể trước khi phê duyệt." action={<div className="flex flex-wrap gap-2"><Link href="/contents" className={buttonVariants({ variant: "secondary" })}><ArrowLeft className="size-4" />Thư viện</Link><PermissionGate allow={["ADMIN", "EDITOR"]}><Button variant="secondary" onClick={openManual}><FilePenLine className="size-4" />Tạo thủ công</Button><Button disabled={!effectiveAiProvider} loading={generate.isPending} onClick={() => void runGenerate()}><Sparkles className="size-4" />{variantItems.length ? "Tạo lại bằng AI" : "Tạo bằng AI"}</Button></PermissionGate></div>} />
+  return <div className="animate-enter"><PageHeader eyebrow="Thư viện nội dung" title="Content Studio" description="So sánh nội dung gốc và tinh chỉnh biến thể trước khi phê duyệt." action={<div className="flex flex-wrap gap-2">{backToLibrary}<PermissionGate allow={["ADMIN", "EDITOR"]}><Button variant="secondary" onClick={openManual}><FilePenLine className="size-4" />Tạo thủ công</Button><Button disabled={!effectiveAiProvider} loading={generate.isPending} onClick={() => void runGenerate()}><Sparkles className="size-4" />{variantItems.length ? "Tạo lại bằng AI" : "Tạo bằng AI"}</Button></PermissionGate></div>} />
     {providerPicker}
     <div className="grid gap-5 xl:grid-cols-[.86fr_1.14fr]"><Card className="overflow-hidden"><div className="flex items-center justify-between border-b border-border px-5 py-4"><div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Nội dung gốc</p><h2 className="mt-1 font-bold">{item.title}</h2></div><Badge value={item.status} /></div><article className="max-h-[650px] overflow-y-auto p-6"><p className="mb-5 text-xs text-muted">{item.source?.name ?? "Nội dung thủ công"} · {formatDate(item.createdAt)}</p>{item.description && <p className="mb-5 rounded-xl border-l-4 border-indigo-300 bg-indigo-50 p-4 text-sm font-medium leading-6 text-indigo-900">{item.description}</p>}<div className="whitespace-pre-wrap text-sm leading-7 text-slate-700">{item.body || "Nội dung gốc chưa được backend trả về."}</div></article></Card>
       <Card className="overflow-hidden">{variantItems.length ? <><div className="flex gap-1 overflow-x-auto border-b border-border bg-slate-50 px-3 pt-3">{variantItems.map((variant) => <button key={variant.id} onClick={() => setActiveId(variant.id)} className={cn("flex shrink-0 items-center gap-2 rounded-t-xl px-4 py-3 text-xs font-bold transition", selected?.id === variant.id ? "border border-b-white border-border bg-white text-primary" : "text-slate-500 hover:bg-white/70")}><PlatformMark slug={variant.platformSlug} name={variant.platform} size="sm" />{variant.platform}</button>)}</div>{selected && <VariantEditor key={selected.id} variant={selected} account={(accounts.data?.items ?? []).find((account) => account.platform?.slug === selected.platformSlug)} />}</> : <EmptyState title="Chưa có biến thể" description="Tạo thủ công để đăng ngay không cần AI, hoặc chọn một provider đã cấu hình để tạo biến thể." action={<PermissionGate allow={["ADMIN", "EDITOR"]}><div className="flex flex-wrap justify-center gap-2"><Button variant="secondary" onClick={openManual}><FilePenLine className="size-4" />Tạo thủ công</Button><Button disabled={!effectiveAiProvider} loading={generate.isPending} onClick={() => void runGenerate()}><Sparkles className="size-4" />Tạo bằng AI</Button></div></PermissionGate>} />}</Card></div>
