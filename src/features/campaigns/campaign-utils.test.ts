@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ContentVariant, PlatformAccount } from "@/types/domain";
-import { canAddAutomationAccount, countAutomationPlatforms, defaultAutomationAccountIds, deriveAutomationCampaignName, getApprovedVariantForAccount, getAutomationAccountBlocker, getEligibleAccounts, includeImageAltText, isAutomationAccountEligible, isCampaignReadyContent, MAX_AUTOMATION_PLATFORMS, normalizeAutomationAccountIds, reviewOutcomeWarning, aiScore, normalizeMinScore } from "./campaign-utils";
+import { canAddAutomationAccount, countAutomationPlatforms, defaultAutomationAccountIds, deriveAutomationCampaignName, getApprovedVariantForAccount, getAutomationAccountBlocker, getEligibleAccounts, includeImageAltText, isAutomationAccountEligible, isCampaignReadyContent, MAX_AUTOMATION_PLATFORMS, normalizeAutomationAccountIds, reviewOutcomeWarning, aiScore, normalizeMinScore, reviewPoints } from "./campaign-utils";
 
 const account: PlatformAccount = { id: "a1", platformId: "p1", platform: { id: "p1", name: "LinkedIn", slug: "linkedin" }, name: "Company", enabled: true, status: "CONNECTED" };
 const variants: ContentVariant[] = [
@@ -102,6 +102,25 @@ describe("AI score in a review note", () => {
     expect(aiScore("Cần xem lại (AI chấm 5/10): Mở bài chung chung")).toBe(5);
     expect(aiScore("Hợp người đọc (AI chưa chấm được)")).toBeNull();
     expect(aiScore(null)).toBeNull();
+  });
+});
+
+describe("recommendations in a review note", () => {
+  it("splits the fixes the server joined with \"; \", keeping a fix that itself continues after \"; \"", () => {
+    const reason = "Cần xem lại (AI chấm 7/10): Thông tin chưa có căn cứ: I write for vpsttt (the brief does not state this); Lời mở đầu hơi chung chung; nên mở bằng một tình huống cụ thể.; Câu 'Nothing above depends on them' khiến phần giới thiệu yếu; 'The VM works' là lỗi mẫu";
+    expect(reviewPoints(reason)).toEqual([
+      "Thông tin chưa có căn cứ: I write for vpsttt (the brief does not state this)",
+      "Lời mở đầu hơi chung chung; nên mở bằng một tình huống cụ thể.",
+      "Câu 'Nothing above depends on them' khiến phần giới thiệu yếu",
+      "'The VM works' là lỗi mẫu",
+    ]);
+  });
+
+  it("returns one point for a single fix, nothing for an empty note, and drops repeats", () => {
+    expect(reviewPoints("Cần xem lại (AI chưa chấm được): điểm dưới 7/10")).toEqual(["điểm dưới 7/10"]);
+    expect(reviewPoints("Cần xem lại (AI chấm 5/10): Thiếu số liệu; Thiếu số liệu")).toEqual(["Thiếu số liệu"]);
+    expect(reviewPoints("")).toEqual([]);
+    expect(reviewPoints(null)).toEqual([]);
   });
 });
 

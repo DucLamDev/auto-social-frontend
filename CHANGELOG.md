@@ -3,6 +3,18 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.18.0 · 04/11/2026
+### Tính năng
+- Sửa bài theo khuyến nghị của AI ngay trong khung ghi chú
+  Cần backend 1.16.0 trở lên. Ở trang Content đợi duyệt, khung vàng "AI đề nghị kiểm tra" nay:
+  - tách ghi chú thành từng khuyến nghị, mỗi mục một dòng có ô tick (mặc định tick hết);
+  - có nút "Sửa theo N khuyến nghị đã chọn": AI viết lại bài chỉ theo các mục còn tick rồi chấm lại, thường 1–3 phút.
+    Bỏ tick mục bạn không đồng ý, ví dụ muốn giữ câu giới thiệu thương hiệu;
+  - nút khoá khi bài đang được sửa tay chưa lưu, hoặc không còn mục nào được tick, kèm lời nhắc;
+  - người chỉ có quyền xem, bài đã duyệt hoặc bài đang được AI viết lại thì chỉ thấy danh sách, không có ô tick và nút.
+  Khi đang viết lại, bài hiện "AI đang viết lại bài này theo N khuyến nghị đã chọn". Nút "Viết lại bằng AI" kèm hướng
+  dẫn tự gõ vẫn giữ như cũ.
+
 ## 1.17.0 · 04/11/2026
 ### Tính năng
 - Trang Tài khoản chia 2 tab, bỏ trang Nền tảng (cần backend 1.15.0)

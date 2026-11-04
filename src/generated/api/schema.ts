@@ -1758,7 +1758,7 @@ export interface components {
             mediaRecommendation?: {
                 [key: string]: unknown;
             } | null;
-            /** @description Last "rewrite with AI" request: status generating | done | failed, instruction, startedAt, finishedAt, error. */
+            /** @description Last "rewrite with AI" request: status generating | done | failed, instruction, notes (review points chosen by the operator, when sent), startedAt, finishedAt, error. */
             aiRevision?: {
                 [key: string]: unknown;
             } | null;
@@ -1896,6 +1896,8 @@ export interface components {
         RewriteVariantDto: {
             /** @description What to change, in the operator's words; the last review notes are added automatically. */
             instruction?: string;
+            /** @description Review recommendations the operator chose to apply ("Sửa theo khuyến nghị"). When sent, they replace the automatic review notes: the AI fixes only these. */
+            notes?: string[];
             /**
              * @description AI provider; the default one when omitted.
              * @enum {string}

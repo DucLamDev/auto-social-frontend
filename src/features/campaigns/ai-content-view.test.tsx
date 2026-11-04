@@ -379,15 +379,63 @@ describe("AI content waiting for review", () => {
     } finally { Element.prototype.scrollIntoView = original; }
   });
 
-  it("cuts a long AI note to three lines until it is opened", () => {
+  it("cuts long AI recommendations to two lines each until opened", () => {
     mocks.review_ = { recommended: false, reason: `Cần xem lại (AI chấm 6/10): ${"Câu này cần kiểm chứng lại. ".repeat(12)}` };
     render(<AiContentView />);
     fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
-    const note = () => screen.getByText("AI đề nghị kiểm tra:").closest("p");
-    expect(note()).toHaveClass("line-clamp-3");
+    const point = () => screen.getByText(/^Câu này cần kiểm chứng lại/);
+    expect(point()).toHaveClass("line-clamp-2");
     fireEvent.click(screen.getByRole("button", { name: "Xem đủ ghi chú" }));
-    expect(note()).not.toHaveClass("line-clamp-3");
+    expect(point()).not.toHaveClass("line-clamp-2");
     expect(screen.getByRole("button", { name: "Thu gọn ghi chú" })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("fixes a post following only the AI recommendations left ticked", async () => {
+    mocks.review_ = { recommended: false, reason: "Cần xem lại (AI chấm 7/10): Thông tin chưa có căn cứ: I write for vpsttt; Lời mở đầu hơi chung chung; Thêm một ví dụ cụ thể" };
+    render(<AiContentView />);
+    fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    const advice = screen.getByRole("region", { name: "Khuyến nghị của AI · DEV" });
+    expect(advice).toHaveTextContent("AI đề nghị kiểm tra (3 điểm)");
+    expect(within(advice).getAllByRole("checkbox").every((box) => (box as HTMLInputElement).checked)).toBe(true);
+    // Keep the disclosure: untick it.
+    fireEvent.click(within(advice).getByRole("checkbox", { name: "Thông tin chưa có căn cứ: I write for vpsttt" }));
+    fireEvent.click(within(advice).getByRole("button", { name: "Sửa theo 2 khuyến nghị đã chọn" }));
+    await waitFor(() => expect(mocks.rewrite).toHaveBeenCalledWith("variant-1", undefined, ["Lời mở đầu hơi chung chung", "Thêm một ví dụ cụ thể"]));
+  });
+
+  it("asks to save or drop an edit first, and needs at least one ticked recommendation", () => {
+    mocks.review_ = { recommended: false, reason: "Cần xem lại (AI chấm 6/10): Lời mở đầu hơi chung chung" };
+    render(<AiContentView />);
+    fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    const advice = screen.getByRole("region", { name: "Khuyến nghị của AI · DEV" });
+    fireEvent.click(within(advice).getByRole("checkbox", { name: "Lời mở đầu hơi chung chung" }));
+    expect(within(advice).getByRole("button", { name: "Sửa theo 0 khuyến nghị đã chọn" })).toBeDisabled();
+    expect(advice).toHaveTextContent("Tick ít nhất một khuyến nghị.");
+    fireEvent.click(within(advice).getByRole("checkbox", { name: "Lời mở đầu hơi chung chung" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sửa bài DEV" }));
+    fireEvent.change(screen.getByLabelText("Nội dung · DEV"), { target: { value: "Đang sửa tay" } });
+    expect(within(advice).getByRole("button", { name: "Sửa theo 1 khuyến nghị đã chọn" })).toBeDisabled();
+    expect(advice).toHaveTextContent("Lưu hoặc huỷ phần đang sửa của bài này trước.");
+    expect(mocks.rewrite).not.toHaveBeenCalled();
+  });
+
+  it("only lists the recommendations for viewers and while the AI is rewriting", () => {
+    mocks.review_ = { recommended: false, reason: "Cần xem lại (AI chấm 6/10): Lời mở đầu hơi chung chung" };
+    mocks.role = "VIEWER";
+    const { unmount } = render(<AiContentView />);
+    fireEvent.click(screen.getByRole("button", { name: /Review/ }));
+    let advice = screen.getByRole("region", { name: "Khuyến nghị của AI · DEV" });
+    expect(advice).toHaveTextContent("Lời mở đầu hơi chung chung");
+    expect(within(advice).queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(within(advice).queryByRole("button")).not.toBeInTheDocument();
+    unmount();
+    mocks.role = "ADMIN";
+    mocks.revision = { status: "generating", notes: ["Lời mở đầu hơi chung chung"] } as typeof mocks.revision;
+    render(<AiContentView />);
+    fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    advice = screen.getByRole("region", { name: "Khuyến nghị của AI · DEV" });
+    expect(within(advice).queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("AI đang viết lại bài này theo 1 khuyến nghị đã chọn");
   });
 
 });
