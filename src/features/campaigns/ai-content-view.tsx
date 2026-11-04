@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { CalendarClock, Check, ChevronDown, ChevronUp, CircleAlert, Clock3, Eye, LoaderCircle, Pencil, RefreshCw, Save, Sparkles, Star, Undo2, X } from "lucide-react";
+import { CalendarClock, Check, ChevronDown, ChevronUp, CircleAlert, Clock3, Eye, FileText, LoaderCircle, Pencil, RefreshCw, Save, Sparkles, Star, Undo2, X } from "lucide-react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import { PageHeader } from "@/components/layout/page-header";
@@ -88,15 +88,16 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
   const [edits, setEdits] = useState<Record<string, { title: string; body: string }>>({});
   // Editing is opened post by post, from that post's own "Sửa bài" button.
   const [editingIds, setEditingIds] = useState<Record<string, boolean>>({});
-  const [view, setView] = useState<"content" | "preview">("content");
+  // Each post is read as its text or as its social-media preview, chosen on its own card.
+  const [views, setViews] = useState<Record<string, "content" | "preview">>({});
   // "all" schedules every draft still waiting; a variant id schedules only that platform.
   const [scheduleTarget, setScheduleTarget] = useState<string | null>(null);
   const scheduleOpen = scheduleTarget !== null;
   const setScheduleOpen = (open: boolean) => setScheduleTarget(open ? "all" : null);
   const [accountIds, setAccountIds] = useState<string[]>([]);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
-  // Approved posts are folded to one line; the operator can open one to read it again.
-  const [openApproved, setOpenApproved] = useState<Record<string, boolean>>({});
+  // Every post starts folded to its header and decision buttons; the operator opens the ones to read.
+  const [openPosts, setOpenPosts] = useState<Record<string, boolean>>({});
   const [minScore, setMinScore] = useState(readApproveMinScore);
   // What is typed; it becomes the threshold only when it is a whole score from 1 to 10.
   const [minScoreText, setMinScoreText] = useState(() => String(minScore));
@@ -215,20 +216,26 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
   if (variants.isError) return <ErrorState error={variants.error} onRetry={() => void variants.refetch()} />;
   return <div className="space-y-5 border-t border-border bg-slate-50/70 p-5">
     {campaign.reviewMode === "EXISTING_CAMPAIGN" && <p className="rounded-xl bg-slate-50 p-3 text-sm text-muted">Các biến thể này đã gắn với chiến dịch trước đây. Theo dõi và xử lý từng bài ở <Link href="/publishing" className="font-semibold text-primary underline">Publishing</Link>.</p>}
-    <div role="tablist" aria-label="Cách xem nội dung" className="inline-flex flex-wrap rounded-xl border border-border bg-slate-50 p-1">
-      {([["content", "Nội dung", Pencil], ["preview", "Xem trước như trên mạng xã hội", Eye]] as const).map(([value, label, Icon]) => <button key={value} type="button" role="tab" aria-selected={view === value} onClick={() => setView(value)}
-        className={cn("inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold transition", view === value ? "bg-white text-primary shadow-sm" : "text-slate-600 hover:text-slate-900")}><Icon aria-hidden className="size-4" />{label}</button>)}
-    </div>
     {media.data?.items.map((asset) => <p key={asset.id} className="text-sm">{asset.publicUrl ? <a href={asset.publicUrl} target="_blank" rel="noreferrer" className="font-semibold text-primary underline">Xem tệp đính kèm{asset.altText ? `: ${asset.altText}` : ""}</a> : `Tệp đính kèm: ${asset.mimeType}`}</p>)}
-    {perPost && items.length > 1 && <nav aria-label="Đi tới bài của từng kênh" className="flex flex-wrap gap-1.5">
-      {items.map((variant) => { const tone = postTone[postStateOf(variant)]; return <button key={variant.id} type="button" onClick={() => jumpToPost(variant.id)}
-        className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border bg-white py-1 pl-1 pr-3 text-xs font-semibold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50/60">
-        <PlatformMark slug={variant.platformSlug} name={variant.platform} size="xs" />{variant.platform}
-        <span aria-hidden className={cn("size-2 rounded-full", tone.dot)} /><span className="sr-only">({tone.label})</span>
-      </button>; })}
-    </nav>}
+    {items.length > 1 && <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-semibold text-slate-600">{items.length} bài · bấm tên kênh để mở và đi tới bài đó</p>
+        <div className="flex gap-1">
+          <Button size="sm" variant="ghost" onClick={() => setOpenPosts(Object.fromEntries(items.map((variant) => [variant.id, true])))}><ChevronDown className="size-4" />Mở hết</Button>
+          <Button size="sm" variant="ghost" onClick={() => setOpenPosts({})}><ChevronUp className="size-4" />Thu gọn hết</Button>
+        </div>
+      </div>
+      <nav aria-label="Đi tới bài của từng kênh" className="flex flex-wrap gap-1.5">
+        {items.map((variant) => { const tone = postTone[postStateOf(variant)]; return <button key={variant.id} type="button" onClick={() => { setOpenPosts((current) => ({ ...current, [variant.id]: true })); jumpToPost(variant.id); }}
+          className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border bg-white py-1 pl-1 pr-3 text-xs font-semibold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50/60">
+          <PlatformMark slug={variant.platformSlug} name={variant.platform} size="xs" />{variant.platform}
+          <span aria-hidden className={cn("size-2 rounded-full", tone.dot)} />{tone.label && <span className="sr-only">({tone.label})</span>}
+        </button>; })}
+      </nav>
+    </div>}
     {items.map((variant, index) => {
-      const folded = perPost && variant.status === "APPROVED" && !openApproved[variant.id];
+      const folded = !openPosts[variant.id];
+      const view = views[variant.id] ?? "content";
       const state = postStateOf(variant);
       const score = aiScore(variant.reason);
       const postAccounts = campaignAccounts.filter((account) => account.platform?.slug === variant.platformSlug).map((account) => account.name);
@@ -243,7 +250,7 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
         ? <><Button size="sm" variant="secondary" disabled={busy || !edit || !edit.body.trim()} loading={saveOne.isPending && saveOne.variables?.id === variant.id}
             onClick={() => edit && void saveOne.mutateAsync({ id: variant.id, input: edit }).then(() => { closeEdit(variant.id); toast.success(`Đã lưu bài ${variant.platform}`); }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không thể lưu"))}><Save className="size-4" />Lưu bài này</Button>
           <Button size="sm" variant="ghost" disabled={busy} onClick={() => closeEdit(variant.id)}>Huỷ sửa</Button></>
-        : <Button size="sm" variant="secondary" aria-label={`Sửa bài ${variant.platform}`} disabled={busy} onClick={() => { setEditingIds((current) => ({ ...current, [variant.id]: true })); setView("content"); }}><Pencil className="size-4" />Sửa bài</Button>}</PermissionGate> : null;
+        : <Button size="sm" variant="secondary" aria-label={`Sửa bài ${variant.platform}`} disabled={busy} onClick={() => { setEditingIds((current) => ({ ...current, [variant.id]: true })); setViews((current) => ({ ...current, [variant.id]: "content" })); }}><Pencil className="size-4" />Sửa bài</Button>}</PermissionGate> : null;
       return <article key={variant.id} id={`post-${variant.id}`} aria-labelledby={`post-title-${variant.id}`}
         className={cn("scroll-mt-24 overflow-hidden rounded-2xl border border-l-4 border-border bg-white shadow-sm", postTone[state].edge)}>
         {/* Who this post is for, at a glance: logo, platform, account, AI score and status. */}
@@ -252,12 +259,19 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
           <div className="min-w-0 flex-1 basis-40">
             <h3 id={`post-title-${variant.id}`} className="truncate font-bold">{variant.platform}</h3>
             <p className="truncate text-xs text-muted">Bài {index + 1}/{items.length}{postAccounts.length ? ` · đăng bằng ${postAccounts.join(", ")}` : ""}</p>
+            {folded && <p className="mt-0.5 truncate text-xs text-slate-600">{variant.title || variant.body.split("\n").find((line) => line.trim())?.trim()}</p>}
           </div>
           {score !== null && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", variant.recommended === false ? "bg-amber-100 text-amber-800" : "bg-emerald-50 text-emerald-700")}>AI chấm {score}/10</span>}
           <Badge value={perPost && waiting(variant) ? "WAITING_REVIEW" : variant.status} />
-          {perPost && variant.status === "APPROVED" && <Button size="sm" variant="ghost" aria-expanded={!folded} aria-label={folded ? `Xem nội dung bài ${variant.platform}` : `Thu gọn bài ${variant.platform}`} onClick={() => setOpenApproved((current) => ({ ...current, [variant.id]: folded }))}>{folded ? <><ChevronDown className="size-4" />Xem nội dung</> : <><ChevronUp className="size-4" />Thu gọn</>}</Button>}
+          {!folded && <div role="tablist" aria-label={`Cách xem bài ${variant.platform}`} className="inline-flex rounded-lg border border-border bg-white p-0.5">
+            {([["content", "Nội dung", FileText], ["preview", "Xem trước", Eye]] as const).map(([value, label, Icon]) => <button key={value} type="button" role="tab" aria-selected={view === value}
+              onClick={() => setViews((current) => ({ ...current, [variant.id]: value }))}
+              className={cn("inline-flex min-h-8 items-center gap-1 rounded-md px-2.5 text-xs font-semibold transition", view === value ? "bg-indigo-50 text-primary" : "text-slate-600 hover:text-slate-900")}><Icon aria-hidden className="size-3.5" />{label}</button>)}
+          </div>}
+          <Button size="sm" variant="ghost" aria-expanded={!folded} aria-controls={`post-body-${variant.id}`} aria-label={folded ? `Xem nội dung bài ${variant.platform}` : `Thu gọn bài ${variant.platform}`}
+            onClick={() => setOpenPosts((current) => ({ ...current, [variant.id]: folded }))}>{folded ? <><ChevronDown className="size-4" />Xem nội dung</> : <><ChevronUp className="size-4" />Thu gọn</>}</Button>
         </header>
-        {!folded && <div className="space-y-3 p-4">
+        {!folded && <div id={`post-body-${variant.id}`} className="space-y-3 p-4">
           {standalone && editable && ["GENERATED", "APPROVED"].includes(variant.status) && <label className="flex items-center gap-2 text-sm text-primary"><input type="radio" name={`variant-${campaign.id}-${variant.platformSlug}`} checked={chosenVariants.some((chosen) => chosen.id === variant.id)} disabled={busy} onChange={() => setSelectedVariants((current) => ({ ...current, [variant.platformSlug]: variant.id }))} />Dùng biến thể này khi đăng · {variant.title || variant.platform}</label>}
           {variant.recommended === false && <ReviewAdvice key={variant.reason ?? ""} variant={variant} unsaved={Boolean(edit)}
             editable={editable && (perPost ? waiting(variant) : ["GENERATED", "APPROVED"].includes(variant.status))} />}
