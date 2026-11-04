@@ -136,14 +136,11 @@ describe("StudioView AI provider state", () => {
     expect(mocks.mutateAsync).toHaveBeenCalledWith("deepseek");
   });
 
-  it("shows the provider choice before a content is selected", () => {
-    render(<StudioView />);
+  it("links back to the library it was opened from", () => {
+    render(<StudioView contentId="content-1" />);
 
-    expect(screen.getByText("Chọn AI tạo nội dung")).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "OpenAI" })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "DeepSeek" })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "Gemini (chưa cấu hình)" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Mở thư viện" })).toBeInTheDocument();
+    expect(screen.getByText("Thư viện nội dung")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Thư viện" })).toHaveAttribute("href", "/contents");
   });
 });
 

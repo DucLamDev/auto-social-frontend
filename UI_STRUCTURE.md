@@ -9,8 +9,9 @@
 | `/platforms` | Connector modes, availability and capabilities | All; ADMIN toggles |
 | `/accounts` | OAuth **Kết nối** / per-row **Kết nối lại**, write-only credential forms, real connection test, **Kiểm tra tất cả**, **Nhập file cấu hình API** (ADMIN, template `/templates/api-accounts.csv`, per-row result with **Kết nối** for OAuth rows), **Nhập file tài khoản** (Chrome profile, optional shared Google email with Google password and TOTP setup key, write-only), status and enable/disable | All; mutations restricted |
 | `/sources` | URL/RSS/Sitemap/WordPress/manual ingestion | ADMIN, EDITOR |
-| `/contents` | Canonical content library and filters | All |
-| `/studio/[contentId]` | Original/variant editor, media attach, generate/save/approve | ADMIN, EDITOR |
+| `/contents` | Canonical content library and filters; title or **Mở Studio** opens the item | All |
+| `/studio/[contentId]` | Studio of one library item (no menu entry; sidebar keeps **Thư viện nội dung** lit): original/variant editor, media attach, generate/save/approve | ADMIN, EDITOR |
+| `/studio` | Redirects to `/contents` | — |
 | `/campaigns` | Content + target selection, publish/schedule | ADMIN, EDITOR |
 | `/calendar` | Day/week/month schedule | All |
 | `/publishing` | Polling queue, retry and manual publish | All; mutations restricted |

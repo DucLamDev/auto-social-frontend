@@ -3,6 +3,18 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.13.0 · 04/11/2026
+### Tính năng
+- Gộp Content Studio vào Thư viện nội dung, bớt một lần bấm qua lại
+  Trước đây mục menu "Content Studio" chỉ mở một trang trống bảo "Mở thư viện", còn thư viện lại dẫn ngược về Studio.
+  Nay:
+  - menu bỏ mục "Content Studio"; Studio là trang của từng bài trong thư viện, khi đang mở thì menu vẫn sáng
+    "Thư viện nội dung";
+  - trong thư viện, bấm vào tiêu đề bài (hoặc "Mở Studio") là vào thẳng Studio của bài đó;
+  - địa chỉ `/studio` cũ (dấu trang, link cũ) tự chuyển về thư viện; nút "Mở Content Studio" ở Dashboard đổi thành
+    "Mở thư viện nội dung".
+  Chọn AI vẫn nằm trong Studio của từng bài như trước.
+
 ## 1.12.2 · 04/11/2026
 ### Sửa lỗi
 - Báo rõ tài khoản bị bỏ qua khi duyệt bài
