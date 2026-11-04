@@ -6,9 +6,9 @@ import { toast } from "sonner";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import { Button } from "@/components/ui/button";
 import { Label, Textarea } from "@/components/ui/form";
-import { useMedia, useResourceMutation } from "@/hooks/use-resources";
+import { useAiImageStatus, useMedia, useResourceMutation } from "@/hooks/use-resources";
 import { resourcesService } from "@/services/resources.service";
-import type { ContentVariant } from "@/types/domain";
+import { aiImageProviderLabel, type ContentVariant } from "@/types/domain";
 
 const errorText = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
 
@@ -21,6 +21,7 @@ export function VariantImagePanel({ variant, editable }: { variant: ContentVaria
   const plan = variant.image;
   const generating = plan?.status === "generating";
   const media = useMedia({ variantId: variant.id, limit: 10 }, generating ? 3_000 : false);
+  const provider = aiImageProviderLabel(useAiImageStatus().data);
   const refetchMedia = media.refetch;
   const [promptOpen, setPromptOpen] = useState(false);
   const [prompt, setPrompt] = useState(plan?.prompt ?? "");
@@ -48,13 +49,13 @@ export function VariantImagePanel({ variant, editable }: { variant: ContentVaria
     try {
       await regenerate.mutateAsync(prompt);
       setPromptOpen(false);
-      toast.success("Đang tạo ảnh mới bằng VPSTTT AI. Ảnh sẽ tự hiện khi xong.");
+      toast.success(`Đang tạo ảnh mới bằng ${provider}. Ảnh sẽ tự hiện khi xong.`);
     } catch (error) { toast.error(errorText(error, "Không thể tạo lại ảnh")); }
   };
 
   return <section aria-label={`Ảnh · ${variant.platform}`} className="space-y-2 rounded-xl border border-border bg-slate-50/70 p-3">
     <div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-700">Ảnh kèm bài · {variant.platform}</p>{current?.generated && <span className="text-[11px] font-semibold text-indigo-700">Ảnh do AI tạo</span>}</div>
-    {generating ? <div role="status" className="flex h-40 items-center justify-center gap-2 rounded-lg bg-white text-sm text-indigo-700"><Loader2 className="size-4 animate-spin" />VPSTTT AI đang tạo ảnh, thường mất 30 giây đến 2 phút…</div>
+    {generating ? <div role="status" className="flex h-40 items-center justify-center gap-2 rounded-lg bg-white text-sm text-indigo-700"><Loader2 className="size-4 animate-spin" />{provider} đang tạo ảnh, thường mất 30 giây đến 2 phút…</div>
       : media.isPending ? <div className="h-40 animate-pulse rounded-lg bg-white" />
         // A failed refresh keeps showing the image already loaded.
         : media.isError && !current ? <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">Không tải được ảnh của bài. <button type="button" className="font-semibold underline" onClick={() => void refetchMedia()}>Thử lại</button></p>

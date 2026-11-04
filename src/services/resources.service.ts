@@ -25,6 +25,7 @@ export type ExtensionLoginCheckRow = { id: string; name: string; platform: strin
   posting?: { status: string; implemented: boolean; engine?: string; message: string; url?: string };
   attempts?: Array<{ method: string; available: boolean; check: { status: string; message?: string | null; finishedAt?: string | null } | null }>;
   check: { id: string; status: string; message?: string | null; detectedUsername?: string | null; finishedAt?: string | null } | null };
+export type VariantPreview = { title: string; body: string; format: "plain" | "markdown" | "html"; tags: string[]; group: string; engine: string | null; maxChars: number | null; length: number; overLimit: boolean };
 export type ExtensionEngine = "xenforo" | "discourse" | "phpbb" | "medium" | "substack" | "quora" | "reddit" | "slideshare" | "aws-builder" | "tinhte" | "pixelfed" | "mastodon" | "bluesky" | "tumblr" | "devto" | "minds" | "stackexchange" | "lemmy" | "discuit" | "linkedin" | "differ" | "dzone" | "dailydev";
 export type ExtensionDeliveryInput = { enabled: boolean; engine?: ExtensionEngine; targetUrl?: string; autoSubmit?: boolean; tags?: string[]; category?: string; flair?: string };
 export type ExtensionSessionInput = { deviceId: string; expectedUsername: string; profileUrl?: string; identitySelector?: string; provider: "password" | "google"; autoLogin: boolean; autoTotp: boolean; loginUrl?: string; loginUsername?: string; password?: string; totpSecret?: string };
@@ -201,6 +202,8 @@ export const resourcesService = {
   aiImageStatus: () => apiRequest<AiImageStatus>("/ai/image-status"),
   /** Starts a new AI image for a draft variant; the variant's image status follows it. */
   regenerateVariantImage: (variantId: string, prompt?: string) => apiRequest<{ status: "generating" }>(`/content-variants/${variantId}/image`, { method: "POST", body: prompt?.trim() ? { prompt: prompt.trim() } : {} }),
+  /** The post as its destination will show it (same rendering as publishing); unsaved edits can be passed in. */
+  previewVariant: (variantId: string, input: { title?: string; body?: string; hashtags?: string[]; platformAccountId?: string }) => apiRequest<VariantPreview>(`/content-variants/${variantId}/preview`, { method: "POST", body: input }),
   removeVariantImage: (variantId: string, mediaId: string) => apiRequest<{ removed: boolean }>(`/content-variants/${variantId}/image/${mediaId}`, { method: "DELETE" }),
   geminiKeys: () => apiRequest<GeminiKeysSettings>("/ai/gemini-keys"),
   updateGeminiKeys: (input: GeminiKeysUpdate) => apiRequest<GeminiKeysSettings>("/ai/gemini-keys", { method: "PUT", body: input }),

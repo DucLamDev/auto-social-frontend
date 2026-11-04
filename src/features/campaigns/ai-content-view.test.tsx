@@ -1,29 +1,34 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AiContentView } from "./ai-content-view";
 
 const mocks = vi.hoisted(() => ({
-  review: vi.fn(), reviewExisting: vi.fn(), update: vi.fn(), state: "WAITING_REVIEW", ids: ["variant-1"], mode: "AUTOMATION", multipleVersions: false,
+  review: vi.fn(), reviewExisting: vi.fn(), update: vi.fn(), preview: vi.fn(), state: "WAITING_REVIEW", ids: ["variant-1"], mode: "AUTOMATION", multipleVersions: false, secondAccount: false,
 }));
 vi.mock("@/hooks/use-auth", () => ({ useCurrentUser: () => ({ data: { role: "ADMIN" } }) }));
 vi.mock("@/hooks/use-resources", () => ({
-  useAiCampaigns: () => ({ data: { items: [{ id: "campaign-1", name: "Launch", reviewMode: mocks.mode, status: "DRAFT", content: { id: "content-1" }, automationState: mocks.state, automationVariantIds: mocks.ids, automationAccountIds: ["account-1"], createdAt: "2026-11-02T00:00:00Z" }] } }),
-  useAccounts: () => ({ data: { items: [{ id: "account-1", name: "DEV account", enabled: true, status: "CONNECTED", platform: { slug: "devto", name: "DEV", mode: "OFFICIAL_API" } }] } }),
+  useAiCampaigns: () => ({ data: { items: [{ id: "campaign-1", name: "Launch", reviewMode: mocks.mode, status: "DRAFT", content: { id: "content-1" }, automationState: mocks.state, automationVariantIds: mocks.ids, automationAccountIds: mocks.secondAccount ? ["account-1", "account-2"] : ["account-1"], createdAt: "2026-11-02T00:00:00Z" }] } }),
+  useAccounts: () => ({ data: { items: [{ id: "account-1", name: "DEV account", enabled: true, status: "CONNECTED", platform: { slug: "devto", name: "DEV", mode: "OFFICIAL_API" } },
+    ...(mocks.secondAccount ? [{ id: "account-2", name: "Tumblr vpsttt", enabled: true, status: "CONNECTED", platform: { slug: "tumblr", name: "Tumblr", mode: "OFFICIAL_API" } }] : [])] } }),
   useVariants: () => ({ data: { items: [{ id: "variant-1", platform: "DEV", platformSlug: "devto", title: "Original title", body: "Original body", status: "GENERATED" }, ...(mocks.multipleVersions ? [{ id: "variant-2", platform: "DEV", platformSlug: "devto", title: "Older version", body: "Older body", status: "APPROVED" }] : [])] } }),
   useMedia: () => ({ data: { items: [] } }),
+  useAiImageStatus: () => ({ data: { configured: true, model: "vpsttt-image", provider: "vpsttt" } }),
   useResourceMutation: (fn: (...args: unknown[]) => unknown) => ({ mutateAsync: (...args: unknown[]) => fn(...args), isPending: false }),
 }));
-vi.mock("@/services/resources.service", () => ({ resourcesService: { reviewAiCampaign: mocks.review, updateVariant: mocks.update, reviewExistingContent: mocks.reviewExisting } }));
+vi.mock("@/services/resources.service", () => ({ resourcesService: { reviewAiCampaign: mocks.review, updateVariant: mocks.update, reviewExistingContent: mocks.reviewExisting, previewVariant: mocks.preview } }));
 
 describe("AI content waiting for review", () => {
   beforeEach(() => {
     mocks.state = "WAITING_REVIEW";
     mocks.mode = "AUTOMATION";
     mocks.multipleVersions = false;
+    mocks.secondAccount = false;
     mocks.ids = ["variant-1"];
     mocks.review.mockReset().mockResolvedValue({});
     mocks.reviewExisting.mockReset().mockResolvedValue({});
     mocks.update.mockReset().mockResolvedValue({});
+    mocks.preview.mockReset().mockResolvedValue({ title: "Original title", body: "Original body #vps", format: "markdown", tags: ["vps"], group: "DEVELOPER", engine: "devto", maxChars: null, length: 18, overLimit: false });
   });
 
   it("shows old campaign variants without offering duplicate approval or editing a referenced post", () => {
@@ -41,7 +46,7 @@ describe("AI content waiting for review", () => {
   it("requires account selection to publish an existing Studio variant through the content endpoint", async () => {
     mocks.mode = "CONTENT";
     render(<AiContentView />);
-    fireEvent.click(screen.getByRole("button", { name: "Review nội dung" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
     expect(screen.getByRole("button", { name: "Duyệt đăng ngay" })).toBeDisabled();
     fireEvent.click(screen.getByRole("checkbox", { name: /DEV account/ }));
     fireEvent.click(screen.getByRole("button", { name: "Duyệt đăng ngay" }));
@@ -54,7 +59,7 @@ describe("AI content waiting for review", () => {
     mocks.multipleVersions = true;
     mocks.ids = ["variant-1", "variant-2"];
     render(<AiContentView />);
-    fireEvent.click(screen.getByRole("button", { name: "Review nội dung" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
     expect(screen.getByDisplayValue("Original body")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Older body")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("radio", { name: /Older version/ }));
@@ -68,18 +73,18 @@ describe("AI content waiting for review", () => {
     mocks.ids = [];
     const { rerender } = render(<AiContentView />);
     expect(screen.getByText(/AI đang tạo nội dung/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Review nội dung" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Review|Xem \d+ kênh/ })).not.toBeInTheDocument();
     mocks.state = "WAITING_REVIEW";
     mocks.ids = ["variant-1"];
     rerender(<AiContentView />);
-    fireEvent.click(screen.getByRole("button", { name: "Review nội dung" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
     expect(screen.getByLabelText("Nội dung · DEV")).toHaveValue("Original body");
     expect(mocks.review).not.toHaveBeenCalled();
   });
 
   it("requires saving edits before approving immediate publication", async () => {
     render(<AiContentView />);
-    fireEvent.click(screen.getByRole("button", { name: "Review nội dung" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
     fireEvent.click(screen.getByRole("button", { name: "Edit nội dung" }));
     fireEvent.change(screen.getByLabelText("Nội dung · DEV"), { target: { value: "Edited body" } });
     expect(screen.getByRole("button", { name: "Duyệt đăng ngay" })).toBeDisabled();
@@ -93,7 +98,7 @@ describe("AI content waiting for review", () => {
 
   it("requires a future schedule and sends it as an explicit timestamp", async () => {
     render(<AiContentView />);
-    fireEvent.click(screen.getByRole("button", { name: "Review nội dung" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
     fireEvent.click(screen.getByRole("button", { name: "Hẹn lịch đăng" }));
     const input = screen.getByLabelText("Ngày giờ đăng (giờ địa phương)");
     fireEvent.change(input, { target: { value: "2000-01-01T12:00" } });
@@ -103,5 +108,51 @@ describe("AI content waiting for review", () => {
     fireEvent.change(input, { target: { value: date } });
     fireEvent.click(screen.getByRole("button", { name: "Duyệt & hẹn lịch" }));
     await waitFor(() => expect(mocks.review).toHaveBeenCalledWith("campaign-1", "approve", { publishMode: "SCHEDULED", scheduledAt: new Date(date).toISOString() }));
+  });
+
+  it("lists which platforms are written while the AI works and opens the finished ones for review", async () => {
+    mocks.state = "PROCESSING";
+    mocks.secondAccount = true;
+    render(<AiContentView />);
+    const progress = screen.getByLabelText("Tiến độ tạo nội dung theo kênh");
+    expect(progress).toHaveTextContent("Đã tạo 1/2 kênh");
+    expect(screen.getByRole("progressbar", { name: "Số kênh đã tạo" })).toHaveAttribute("aria-valuenow", "1");
+    expect(within(progress).getByText("DEV").closest("li")).toHaveTextContent("Đã tạo");
+    expect(within(progress).getByText("Tumblr").closest("li")).toHaveTextContent("AI đang viết…");
+    fireEvent.click(screen.getByRole("button", { name: "Xem 1 kênh đã tạo" }));
+    expect(screen.getByLabelText("Nội dung · DEV")).toHaveValue("Original body");
+    fireEvent.click(screen.getByRole("button", { name: "Edit nội dung" }));
+    fireEvent.change(screen.getByLabelText("Nội dung · DEV"), { target: { value: "Edited early" } });
+    fireEvent.click(screen.getByRole("button", { name: "Lưu chỉnh sửa" }));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledWith("variant-1", { title: "Original title", body: "Edited early" }));
+    expect(screen.getByRole("button", { name: "Duyệt đăng ngay" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Hẹn lịch đăng" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Từ chối" })).toBeDisabled();
+    expect(screen.getByText(/nút duyệt mở khi tạo xong tất cả/)).toBeInTheDocument();
+    expect(mocks.review).not.toHaveBeenCalled();
+  });
+
+  it("shows the platforms still missing after a failed run", () => {
+    mocks.state = "FAILED";
+    mocks.secondAccount = true;
+    render(<AiContentView />);
+    const progress = screen.getByLabelText("Tiến độ tạo nội dung theo kênh");
+    expect(within(progress).getByText("Tumblr").closest("li")).toHaveTextContent("Chưa tạo được");
+    expect(within(progress).getByText("DEV").closest("li")).toHaveTextContent("Đã tạo");
+  });
+
+  it("keeps the approval buttons in a bar that stays visible and previews each post as its platform shows it", async () => {
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><AiContentView /></QueryClientProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    const bar = screen.getByRole("region", { name: "Duyệt nội dung" });
+    expect(bar).toHaveClass("sticky");
+    expect(within(bar).getByRole("button", { name: "Duyệt đăng ngay" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("tab", { name: "Xem trước như trên mạng xã hội" }));
+    expect(await screen.findByRole("heading", { name: "Original title" })).toBeInTheDocument();
+    expect(mocks.preview).toHaveBeenCalledWith("variant-1", { title: "Original title", body: "Original body", platformAccountId: "account-1" });
+    expect(screen.getByText(/18 ký tự · 1 tag gửi riêng/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Nội dung · DEV")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Edit nội dung" }));
+    expect(screen.getByLabelText("Nội dung · DEV")).not.toHaveAttribute("readonly");
   });
 });

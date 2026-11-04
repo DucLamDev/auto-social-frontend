@@ -416,6 +416,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/content-variants/{id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContentVariants_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/content-variants/{id}": {
         parameters: {
             query?: never;
@@ -1749,6 +1765,31 @@ export interface components {
             title?: string;
             body: string;
             hashtags?: string[];
+        };
+        VariantPreviewDto: {
+            /** @description Empty for destinations without a title field. */
+            title: string;
+            /** @description Body exactly as the destination receives it. */
+            body: string;
+            /** @enum {string} */
+            format: "plain" | "markdown" | "html";
+            /** @description Tags sent in the destination tag field. */
+            tags: string[];
+            /** @description Platform group (SOCIAL, FORUM, DEVELOPER, BLOGGING…). */
+            group: string;
+            engine?: string | null;
+            maxChars?: number | null;
+            length: number;
+            overLimit: boolean;
+        };
+        PreviewVariantDto: {
+            /** @description Unsaved title to preview instead of the stored one. */
+            title?: string;
+            /** @description Unsaved body to preview instead of the stored one. */
+            body?: string;
+            hashtags?: string[];
+            /** @description Account of the same platform whose posting route decides the formatting. */
+            platformAccountId?: string;
         };
         UpdateVariantDto: {
             title?: string;
@@ -3910,6 +3951,58 @@ export interface operations {
                         /** @example true */
                         success: boolean;
                         data: components["schemas"]["ContentVariantContractDto"];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ContentVariants_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewVariantDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["VariantPreviewDto"];
                         meta: components["schemas"]["ApiMetaContractDto"];
                     };
                 };
