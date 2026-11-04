@@ -123,3 +123,22 @@ export function aiScore(reason?: string | null): number | null {
   const match = /AI chấm (\d{1,2})\/10/.exec(reason ?? "");
   return match ? Number(match[1]) : null;
 }
+
+export const DEFAULT_APPROVE_MIN_SCORE = 7;
+const APPROVE_MIN_SCORE_KEY = "auto-social:approve-min-score";
+
+/** A whole score from 1 to 10; anything else falls back to the default. */
+export function normalizeMinScore(value: unknown): number {
+  const score = Math.round(Number(value));
+  return Number.isFinite(score) && score >= 1 && score <= 10 ? score : DEFAULT_APPROVE_MIN_SCORE;
+}
+
+/** The "approve posts scoring at least N" threshold this browser remembers. */
+export function readApproveMinScore(): number {
+  try { return normalizeMinScore(window.localStorage.getItem(APPROVE_MIN_SCORE_KEY) ?? DEFAULT_APPROVE_MIN_SCORE); }
+  catch { return DEFAULT_APPROVE_MIN_SCORE; }
+}
+
+export function saveApproveMinScore(score: number) {
+  try { window.localStorage.setItem(APPROVE_MIN_SCORE_KEY, String(normalizeMinScore(score))); } catch { /* private mode: keep it for this page only */ }
+}
