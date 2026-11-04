@@ -6,8 +6,8 @@
 | --- | --- | --- |
 | `/login` | JWT/cookie authentication | Public |
 | `/dashboard` | Metrics, 7-day throughput, recent jobs | All |
-| `/platforms` | Connector modes, availability and capabilities | All; ADMIN toggles |
-| `/accounts` | OAuth **Kết nối** / per-row **Kết nối lại**, write-only credential forms, real connection test, **Kiểm tra tất cả**, **Nhập file cấu hình API** (ADMIN, template `/templates/api-accounts.csv`, per-row result with **Kết nối** for OAuth rows), **Nhập file tài khoản** (Chrome profile, optional shared Google email with Google password and TOTP setup key, write-only), status and enable/disable | All; mutations restricted |
+| `/platforms` | Redirects to `/accounts?tab=api` (the catalogue is chosen in **Kết nối tài khoản API**; a disabled platform is switched on when an account is added for it) | — |
+| `/accounts` | Two tabs (`?tab=extension` default, `?tab=api`), each with **Tạo nội dung hàng loạt & đăng** (`/campaigns?automate=1&channel=…` preselects that tab's accounts). **Đăng bằng tiện ích Chrome**: paired Chromes, **Thêm social** (one row, only it is signed in), **Nhập file tài khoản** (re-upload skips unchanged socials), **Kết nối / cấu hình** (Chrome flows), per-row **Test** and why an account cannot post yet. **Đăng qua API**: **Kết nối tài khoản API** (OAuth **Kết nối**, write-only credential forms, Playwright, manual handoff), **Nhập file cấu hình API** (ADMIN, template `/templates/api-accounts.csv`), per-row **Kết nối lại** / **Test**. No bulk check button. Status and enable/disable | All; mutations restricted |
 | `/sources` | URL/RSS/Sitemap/WordPress/manual ingestion | ADMIN, EDITOR |
 | `/contents` | Canonical content library and filters; title or **Mở Studio** opens the item | All |
 | `/studio/[contentId]` | Studio of one library item (no menu entry; sidebar keeps **Thư viện nội dung** lit): original/variant editor, media attach, generate/save/approve | ADMIN, EDITOR |

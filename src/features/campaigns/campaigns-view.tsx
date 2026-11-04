@@ -25,7 +25,7 @@ import { getAiGenerationErrorMessage } from "@/services/api/errors";
 import { resourcesService } from "@/services/resources.service";
 import type { MediaAsset } from "@/types/domain";
 import { AutomationCampaignModal } from "./automation-campaign-modal";
-import { isSelectedExtensionAccount } from "../accounts/extension-account-state";
+import { accountChannel, isSelectedExtensionAccount, type AccountChannel } from "../accounts/extension-account-state";
 import { deriveAutomationCampaignName, getApprovedVariantForAccount, getEligibleAccounts, includeImageAltText, isCampaignReadyContent, normalizeAutomationAccountIds } from "./campaign-utils";
 
 function createAutomationIdempotencyKey() {
@@ -33,7 +33,7 @@ function createAutomationIdempotencyKey() {
   return `automation-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export function CampaignsView({ initialAutomationOpen = false }: { initialAutomationOpen?: boolean } = {}) {
+export function CampaignsView({ initialAutomationOpen = false, initialChannel }: { initialAutomationOpen?: boolean; initialChannel?: AccountChannel } = {}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [automationOpen, setAutomationOpen] = useState(initialAutomationOpen);
@@ -73,9 +73,11 @@ export function CampaignsView({ initialAutomationOpen = false }: { initialAutoma
     .map((platform) => platform.id));
   // Manual destinations stay visible only as explicitly blocked candidates so
   // users understand why an existing account cannot enter one-click publishing.
+  // Once Chrome accounts were chosen in an import, older Chrome imports stay out;
+  // API accounts are not part of that choice and stay available (the API tab).
   const selectedImport = (accounts.data?.items ?? []).some(isSelectedExtensionAccount);
   const automationCandidates = (accounts.data?.items ?? []).filter((account) => enabledPlatformIds.has(account.platformId)
-    && (!selectedImport || isSelectedExtensionAccount(account)));
+    && (!selectedImport || accountChannel(account) === "api" || isSelectedExtensionAccount(account)));
 
   const openAutomation = () => {
     automationRequest.current = null;
@@ -217,6 +219,7 @@ export function CampaignsView({ initialAutomationOpen = false }: { initialAutoma
     <AutomationCampaignModal
       open={automationOpen}
       accounts={automationCandidates}
+      channel={initialChannel}
       accountsPending={accounts.isPending || platforms.isPending}
       accountsError={accounts.error ?? platforms.error}
       aiProviders={aiProviders.data ?? []}

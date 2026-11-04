@@ -31,6 +31,22 @@ describe("account file import", () => {
     render(<AccountImportModal open onClose={() => undefined} />);
     const file = upload();
     await waitFor(() => expect(importExtensionAccounts).toHaveBeenCalledWith(file, "device-1"));
-    await screen.findByText(/Đã nhập 1 tài khoản/);
+    await screen.findByText("Đã thêm / cập nhật 1 social; giao Chrome đăng nhập thử 1 social.");
+  });
+
+  it("says how many unchanged socials were skipped and lists only the rows that need attention", async () => {
+    importExtensionAccounts.mockResolvedValue({
+      imported: 1, skipped: 2, queued: 1, batchId: "b",
+      rows: [
+        { row: "2", name: "Medium", platform: "medium", setup: "UNCHANGED" },
+        { row: "3", name: "Reddit", platform: "reddit", setup: "UNCHANGED" },
+        { row: "4", name: "Tinhte", platform: "tinhte", setup: "DESTINATION_REQUIRED" },
+      ],
+    });
+    render(<AccountImportModal open onClose={() => undefined} />);
+    upload();
+    await screen.findByText("Đã thêm / cập nhật 1 social, bỏ qua 2 social đã có không đổi; giao Chrome đăng nhập thử 1 social.");
+    expect(screen.getByText("Tinhte: cần trang đăng (URL tạo bài)")).toBeInTheDocument();
+    expect(screen.queryByText(/Medium:/)).toBeNull();
   });
 });

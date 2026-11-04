@@ -137,13 +137,11 @@ describe("selected Chrome connections", () => {
     expect(within(row).getByText("Tiện ích Chrome")).toBeInTheDocument();
     expect(screen.queryByText("Old import")).not.toBeInTheDocument();
     fireEvent.click(within(row).getByRole("button", { name: "Test" }));
-    // The row Test logs in when needed (saved password, then Google), like the bulk test.
+    // The row Test logs in when needed (saved password, then Google).
     await waitFor(() => expect(mocks.queueExtensionLoginChecks).toHaveBeenCalledWith(["selected"], false, true));
     expect(mocks.testAccount).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Kiểm tra tất cả" }));
-    await waitFor(() => expect(mocks.queueExtensionLoginChecks).toHaveBeenCalledTimes(2));
-    // "Kiểm tra tất cả" leaves out accounts already signed in; the row Test above still checks one again.
-    expect(mocks.queueExtensionLoginChecks).toHaveBeenLastCalledWith(["selected"], false, true, true);
+    // No bulk "Kiểm tra tất cả": one mis-click signed every account in again. Test stays per row.
+    expect(screen.queryByRole("button", { name: /Kiểm tra tất cả/ })).not.toBeInTheDocument();
     expect(mocks.runAccountCheck).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText("Phạm vi tài khoản"), { target: { value: "all" } });
     expect(screen.getByText("Old import")).toBeInTheDocument();
@@ -160,7 +158,8 @@ describe("selected Chrome connections", () => {
     render(<AccountsView />);
     const row = screen.getByRole("row", { name: /Selected VPSTTT/ });
     expect(within(row).getByText("Đã đăng nhập")).toBeInTheDocument();
-    expect(within(row).getByText(/chưa có luồng đăng tự động/)).toBeInTheDocument();
+    expect(within(row).getByText("Chưa đăng tự động được (chưa có luồng đăng)")).toBeInTheDocument();
+    expect(within(row).getByText("Khoá: chưa có luồng đăng")).toBeInTheDocument();
     expect(within(row).queryByText("Đã kết nối")).not.toBeInTheDocument();
   });
   it("opens manual connection instructions and checks the existing session", async () => {
@@ -229,6 +228,72 @@ describe("selected Chrome connections", () => {
   });
 });
 
+describe("accounts tabs", () => {
+  const extensionAccount: PlatformAccount = { ...browserAccount, id: "ext", name: "Forum qua Chrome", settings: { delivery: "extension", extensionTargetUrl: "https://forum.test/new", extensionAutoSubmit: true } };
+  const apiAccount: PlatformAccount = { ...browserAccount, id: "api", name: "Threads qua API", platform: { id: "platform-threads", slug: "threads", name: "Threads", mode: "OFFICIAL_API", connectorKey: "threads" }, platformId: "platform-threads", settings: {}, oauthConfigured: true };
+  const bound = (id: string, name: string, extra: Record<string, unknown> = {}): PlatformAccount => ({ ...browserAccount, id, name, enabled: false, status: "RECONNECT_REQUIRED", settings: { extensionSession: { deviceId: "chrome" }, ...extra } });
+  const checked = (account: PlatformAccount, posting: ExtensionLoginCheckRow["posting"]): ExtensionLoginCheckRow => ({ id: account.id, name: account.name, platform: "Forum", configured: true, issues: [], posting, check: { id: `c-${account.id}`, status: "AUTHENTICATED", message: "Session verified" } });
+  beforeEach(() => {
+    mocks.role = "ADMIN";
+    mocks.platforms = [vozPlatform]; mocks.providers = [];
+    mocks.devices = [{ id: "d1", name: "Chrome văn phòng", lastSeenAt: new Date().toISOString(), createdAt: new Date().toISOString() }];
+    mocks.accounts = [extensionAccount, apiAccount];
+    window.history.replaceState({}, "", "/accounts");
+  });
+
+  it("lists each account in its own tab with that tab's actions and bulk-content link", () => {
+    render(<AccountsView />);
+    expect(screen.getByRole("tab", { name: /Đăng bằng tiện ích Chrome\s*1/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: /Đăng qua API\s*1/ })).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByRole("row", { name: /Forum qua Chrome/ })).toBeInTheDocument();
+    expect(screen.queryByRole("row", { name: /Threads qua API/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Tạo nội dung hàng loạt & đăng/ })).toHaveAttribute("href", "/campaigns?automate=1&channel=extension");
+    expect(screen.getByRole("button", { name: "Thêm social" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Nhập file cấu hình API" })).not.toBeInTheDocument();
+    expect(screen.getByText("Chrome văn phòng")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: /Đăng qua API/ }));
+    expect(screen.getByRole("tab", { name: /Đăng qua API/ })).toHaveAttribute("aria-selected", "true");
+    expect(window.location.search).toBe("?tab=api");
+    expect(screen.getByRole("row", { name: /Threads qua API/ })).toBeInTheDocument();
+    expect(screen.queryByRole("row", { name: /Forum qua Chrome/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Tạo nội dung hàng loạt & đăng/ })).toHaveAttribute("href", "/campaigns?automate=1&channel=api");
+    expect(screen.getByRole("button", { name: "Nhập file cấu hình API" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Thêm social" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Chrome văn phòng")).not.toBeInTheDocument();
+  });
+
+  it("opens the tab given in the address and offers to add the first social when a tab is empty", () => {
+    mocks.accounts = [apiAccount];
+    render(<AccountsView initialTab="api" />);
+    expect(screen.getByRole("row", { name: /Threads qua API/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: /Đăng bằng tiện ích Chrome/ }));
+    expect(screen.getByText("Chưa có social đăng bằng tiện ích")).toBeInTheDocument();
+  });
+
+  it("says why a signed-in Chrome account is not posting yet, from the backend flow audit", () => {
+    const noFlow = bound("disqus", "Disqus vpsttt");
+    const noPage = bound("cloudpanel", "CloudPanel vpsttt");
+    const ready = bound("daily", "daily.dev vpsttt", { extensionSetup: { status: "FLOW_REQUIRED" } });
+    mocks.accounts = [noFlow, noPage, ready];
+    mocks.loginChecks = [
+      checked(noFlow, { status: "FLOW_REQUIRED", implemented: false, message: "Disqus chưa có luồng đăng tự động. Đăng thủ công." }),
+      checked(noPage, { status: "DESTINATION_REQUIRED", implemented: true, message: "Cần trang tạo chủ đề." }),
+      // A stale stored status (saved before the flow existed) gives way to the backend audit.
+      checked(ready, { status: "CONFIGURATION_REQUIRED", implemented: true, message: "Chưa bật đăng." }),
+    ];
+    render(<AccountsView />);
+    const disqus = screen.getByRole("row", { name: /Disqus vpsttt/ });
+    expect(within(disqus).getByText("Chưa đăng tự động được: Disqus chưa có luồng đăng tự động.")).toBeInTheDocument();
+    expect(within(disqus).getByText("Khoá: chưa có luồng đăng")).toBeInTheDocument();
+    expect(within(disqus).getByRole("switch", { name: "Bật Disqus vpsttt" })).toBeDisabled();
+    expect(within(screen.getByRole("row", { name: /CloudPanel vpsttt/ })).getByText("Cần chọn trang đăng · bấm Tiện ích")).toBeInTheDocument();
+    const daily = screen.getByRole("row", { name: /daily\.dev vpsttt/ });
+    expect(within(daily).getByText("Bấm Test để tự kết nối")).toBeInTheDocument();
+    expect(within(daily).getByText("Bật được khi đã kết nối")).toBeInTheDocument();
+  });
+});
+
 describe("AccountsView Playwright flow", () => {
   beforeEach(() => {
     mocks.accounts = [];
@@ -246,10 +311,11 @@ describe("AccountsView Playwright flow", () => {
 
   it("creates a browser account without a password and keeps the login command visible as the next step", async () => {
     mocks.createAccount.mockResolvedValue({ ...browserAccount, status: "RECONNECT_REQUIRED", browserSessionConfigured: false, credential: null });
-    render(<AccountsView />);
+    render(<AccountsView initialTab="api" />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Kết nối / cấu hình" }));
-    const destinations = screen.getByRole("dialog", { name: "Kết nối / cấu hình điểm đến" });
+    // Header button (the empty list offers the same one).
+    fireEvent.click(screen.getAllByRole("button", { name: "Kết nối tài khoản API" })[0]!);
+    const destinations = screen.getByRole("dialog", { name: "Kết nối tài khoản đăng qua API" });
     fireEvent.click(within(destinations).getByRole("button", { name: /Voz Forums/ }));
     const formDialog = screen.getByRole("dialog", { name: "Thêm Voz Forums" });
     expect(within(formDialog).queryByLabelText(/mật khẩu/i)).not.toBeInTheDocument();
@@ -276,7 +342,7 @@ describe("AccountsView Playwright flow", () => {
   it("edits allowlisted browser settings without replacing the encrypted session", async () => {
     mocks.accounts = [browserAccount];
     mocks.updateAccountSettings.mockResolvedValue({ ...browserAccount, settings: { ...browserAccount.settings, threadPrefixId: "2" } });
-    render(<AccountsView />);
+    render(<AccountsView initialTab="api" />);
 
     fireEvent.click(screen.getByRole("button", { name: "Cấu hình" }));
     const dialog = screen.getByRole("dialog", { name: "Cập nhật Voz Forums" });
@@ -293,7 +359,7 @@ describe("AccountsView Playwright flow", () => {
 
   it("offers separate test and reconnect actions for a stored browser session", () => {
     mocks.accounts = [{ ...browserAccount, status: "RECONNECT_REQUIRED" }];
-    render(<AccountsView />);
+    render(<AccountsView initialTab="api" />);
 
     expect(screen.getByRole("button", { name: "Test" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Kết nối lại" }));
@@ -309,7 +375,7 @@ describe("AccountsView Playwright flow", () => {
       browserSessionConfigured: false,
       lastCheckedAt: null,
     });
-    render(<AccountsView />);
+    render(<AccountsView initialTab="api" />);
 
     fireEvent.click(screen.getByRole("button", { name: "Thu hồi session" }));
     const dialog = screen.getByRole("dialog", { name: "Thu hồi session Playwright đã mã hóa" });
@@ -327,7 +393,7 @@ describe("AccountsView Playwright flow", () => {
   it("does not expose browser-session revocation to non-admin users", () => {
     mocks.accounts = [browserAccount];
     mocks.role = "EDITOR";
-    render(<AccountsView />);
+    render(<AccountsView initialTab="api" />);
 
     expect(screen.queryByRole("button", { name: "Thu hồi session" })).not.toBeInTheDocument();
   });
@@ -339,7 +405,7 @@ describe("AccountsView Playwright flow", () => {
       "CONFLICT",
       409,
     ));
-    render(<AccountsView />);
+    render(<AccountsView initialTab="api" />);
 
     fireEvent.click(screen.getByRole("button", { name: "Thu hồi session" }));
     const dialog = screen.getByRole("dialog", { name: "Thu hồi session Playwright đã mã hóa" });
@@ -374,25 +440,27 @@ describe("AccountsView Meta OAuth", () => {
   });
 
   it("reconnects an OAuth account in one click and labels the auto-renewed token", async () => {
-    render(<AccountsView />);
+    render(<AccountsView initialTab="api" />);
     expect(screen.getByText("Token tự gia hạn")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Kết nối lại/ }));
     await waitFor(() => expect(mocks.oauthStart).toHaveBeenCalledWith("threads"));
   });
 
   it("offers a Kết nối button only for providers the backend has configured", () => {
-    render(<AccountsView />);
-    fireEvent.click(screen.getByRole("button", { name: /Kết nối \/ cấu hình/ }));
+    render(<AccountsView initialTab="api" />);
+    fireEvent.click(screen.getByRole("button", { name: "Kết nối tài khoản API" }));
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getAllByRole("button", { name: /^Kết nối$/ })).toHaveLength(1);
     expect(within(dialog).getByText("Backend chưa cấu hình App ID/Secret")).toBeInTheDocument();
   });
 
-  it("runs the account check on demand", async () => {
-    mocks.runAccountCheck.mockResolvedValue({ tokens: { refreshed: 1, failed: 0, skipped: 0 }, connections: { checked: 1, failed: 0 } });
-    render(<AccountsView />);
-    fireEvent.click(screen.getByRole("button", { name: /Kiểm tra tất cả/ }));
-    await waitFor(() => expect(mocks.runAccountCheck).toHaveBeenCalled());
+  it("has no bulk check: each account is checked with its own Test button", async () => {
+    mocks.testAccount.mockReset().mockResolvedValue({ ok: true });
+    render(<AccountsView initialTab="api" />);
+    expect(screen.queryByRole("button", { name: /Kiểm tra tất cả/ })).not.toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole("row", { name: /@vpsttt/ })).getByRole("button", { name: "Test" }));
+    await waitFor(() => expect(mocks.testAccount).toHaveBeenCalledExactlyOnceWith(threadsAccount.id));
+    expect(mocks.runAccountCheck).not.toHaveBeenCalled();
   });
 });
 
@@ -416,7 +484,7 @@ describe("AccountsView publish mode", () => {
   });
 
   it("switches a Blogger account from drafts to immediate publishing", async () => {
-    render(<AccountsView />);
+    render(<AccountsView initialTab="api" />);
     expect(screen.getByText("Lưu nháp")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("switch", { name: /Đăng ngay trên Blog VPSTTT/ }));
     await waitFor(() => expect(mocks.updateAccountSettings).toHaveBeenCalledWith("b1d6d0c4-6a8e-4b8a-9d8e-1f0a0b0c0d0e", { publishImmediately: true }));
@@ -465,8 +533,8 @@ describe("AccountsView Chrome extension delivery", () => {
 
   it("creates a Discourse account without API credentials and opens Chrome configuration", async () => {
     mocks.platforms = [nginxPlatform];
-    render(<AccountsView />);
-    fireEvent.click(screen.getByRole("button", { name: "Kết nối / cấu hình" }));
+    render(<AccountsView initialTab="api" />);
+    fireEvent.click(screen.getByRole("button", { name: "Kết nối tài khoản API" }));
     fireEvent.click(screen.getByRole("button", { name: /NGINX Community/ }));
     const createDialog = screen.getByRole("dialog", { name: "Thêm NGINX Community" });
     fireEvent.change(within(createDialog).getByLabelText("Tên hiển thị"), { target: { value: "NGINX Chrome" } });
@@ -509,6 +577,17 @@ describe("AccountsView Chrome extension delivery", () => {
     }));
   });
 
+  it("keeps only Chrome flows in the extension tab's Kết nối / cấu hình", () => {
+    const caddy: Platform = { ...nginxPlatform, id: "caddy-platform", slug: "caddy-community", name: "Caddy Community", defaultSettings: { extensionFlowId: "caddy-community", extensionEngine: "discourse" } };
+    mocks.platforms = [caddy, nginxPlatform];
+    render(<AccountsView />);
+    fireEvent.click(screen.getByRole("button", { name: "Kết nối / cấu hình" }));
+    const dialog = screen.getByRole("dialog", { name: "Kết nối / cấu hình điểm đến" });
+    expect(within(dialog).getByRole("button", { name: /Caddy Community/ })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: /NGINX Community/ })).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Kênh tự động qua API")).not.toBeInTheDocument();
+  });
+
   it("creates a dedicated Caddy flow with its own forum URL, category and tags", async () => {
     const platform: Platform = { ...nginxPlatform, id: 'caddy-platform', slug: 'caddy-community', name: 'Caddy Community', defaultSettings: {
       extensionFlowId: 'caddy-community', extensionEngine: 'discourse', extensionForumUrl: 'https://caddy.community', extensionTargetUrl: 'https://caddy.community/new-topic',
@@ -537,8 +616,8 @@ describe("AccountsView Chrome extension delivery", () => {
   it("still saves and tests API credentials when switching back to the API method", async () => {
     mocks.platforms = [nginxPlatform];
     mocks.testAccount.mockResolvedValue({ ok: true });
-    render(<AccountsView />);
-    fireEvent.click(screen.getByRole("button", { name: "Kết nối / cấu hình" }));
+    render(<AccountsView initialTab="api" />);
+    fireEvent.click(screen.getByRole("button", { name: "Kết nối tài khoản API" }));
     fireEvent.click(screen.getByRole("button", { name: /NGINX Community/ }));
     const dialog = screen.getByRole("dialog", { name: "Thêm NGINX Community" });
     fireEvent.change(within(dialog).getByLabelText("Phương thức đăng"), { target: { value: "extension" } });
@@ -588,6 +667,8 @@ describe("AccountsView Chrome extension delivery", () => {
     render(<AccountsView />);
     expect(screen.getByText("Chrome văn phòng")).toBeInTheDocument();
     expect(screen.getByText("1/1 đang chạy")).toBeInTheDocument();
+    // The manual forum is not on the extension yet, so it is listed in the API tab.
+    fireEvent.click(screen.getByRole("tab", { name: /Đăng qua API/ }));
     fireEvent.click(screen.getByRole("button", { name: /Tiện ích$/ }));
     const dialog = screen.getByRole("dialog");
     fireEvent.change(within(dialog).getByLabelText("Trang tạo chủ đề"), { target: { value: "https://forum.directadmin.com/forums/general.5/post-thread" } });
@@ -603,7 +684,7 @@ describe("AccountsView Chrome extension delivery", () => {
     } };
     mocks.platforms = [platform];
     mocks.accounts = [{ id: "daily-account", platformId: platform.id, platform, name: "daily.dev · vpsttt", enabled: false, status: "RECONNECT_REQUIRED", settings: {} }];
-    render(<AccountsView />);
+    render(<AccountsView initialTab="api" />);
     fireEvent.click(screen.getByRole("button", { name: /Tiện ích$/ }));
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByLabelText("Luồng đăng")).toHaveValue("dailydev");

@@ -18,7 +18,12 @@ export type MaintenanceRun = components["schemas"]["MaintenanceRunContractDto"];
 export type ExtensionDevice = { id: string; name: string; lastSeenAt?: string | null; createdAt: string };
 export type GeminiKeysSettings = { revision: string; source: "environment" | "saved"; maxKeys: number; slots: Array<{ slot: number; configured: boolean; active: boolean; retryAt: string | null }> };
 export type GeminiKeysUpdate = { revision: string; changes: Array<{ slot: number; apiKey?: string; clear?: boolean }> };
-export type AccountImportResult = { imported: number; queued: number; batchId: string; rows: Array<{ id?: string; row: string; name: string; setup?: string; issue?: string }> };
+export type AccountImportResult = { imported: number; skipped?: number; queued: number; batchId: string | null; rows: Array<{ id?: string; row: string; name: string; setup?: string; issue?: string }> };
+/** One social added by hand to the extension flow: the same fields as one row of the accounts file. */
+export type ImportOneAccountInput = {
+  deviceId: string; platform: string; provider: "password" | "google"; loginUsername: string;
+  password?: string; totpSecret?: string; expectedUsername?: string; profileUrl?: string; targetUrl?: string; category?: string; tags?: string;
+};
 export type ApiAccountImportStatus = "CONNECTED" | "CHECK_FAILED" | "OAUTH_REQUIRED" | "INVALID_ROW" | "NOT_SUPPORTED" | "ACCOUNT_BUSY" | "DUPLICATE_ROW";
 export type ApiAccountImportResult = { total: number; connected: number; needsAttention: number; rows: Array<{ row: number; platform: string; slug?: string; name: string; status: ApiAccountImportStatus; message: string; accountId?: string }> };
 export type ExtensionLoginCheckRow = { id: string; name: string; platform: string; configured: boolean; autoLogin?: boolean; issues: string[]; deviceId?: string;
@@ -225,7 +230,6 @@ export const resourcesService = {
   geminiKeys: () => apiRequest<GeminiKeysSettings>("/ai/gemini-keys"),
   updateGeminiKeys: (input: GeminiKeysUpdate) => apiRequest<GeminiKeysSettings>("/ai/gemini-keys", { method: "PUT", body: input }),
   async platforms(params?: ListParams) { const raw = await apiList<RawPlatform>("/platforms", { query: { page: params?.page, limit: params?.limit, search: params?.search, group: params?.group, mode: params?.mode, availability: params?.availability, enabled: params?.enabled } }); return result(raw, raw.items.map(mapPlatform)); },
-  async updatePlatform(slug: string, input: Pick<Platform, "enabled">) { return mapPlatform(await apiRequest<RawPlatform>(`/platforms/${slug}`, { method: "PATCH", body: input })); },
   async accounts(params?: ListParams) { const raw = await apiList<RawAccount>("/platform-accounts"); let items = raw.items.map(mapAccount); if (params?.platformId) items = items.filter((item) => item.platformId === params.platformId); return result(raw, filterItems(items, params, (item) => `${item.name} ${item.username ?? ""} ${item.platform?.name ?? ""}`, (item) => item.status)); },
   async createAccount(input: { platformSlug: string; name: string; username?: string; externalId?: string; settings?: Record<string, unknown>; credential?: Record<string, unknown>; enabled?: boolean }) { return mapAccount(await apiRequest<RawAccount>("/platform-accounts", { method: "POST", body: input })); },
   async updateAccountCredential(id: string, input: { credential: Record<string, unknown>; settings?: Record<string, unknown> }) { return mapAccount(await apiRequest<RawAccount>(`/platform-accounts/${id}/credential`, { method: "PUT", body: input })); },
@@ -238,6 +242,10 @@ export const resourcesService = {
   accountHealth: () => apiRequest<AccountHealth>("/account-health"),
   runAccountCheck: () => apiRequest<MaintenanceRun>("/account-health/check", { method: "POST" }),
   extensionDevices: () => apiRequest<ExtensionDevice[]>("/extension/devices"),
+  /** Adds (or updates) one social through the same rules as a file row; only it is signed in. Empty optional fields are left out. */
+  importOneExtensionAccount: (input: ImportOneAccountInput) => apiRequest<AccountImportResult>("/extension/accounts/import/one", {
+    method: "POST", body: Object.fromEntries(Object.entries(input).filter(([, value]) => typeof value === "string" && value.trim() !== "")),
+  }),
   importExtensionAccounts: (file: File, deviceId: string) => {
     const body = new FormData(); body.set("file", file); body.set("deviceId", deviceId);
     return apiRequest<AccountImportResult>("/extension/accounts/import", { method: "POST", body });

@@ -5,6 +5,7 @@ import { AlertTriangle, Bot, CheckCircle2, Clock3, ImagePlus, Send, Sparkles, Za
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { PlatformMark } from "@/components/platforms/platform-mark";
+import { accountChannel, type AccountChannel } from "@/features/accounts/extension-account-state";
 import { Button } from "@/components/ui/button";
 import { FieldError, Input, Label, Select, Switch, Textarea } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
@@ -15,6 +16,8 @@ import { canAddAutomationAccount, countAutomationPlatforms, defaultAutomationAcc
 type AutomationCampaignModalProps = {
   open: boolean;
   accounts: PlatformAccount[];
+  /** Accounts tab the run starts from: only its accounts are selected at first (all stay selectable). */
+  channel?: AccountChannel;
   accountsPending?: boolean;
   accountsError?: unknown;
   aiProviders: AiProviderOption[];
@@ -45,6 +48,7 @@ const defaultValues: AutomationCampaignInput = {
 export function AutomationCampaignModal({
   open,
   accounts,
+  channel,
   accountsPending = false,
   accountsError,
   aiProviders,
@@ -80,7 +84,10 @@ export function AutomationCampaignModal({
     [accounts],
   );
   const accountKey = eligibleAccounts.map((account) => account.id).join("|");
-  const defaultAccountIds = useMemo(() => defaultAutomationAccountIds(eligibleAccounts), [eligibleAccounts]);
+  const defaultAccountIds = useMemo(
+    () => defaultAutomationAccountIds(channel ? eligibleAccounts.filter((account) => accountChannel(account) === channel) : eligibleAccounts),
+    [eligibleAccounts, channel],
+  );
   const selectedPlatformCount = countAutomationPlatforms(eligibleAccounts, selectedAccountIds);
   const initializedAccounts = useRef<string | null>(null);
 
