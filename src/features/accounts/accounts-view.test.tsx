@@ -142,7 +142,8 @@ describe("selected Chrome connections", () => {
     expect(mocks.testAccount).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Kiểm tra tất cả" }));
     await waitFor(() => expect(mocks.queueExtensionLoginChecks).toHaveBeenCalledTimes(2));
-    expect(mocks.queueExtensionLoginChecks).toHaveBeenLastCalledWith(["selected"], false, true);
+    // "Kiểm tra tất cả" leaves out accounts already signed in; the row Test above still checks one again.
+    expect(mocks.queueExtensionLoginChecks).toHaveBeenLastCalledWith(["selected"], false, true, true);
     expect(mocks.runAccountCheck).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText("Phạm vi tài khoản"), { target: { value: "all" } });
     expect(screen.getByText("Old import")).toBeInTheDocument();

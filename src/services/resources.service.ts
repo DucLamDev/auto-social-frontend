@@ -199,7 +199,8 @@ const result = <T, U>(raw: ListResult<T>, items: U[]): ListResult<U> => ({ items
 
 export const resourcesService = {
   extensionLoginChecks: () => apiRequest<ExtensionLoginCheckRow[]>("/extension/login-checks"),
-  queueExtensionLoginChecks: (accountIds?: string[], verifyOnly = false, tryBoth = false) => apiRequest<{ batchId: string; queued: number }>("/extension/login-checks", { method: "POST", body: { accountIds, verifyOnly, tryBoth } }),
+  /** `skipAuthenticated`: bulk runs leave out accounts whose latest login check succeeded. */
+  queueExtensionLoginChecks: (accountIds?: string[], verifyOnly = false, tryBoth = false, skipAuthenticated = false) => apiRequest<{ batchId: string; queued: number; skipped?: number }>("/extension/login-checks", { method: "POST", body: { accountIds, verifyOnly, tryBoth, ...(skipAuthenticated ? { skipAuthenticated: true } : {}) } }),
   aiProviders: () => apiRequest<AiProviderOption[]>("/ai/providers"),
   aiImageStatus: () => apiRequest<AiImageStatus>("/ai/image-status"),
   /** Starts a new AI image for a draft variant; the variant's image status follows it. */

@@ -3,6 +3,13 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.11.1 · 04/11/2026
+### Sửa lỗi
+- Test đăng nhập hàng loạt chỉ chạy cho tài khoản chưa đăng nhập (cần backend 1.12.1)
+  "Test đăng nhập hàng loạt" và "Kiểm tra tất cả" bỏ qua tài khoản đã đăng nhập thành công; khung Test đăng nhập ghi
+  "Sẽ test N tài khoản chưa đăng nhập · bỏ qua M tài khoản đã đăng nhập thành công", nút bị khoá khi không còn tài khoản
+  nào cần test, thông báo sau khi bấm cho biết số tài khoản được bỏ qua. Nút "Test" ở từng dòng vẫn kiểm lại tài khoản đó.
+
 ## 1.11.0 · 04/11/2026
 ### Tính năng
 - Duyệt một lần là bài tự đăng (cần backend 1.12.0)
