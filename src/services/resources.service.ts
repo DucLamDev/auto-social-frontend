@@ -80,6 +80,10 @@ type RawAutomateCampaignResult = {
   generatedVariants: number;
   jobsCreated: number;
   activated: boolean;
+  /** Review decisions: accounts of an approved platform that got no post because they were not ready. */
+  skippedAccounts?: { id: string; name: string; platform: string; reason: string; reasonLabel: string }[];
+  /** Review decisions: drafts kept waiting because their platform had no ready account. */
+  waitingVariantIds?: string[];
 };
 
 const defaultCapability: Capability = { text: false, image: false, video: false, article: false, delete: false, schedule: false, analytics: false };

@@ -1974,6 +1974,17 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        SkippedReviewAccountContractDto: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @description Platform display name. */
+            platform: string;
+            /** @enum {string} */
+            reason: "DISABLED" | "NOT_CONNECTED" | "PLATFORM_DISABLED" | "UNSUPPORTED" | "MANUAL_SUBMIT" | "NO_BROWSER_SESSION";
+            /** @description Vietnamese explanation shown to the reviewer. */
+            reasonLabel: string;
+        };
         AutomatedCampaignContractDto: {
             campaign: components["schemas"]["CampaignContractDto"];
             content: components["schemas"]["ContentContractDto"];
@@ -1981,6 +1992,10 @@ export interface components {
             jobsCreated: number;
             /** @description Whether the campaign was activated for immediate or scheduled delivery. */
             activated: boolean;
+            /** @description Review decisions only: accounts of an approved platform that got no post because they were not ready. */
+            skippedAccounts?: components["schemas"]["SkippedReviewAccountContractDto"][];
+            /** @description Review decisions only: drafts left waiting because their platform had no ready account. */
+            waitingVariantIds?: string[];
         };
         ReviewExistingContentDto: {
             /**

@@ -17,7 +17,7 @@ import { useAccounts, useAiCampaigns, useMedia, useResourceMutation, useVariants
 import { cn, formatDate } from "@/lib/utils";
 import { resourcesService } from "@/services/resources.service";
 import type { Campaign, ContentVariant, PlatformAccount } from "@/types/domain";
-import { imagePending, isAutomationAccountEligible } from "./campaign-utils";
+import { imagePending, isAutomationAccountEligible, reviewOutcomeWarning } from "./campaign-utils";
 import { VariantImagePanel } from "./variant-image-panel";
 import { useSlow, VariantPreviewCard } from "./variant-preview-card";
 
@@ -107,12 +107,11 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
         return;
       }
       const selectedPlatforms = new Set(accounts.filter((account) => accountIds.includes(account.id)).map((account) => account.platform?.slug));
-      await resourcesService.reviewExistingContent(campaign.content!.id, { ...options, platformAccountIds: accountIds, variantIds: chosenVariants.filter((variant) => selectedPlatforms.has(variant.platformSlug)).map((variant) => variant.id) });
-      return;
+      return resourcesService.reviewExistingContent(campaign.content!.id, { ...options, platformAccountIds: accountIds, variantIds: chosenVariants.filter((variant) => selectedPlatforms.has(variant.platformSlug)).map((variant) => variant.id) });
     }
     // Approving saves what was edited first, so it needs no separate "Save".
     if (action === "approve") await saveEdits(items.filter((variant) => variant.status === "GENERATED" && !imagePending(variant)).map((variant) => variant.id));
-    await resourcesService.reviewAiCampaign(campaign.id, action, action === "approve" ? options : undefined);
+    return resourcesService.reviewAiCampaign(campaign.id, action, action === "approve" ? options : undefined);
   }, ["campaigns", "contents", "variants", "publish-jobs"]);
   // AI reviews are decided post by post; "all" then means the drafts still waiting.
   const perPost = campaign.reviewMode === "AUTOMATION";
@@ -140,19 +139,26 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
   const ready = perPost
     ? readyCount > 0 && !busy && !emptyEdit
     : !generating && items.length > 0 && items.length === campaign.automationVariantIds?.length && !dirty && !busy && (!standalone || (accountIds.length > 0 && accountIds.every((id) => eligibleAccounts.some((account) => account.id === id))));
+  // Accounts that went offline since the AI run are left out of an approval; say which ones.
+  const warnSkipped = (outcome: Parameters<typeof reviewOutcomeWarning>[0]) => {
+    const warning = reviewOutcomeWarning(outcome, (id) => items.find((variant) => variant.id === id)?.platform);
+    if (warning) toast.warning(warning, { duration: 15_000 });
+  };
   const actOn = async (variant: ContentVariant, action: "approve" | "reject" | "restore", schedule?: string) => {
     try {
-      await decide.mutateAsync({ variantId: variant.id, action, schedule });
+      const outcome = await decide.mutateAsync({ variantId: variant.id, action, schedule });
       setScheduleTarget(null);
       toast.success(action === "restore" ? `Đã khôi phục bài ${variant.platform} về chờ duyệt. Nội dung được giữ nguyên.` : action === "reject" ? `Đã từ chối bài ${variant.platform}. Bài này sẽ không được đăng.`
         : schedule ? `Đã duyệt và hẹn lịch bài ${variant.platform}.` : `Đã duyệt bài ${variant.platform}, đưa vào hàng đợi đăng ngay.`);
+      warnSkipped(outcome);
     } catch (error) { toast.error(error instanceof Error ? error.message : "Không thể xử lý bài này"); }
   };
   const act = async (action: "approve" | "reject", schedule?: string) => {
     try {
-      await review.mutateAsync({ action, schedule });
+      const outcome = await review.mutateAsync({ action, schedule });
       setScheduleOpen(false);
       toast.success(action === "approve" ? schedule ? "Đã duyệt và hẹn lịch đăng." : "Đã duyệt và đưa vào hàng đợi đăng ngay." : "Đã từ chối nội dung. Bài sẽ không được đăng.");
+      warnSkipped(outcome);
     } catch (error) { toast.error(error instanceof Error ? error.message : "Không thể xử lý nội dung"); }
   };
   const scheduleVariant = scheduleTarget && scheduleTarget !== "all" ? items.find((variant) => variant.id === scheduleTarget) : undefined;

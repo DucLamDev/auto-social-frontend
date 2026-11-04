@@ -3,6 +3,16 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.12.2 · 04/11/2026
+### Sửa lỗi
+- Báo rõ tài khoản bị bỏ qua khi duyệt bài
+  Cần backend 1.11.1 trở lên. Từ bản đó, duyệt bài không còn hỏng vì có một tài khoản chưa sẵn sàng. Sau khi bấm
+  "Duyệt & đăng bài này" hoặc nút duyệt chung, trang Content đợi duyệt hiện thêm một cảnh báo vàng nếu có:
+  - tài khoản không được đăng, kèm tên và lý do (chưa kết nối, tài khoản đang tắt, chưa bật "Tự bấm Đăng"…);
+  - bài vẫn chờ duyệt vì nền tảng của nó chưa có tài khoản nào sẵn sàng.
+  Khi duyệt bị từ chối, trang hiện nguyên câu báo tiếng Việt của máy chủ, có tên từng tài khoản. Kiểu dữ liệu API được
+  sinh lại theo backend mới.
+
 ## 1.12.1 · 04/11/2026
 ### Sửa lỗi
 - Sửa lỗi build hỏng (`Unexpected token` ở trang Content đợi duyệt) sau lần gộp nhánh Khôi phục
