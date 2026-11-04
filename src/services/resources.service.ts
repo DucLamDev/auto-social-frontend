@@ -282,11 +282,11 @@ export const resourcesService = {
     };
   },
   async publishCampaign(id: string) { const campaign = await apiRequest<RawCampaign>(`/campaigns/${id}/publish`, { method: "POST" }); return { campaign: mapCampaign(campaign), jobsCreated: campaign.targets?.flatMap((target) => target.publishJobs ?? []).length ?? 0 }; },
-  async reviewAiCampaign(id: string, action: "approve" | "reject" | "retry-generation", options?: { publishMode: "NOW" | "SCHEDULED"; scheduledAt?: string }) {
+  async reviewAiCampaign(id: string, action: "approve" | "reject" | "retry-generation" | "restore", options?: { publishMode: "NOW" | "SCHEDULED"; scheduledAt?: string }) {
     return apiRequest<RawAutomateCampaignResult>(`/campaigns/${id}/${action}`, { method: "POST", ...(options ? { body: options } : {}) });
   },
-  /** Approves (now or at a time) or rejects one platform's draft of an AI review; the other platforms keep waiting. */
-  async reviewAiVariant(campaignId: string, variantId: string, action: "approve" | "reject", options?: { publishMode: "NOW" | "SCHEDULED"; scheduledAt?: string }) {
+  /** Decides or restores one platform draft without changing the other platforms. */
+  async reviewAiVariant(campaignId: string, variantId: string, action: "approve" | "reject" | "restore", options?: { publishMode: "NOW" | "SCHEDULED"; scheduledAt?: string }) {
     return apiRequest<RawAutomateCampaignResult>(`/campaigns/${campaignId}/variants/${variantId}/${action}`, { method: "POST", ...(options ? { body: options } : {}) });
   },
   async aiReviewContents() {

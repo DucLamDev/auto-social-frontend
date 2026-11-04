@@ -59,6 +59,8 @@ The `/platforms` screen shows the backend catalog of **65 destinations** in 8 gr
 
 Open `/campaigns`, click **Tạo tự động**, enter a brief, optionally attach an image, choose an AI provider and destinations, then click **Tạo bằng AI chạy ngầm**. The server persists the task and immediately returns, so navigation or closing the page does not cancel generation. The sidebar's **Content đợi duyệt** (`/ai-content`) refreshes every two seconds and shows queued, generating, reviewable and failed tasks. Review platform variants, edit and save the text, then choose **Hẹn lịch đăng** (a future local time) or **Duyệt đăng ngay**. No publish jobs are created before that explicit approval. Failed tasks can be retried and unwanted drafts rejected. Up to 50 distinct platforms are supported per automation request.
 
+Từ chối nhầm trong **Content đợi duyệt**: vào **Đã từ chối**, bấm **Khôi phục để duyệt** trên lượt AI. Trang mở lại nội dung ở **Chờ duyệt** để sửa, duyệt hoặc hẹn lịch. Từng bài bị từ chối trong Review cũng có **Khôi phục bài này**, kể cả khi các bài khác đã được duyệt. Chỉ ADMIN/EDITOR thấy nút; khôi phục giữ nguyên nội dung và ảnh, chưa đăng bài. Cần backend hỗ trợ `/campaigns/:id/restore` và `/campaigns/:id/variants/:variantId/restore`.
+
 Destination behavior is explicit:
 
 - **Kênh tự động qua API** uses an official or compatible API. A successful public post is `PUBLISHED`; a draft or moderated submission can correctly remain `NEEDS_ACTION`.
