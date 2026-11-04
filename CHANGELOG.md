@@ -3,6 +3,20 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.14.0 · 04/11/2026
+### Tính năng
+- Viết lại bài bằng AI ngay trên từng bài (cần backend 1.13.0)
+  - Mỗi bài trong Content đợi duyệt có nhãn **AI chấm X/10** và nút **Viết lại bằng AI**, nổi bật với bài AI đề nghị
+    kiểm tra.
+  - Ô hướng dẫn cho AI là tuỳ chọn; AI tự đọc ghi chú của lần chấm trước. Bài mới thay bài hiện tại và được chấm lại.
+  - Trong 1–3 phút AI viết lại, bài hiện "AI đang viết lại…" và khoá nút duyệt, hẹn lịch, sửa của bài đó để không đăng
+    nhầm bản cũ. Lỗi thì hiện lý do.
+  - Đang có phần sửa chưa lưu thì phải lưu hoặc bỏ trước khi viết lại.
+- Tạo ảnh bằng AI cho bài chưa có ảnh
+  - Bài chưa có ảnh có nút **Tạo ảnh bằng AI**: một lần bấm, AI tự thiết kế ảnh từ nội dung bài rồi tạo. Không phải
+    chọn tệp từ máy; nút **Tải ảnh lên** vẫn còn nếu bạn muốn.
+  - **Tạo lại ảnh** nay cho để trống mô tả để AI tự thiết kế.
+
 ## 1.13.0 · 04/11/2026
 ### Tính năng
 - Gộp Content Studio vào Thư viện nội dung, bớt một lần bấm qua lại

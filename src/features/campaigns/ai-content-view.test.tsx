@@ -4,20 +4,20 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AiContentView } from "./ai-content-view";
 
 const mocks = vi.hoisted(() => ({
-  role: "ADMIN", review: vi.fn(), reviewExisting: vi.fn(), update: vi.fn(), preview: vi.fn(), reviewVariant: vi.fn(), warning: vi.fn(), error: vi.fn(), variantStatus: "GENERATED", image: null as null | { type: string; status: string }, state: "WAITING_REVIEW", ids: ["variant-1"], mode: "AUTOMATION", multipleVersions: false, secondAccount: false,
+  role: "ADMIN", review: vi.fn(), reviewExisting: vi.fn(), update: vi.fn(), preview: vi.fn(), reviewVariant: vi.fn(), rewrite: vi.fn(), revision: null as null | { status: string; instruction?: string; error?: string }, review_: { recommended: true as boolean, reason: "" }, warning: vi.fn(), error: vi.fn(), variantStatus: "GENERATED", image: null as null | { type: string; status: string }, state: "WAITING_REVIEW", ids: ["variant-1"], mode: "AUTOMATION", multipleVersions: false, secondAccount: false,
 }));
 vi.mock("@/hooks/use-auth", () => ({ useCurrentUser: () => ({ data: { role: mocks.role } }) }));
 vi.mock("@/hooks/use-resources", () => ({
   useAiCampaigns: () => ({ data: { items: [{ id: "campaign-1", name: "Launch", reviewMode: mocks.mode, status: "DRAFT", content: { id: "content-1" }, automationState: mocks.state, automationVariantIds: mocks.ids, automationAccountIds: mocks.secondAccount ? ["account-1", "account-2"] : ["account-1"], createdAt: "2026-11-02T00:00:00Z" }] } }),
   useAccounts: () => ({ data: { items: [{ id: "account-1", name: "DEV account", enabled: true, status: "CONNECTED", platform: { slug: "devto", name: "DEV", mode: "OFFICIAL_API" } },
     ...(mocks.secondAccount ? [{ id: "account-2", name: "Tumblr vpsttt", enabled: true, status: "CONNECTED", platform: { slug: "tumblr", name: "Tumblr", mode: "OFFICIAL_API" } }] : [])] } }),
-  useVariants: () => ({ data: { items: [{ id: "variant-1", platform: "DEV", platformSlug: "devto", title: "Original title", body: "Original body", status: mocks.variantStatus, image: mocks.image }, ...(mocks.multipleVersions ? [{ id: "variant-2", platform: "DEV", platformSlug: "devto", title: "Older version", body: "Older body", status: "APPROVED" }] : [])] } }),
+  useVariants: () => ({ data: { items: [{ id: "variant-1", platform: "DEV", platformSlug: "devto", title: "Original title", body: "Original body", status: mocks.variantStatus, image: mocks.image, aiRevision: mocks.revision, recommended: mocks.review_.recommended, reason: mocks.review_.reason }, ...(mocks.multipleVersions ? [{ id: "variant-2", platform: "DEV", platformSlug: "devto", title: "Older version", body: "Older body", status: "APPROVED" }] : [])] } }),
   useMedia: () => ({ data: { items: [] } }),
   useAiImageStatus: () => ({ data: { configured: true, model: "vpsttt-image", provider: "vpsttt" } }),
   useResourceMutation: (fn: (...args: unknown[]) => unknown) => ({ mutateAsync: (...args: unknown[]) => fn(...args), isPending: false }),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: mocks.error, warning: mocks.warning } }));
-vi.mock("@/services/resources.service", () => ({ resourcesService: { reviewAiCampaign: mocks.review, updateVariant: mocks.update, reviewExistingContent: mocks.reviewExisting, previewVariant: mocks.preview, reviewAiVariant: mocks.reviewVariant } }));
+vi.mock("@/services/resources.service", () => ({ resourcesService: { reviewAiCampaign: mocks.review, updateVariant: mocks.update, reviewExistingContent: mocks.reviewExisting, previewVariant: mocks.preview, reviewAiVariant: mocks.reviewVariant, rewriteVariant: mocks.rewrite } }));
 
 describe("AI content waiting for review", () => {
   beforeEach(() => {
@@ -35,6 +35,9 @@ describe("AI content waiting for review", () => {
     mocks.error.mockReset();
     mocks.variantStatus = "GENERATED";
     mocks.image = null;
+    mocks.revision = null;
+    mocks.review_ = { recommended: true, reason: "" };
+    mocks.rewrite.mockReset().mockResolvedValue({ status: "generating" });
     mocks.preview.mockReset().mockResolvedValue({ title: "Original title", body: "Original body #vps", format: "markdown", tags: ["vps"], group: "DEVELOPER", engine: "devto", maxChars: null, length: 18, overLimit: false });
   });
 
@@ -214,6 +217,34 @@ describe("AI content waiting for review", () => {
     fireEvent.click(within(card).getByRole("button", { name: "Duyệt & đăng bài này" }));
     await waitFor(() => expect(mocks.error).toHaveBeenCalledWith("Chưa có tài khoản DEV nào sẵn sàng để đăng: DEV account (tài khoản đang tắt)."));
     expect(mocks.warning).toHaveBeenCalledTimes(1);
+  });
+
+  it("rewrites a low-scoring post with AI from an optional instruction, showing its score", async () => {
+    mocks.review_ = { recommended: false, reason: "Cần xem lại (AI chấm 5/10): Mở bài chung chung" };
+    render(<AiContentView />);
+    fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    expect(screen.getByText("AI chấm 5/10")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Viết lại bằng AI" }));
+    fireEvent.change(screen.getByLabelText("Hướng dẫn cho AI (không bắt buộc)"), { target: { value: "Mở bài bằng số liệu" } });
+    fireEvent.click(screen.getByRole("button", { name: "Viết lại" }));
+    await waitFor(() => expect(mocks.rewrite).toHaveBeenCalledWith("variant-1", "Mở bài bằng số liệu"));
+  });
+
+  it("locks approval and editing of a post while the AI rewrites it, and shows a failed rewrite", () => {
+    mocks.revision = { status: "generating", instruction: "Ngắn hơn" };
+    const { unmount } = render(<AiContentView />);
+    fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    expect(screen.getByRole("status")).toHaveTextContent("AI đang viết lại bài này theo hướng dẫn “Ngắn hơn”");
+    const card = screen.getByRole("group", { name: "Duyệt bài DEV" });
+    expect(within(card).getByRole("button", { name: "Duyệt & đăng bài này" })).toBeDisabled();
+    expect(within(card).getByRole("button", { name: "Hẹn lịch bài này" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Viết lại bằng AI" })).not.toBeInTheDocument();
+    unmount();
+    mocks.revision = { status: "failed", error: "VPSTTT AI đang giới hạn lượt." };
+    render(<AiContentView />);
+    fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Chưa viết lại được: VPSTTT AI đang giới hạn lượt.");
+    expect(screen.getByRole("button", { name: "Viết lại bằng AI" })).toBeEnabled();
   });
 
   it("shows an approved post as decided, without its approve buttons or edits", () => {

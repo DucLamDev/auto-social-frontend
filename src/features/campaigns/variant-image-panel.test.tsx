@@ -27,10 +27,29 @@ describe("image of a post under review", () => {
     mocks.upload.mockReset().mockResolvedValue({ ...asset, id: "media-2", generated: false });
   });
 
-  it("says a text-only destination posts without an image", () => {
-    render(<VariantImagePanel variant={variant({ type: "none" })} editable />);
+  it("says a text-only destination posts without an image when the post can no longer change", () => {
+    render(<VariantImagePanel variant={variant({ type: "none" })} editable={false} />);
     expect(screen.getByText("Kênh này chỉ đăng chữ, không kèm ảnh.")).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("creates an image with AI for a post without one, in one click and without choosing a file", async () => {
+    render(<VariantImagePanel variant={variant({ type: "none" })} editable />);
+    expect(screen.getByText(/Bài này chưa có ảnh/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Tạo lại ảnh/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tải ảnh lên" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Tạo ảnh bằng AI" }));
+    // No description: the AI designs the image from the post.
+    await waitFor(() => expect(mocks.regenerate).toHaveBeenCalledWith("variant-1", ""));
+  });
+
+  it("lets the AI design a new image when the description is left empty", async () => {
+    mocks.media = [asset];
+    render(<VariantImagePanel variant={variant({ type: "image", prompt: "A calm server room", altText: "Máy chủ VPS", status: "generated" })} editable />);
+    fireEvent.click(screen.getByRole("button", { name: "Tạo lại ảnh" }));
+    fireEvent.change(screen.getByLabelText(/Mô tả ảnh cho AI/), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Tạo ảnh mới" }));
+    await waitFor(() => expect(mocks.regenerate).toHaveBeenCalledWith("variant-1", ""));
   });
 
   it("shows the AI image with its description and regenerates from an edited prompt", async () => {

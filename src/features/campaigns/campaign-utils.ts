@@ -117,3 +117,9 @@ export function reviewOutcomeWarning(outcome: ReviewOutcome | void | undefined, 
   }
   return parts.length ? parts.join(" ") : null;
 }
+
+/** The AI editor's score in a draft's review note ("… (AI chấm 8/10)"), or null when it was not scored. */
+export function aiScore(reason?: string | null): number | null {
+  const match = /AI chấm (\d{1,2})\/10/.exec(reason ?? "");
+  return match ? Number(match[1]) : null;
+}

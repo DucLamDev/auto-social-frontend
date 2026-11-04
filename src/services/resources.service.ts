@@ -1,6 +1,6 @@
 import { apiList, apiRequest } from "@/services/api/client";
 import type { ListResult } from "@/services/api/types";
-import type { AiImageStatus, AiProviderId, AiProviderOption, AuditLog, Campaign, Capability, ConnectorMode, Content, ContentSource, ContentVariant, MediaAsset, Platform, PlatformAccount, PlatformAvailability, PlatformGroup, PromptTemplate, PublishJob, SourceArticle, Status, SystemSettings, VariantImagePlan } from "@/types/domain";
+import type { AiImageStatus, AiProviderId, AiProviderOption, AuditLog, Campaign, Capability, ConnectorMode, Content, ContentSource, ContentVariant, MediaAsset, Platform, PlatformAccount, PlatformAvailability, PlatformGroup, PromptTemplate, PublishJob, SourceArticle, Status, SystemSettings, VariantAiRevision, VariantImagePlan } from "@/types/domain";
 import type { components } from "@/generated/api/schema";
 import type { PublishedPost } from "@/types/domain";
 
@@ -105,7 +105,15 @@ const mapImagePlan = (value: unknown): VariantImagePlan | null => {
     error: text("error") ?? null,
   };
 };
-const mapVariant = (item: RawVariant): ContentVariant => ({ image: mapImagePlan(item.mediaRecommendation), id: item.id, contentId: item.contentId, platform: item.platform?.name ?? item.platform?.slug ?? "Platform", platformSlug: item.platform?.slug ?? "unknown", title: item.title, body: item.body, summary: item.summary, hashtags: item.hashtags, cta: item.cta, status: item.status, recommended: item.recommended, reason: item.reason, updatedAt: item.updatedAt });
+const mapAiRevision = (value: unknown): VariantAiRevision | null => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const revision = value as Record<string, unknown>;
+  const text = (key: string) => typeof revision[key] === "string" ? revision[key] as string : undefined;
+  const status = text("status");
+  if (status !== "generating" && status !== "done" && status !== "failed") return null;
+  return { status, instruction: text("instruction") ?? "", startedAt: text("startedAt"), finishedAt: text("finishedAt") ?? null, error: text("error") ?? null };
+};
+const mapVariant = (item: RawVariant): ContentVariant => ({ image: mapImagePlan(item.mediaRecommendation), aiRevision: mapAiRevision(item.aiRevision), id: item.id, contentId: item.contentId, platform: item.platform?.name ?? item.platform?.slug ?? "Platform", platformSlug: item.platform?.slug ?? "unknown", title: item.title, body: item.body, summary: item.summary, hashtags: item.hashtags, cta: item.cta, status: item.status, recommended: item.recommended, reason: item.reason, updatedAt: item.updatedAt });
 const mapContent = (item: RawContent): Content => ({ id: item.id, title: item.title, body: item.body, description: item.summary, canonicalUrl: item.canonicalUrl, status: item.status, source: item.sourceArticle?.source ?? null, variantsCount: item._count?.variants ?? item.variants?.length ?? 0, createdAt: item.createdAt, updatedAt: item.updatedAt });
 const mapMedia = (item: RawMedia): MediaAsset => {
   const metadata = item.metadata && typeof item.metadata === "object" && !Array.isArray(item.metadata)
@@ -211,6 +219,8 @@ export const resourcesService = {
   regenerateVariantImage: (variantId: string, prompt?: string) => apiRequest<{ status: "generating" }>(`/content-variants/${variantId}/image`, { method: "POST", body: prompt?.trim() ? { prompt: prompt.trim() } : {} }),
   /** The post as its destination will show it (same rendering as publishing); unsaved edits can be passed in. */
   previewVariant: (variantId: string, input: { title?: string; body?: string; hashtags?: string[]; platformAccountId?: string }) => apiRequest<VariantPreview>(`/content-variants/${variantId}/preview`, { method: "POST", body: input }),
+  /** Starts "Viết lại bằng AI" for one draft; the variant list follows `aiRevision`. */
+  rewriteVariant: (variantId: string, instruction?: string) => apiRequest<{ status: "generating" }>(`/content-variants/${variantId}/rewrite`, { method: "POST", body: instruction?.trim() ? { instruction: instruction.trim() } : {} }),
   removeVariantImage: (variantId: string, mediaId: string) => apiRequest<{ removed: boolean }>(`/content-variants/${variantId}/image/${mediaId}`, { method: "DELETE" }),
   geminiKeys: () => apiRequest<GeminiKeysSettings>("/ai/gemini-keys"),
   updateGeminiKeys: (input: GeminiKeysUpdate) => apiRequest<GeminiKeysSettings>("/ai/gemini-keys", { method: "PUT", body: input }),
