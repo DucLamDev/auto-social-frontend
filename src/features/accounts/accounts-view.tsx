@@ -358,8 +358,8 @@ export function AccountsView() {
         const oauthProvider = oauthProviderForPlatform(account.platform?.slug);
         const canReconnectOAuth = Boolean(oauthProvider && readyProviders.has(oauthProvider));
         const autoRefresh = account.oauthConfigured && isAutoRefreshPlatform(account.platform?.slug);
-        // Blogger and Tumblr can save drafts instead of publishing; the connector publishes unless this is false.
-        const draftCapable = ["blogger", "tumblr"].includes(account.platform?.slug ?? "");
+        // Blogger, Tumblr and dev.to can save drafts instead of publishing; the connector publishes unless this is false.
+        const draftCapable = ["blogger", "tumblr", "devto"].includes(account.platform?.slug ?? "");
         const publishImmediately = account.settings?.publishImmediately !== false;
         return <tr key={account.id} className="group hover:bg-slate-50/70">
           <Td><div className="flex items-center gap-3"><PlatformMark slug={account.platform?.slug} name={account.platform?.name ?? "Platform"} /><div><p className="font-bold text-foreground">{account.name}</p><p className="mt-0.5 text-xs text-muted">{account.platform?.name ?? "—"}{account.username ? ` · @${account.username}` : ""}</p></div></div></Td>

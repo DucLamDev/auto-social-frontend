@@ -3,6 +3,16 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.11.0 · 04/11/2026
+### Tính năng
+- Duyệt một lần là bài tự đăng (cần backend 1.12.0)
+  Trong Content đợi duyệt, kênh nào AI viết xong (kèm ảnh) là có nút "Duyệt & đăng bài này" ngay, không chờ các kênh
+  khác; nút chung đổi thành "Duyệt & đăng bài đã xong". Bấm duyệt tự lưu phần bạn đã sửa, không cần bấm "Lưu chỉnh
+  sửa" trước. Bài có ảnh đang tạo ghi rõ "duyệt được ngay khi ảnh xong".
+- Công tắc "Tự đăng bài AI chấm đạt, không cần duyệt" trong hộp Tạo nội dung AI chạy ngầm
+  Mặc định tắt. Bật thì bài AI chấm đạt đăng luôn khi viết xong; bài chưa đạt vẫn chờ duyệt. Các bước hướng dẫn trong
+  hộp ghi đúng quy trình mới.
+- dev.to có nút Đăng ngay / Lưu nháp ở trang Tài khoản như Blogger và Tumblr.
 ## 1.10.0 · 04/11/2026
 ### Tính năng
 - Duyệt, hẹn lịch hoặc từ chối từng bài theo nền tảng (cần backend 1.11.0)

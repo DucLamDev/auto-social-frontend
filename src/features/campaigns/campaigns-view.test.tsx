@@ -131,6 +131,17 @@ describe("CampaignsView automation media retries", () => {
     fireEvent.click(screen.getByRole("button", { name: "Tạo bằng AI chạy ngầm" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(mocks.automateCampaign).toHaveBeenCalledWith(expect.objectContaining({ publishImmediately: false, generateImages: true }), expect.any(String));
+    // Without the switch, every post waits for one review.
+    expect(mocks.automateCampaign.mock.calls[0]?.[0]).not.toHaveProperty("autoPublish");
     expect(screen.getByRole("button", { name: "Tạo tự động" })).toBeEnabled();
+  });
+
+  it("asks the backend to publish passing posts on its own when the switch is on", async () => {
+    mocks.automateCampaign.mockReset().mockResolvedValue({ campaign: { automationState: "QUEUED" }, generatedVariants: 0, jobsCreated: 0, activated: false });
+    render(<CampaignsView initialAutomationOpen />);
+    fireEvent.change(screen.getByLabelText("Mô tả bài đăng"), { target: { value: "Quảng bá VPS hiệu năng cao cho cộng đồng lập trình viên Việt Nam." } });
+    fireEvent.click(screen.getByRole("switch", { name: "Tự đăng bài AI chấm đạt, không cần duyệt" }));
+    fireEvent.click(screen.getByRole("button", { name: "Tạo bằng AI chạy ngầm" }));
+    await waitFor(() => expect(mocks.automateCampaign).toHaveBeenCalledWith(expect.objectContaining({ autoPublish: true, publishImmediately: false }), expect.any(String)));
   });
 });

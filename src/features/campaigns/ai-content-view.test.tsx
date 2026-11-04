@@ -4,14 +4,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AiContentView } from "./ai-content-view";
 
 const mocks = vi.hoisted(() => ({
-  review: vi.fn(), reviewExisting: vi.fn(), update: vi.fn(), preview: vi.fn(), reviewVariant: vi.fn(), variantStatus: "GENERATED", state: "WAITING_REVIEW", ids: ["variant-1"], mode: "AUTOMATION", multipleVersions: false, secondAccount: false,
+  review: vi.fn(), reviewExisting: vi.fn(), update: vi.fn(), preview: vi.fn(), reviewVariant: vi.fn(), variantStatus: "GENERATED", image: null as null | { type: string; status: string }, state: "WAITING_REVIEW", ids: ["variant-1"], mode: "AUTOMATION", multipleVersions: false, secondAccount: false,
 }));
 vi.mock("@/hooks/use-auth", () => ({ useCurrentUser: () => ({ data: { role: "ADMIN" } }) }));
 vi.mock("@/hooks/use-resources", () => ({
   useAiCampaigns: () => ({ data: { items: [{ id: "campaign-1", name: "Launch", reviewMode: mocks.mode, status: "DRAFT", content: { id: "content-1" }, automationState: mocks.state, automationVariantIds: mocks.ids, automationAccountIds: mocks.secondAccount ? ["account-1", "account-2"] : ["account-1"], createdAt: "2026-11-02T00:00:00Z" }] } }),
   useAccounts: () => ({ data: { items: [{ id: "account-1", name: "DEV account", enabled: true, status: "CONNECTED", platform: { slug: "devto", name: "DEV", mode: "OFFICIAL_API" } },
     ...(mocks.secondAccount ? [{ id: "account-2", name: "Tumblr vpsttt", enabled: true, status: "CONNECTED", platform: { slug: "tumblr", name: "Tumblr", mode: "OFFICIAL_API" } }] : [])] } }),
-  useVariants: () => ({ data: { items: [{ id: "variant-1", platform: "DEV", platformSlug: "devto", title: "Original title", body: "Original body", status: mocks.variantStatus }, ...(mocks.multipleVersions ? [{ id: "variant-2", platform: "DEV", platformSlug: "devto", title: "Older version", body: "Older body", status: "APPROVED" }] : [])] } }),
+  useVariants: () => ({ data: { items: [{ id: "variant-1", platform: "DEV", platformSlug: "devto", title: "Original title", body: "Original body", status: mocks.variantStatus, image: mocks.image }, ...(mocks.multipleVersions ? [{ id: "variant-2", platform: "DEV", platformSlug: "devto", title: "Older version", body: "Older body", status: "APPROVED" }] : [])] } }),
   useMedia: () => ({ data: { items: [] } }),
   useAiImageStatus: () => ({ data: { configured: true, model: "vpsttt-image", provider: "vpsttt" } }),
   useResourceMutation: (fn: (...args: unknown[]) => unknown) => ({ mutateAsync: (...args: unknown[]) => fn(...args), isPending: false }),
@@ -30,6 +30,7 @@ describe("AI content waiting for review", () => {
     mocks.update.mockReset().mockResolvedValue({});
     mocks.reviewVariant.mockReset().mockResolvedValue({});
     mocks.variantStatus = "GENERATED";
+    mocks.image = null;
     mocks.preview.mockReset().mockResolvedValue({ title: "Original title", body: "Original body #vps", format: "markdown", tags: ["vps"], group: "DEVELOPER", engine: "devto", maxChars: null, length: 18, overLimit: false });
   });
 
@@ -84,18 +85,29 @@ describe("AI content waiting for review", () => {
     expect(mocks.review).not.toHaveBeenCalled();
   });
 
-  it("requires saving edits before approving immediate publication", async () => {
+  it("saves unsaved edits as part of approving, so publishing needs no separate save", async () => {
     render(<AiContentView />);
     fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
     fireEvent.click(screen.getByRole("button", { name: "Edit nội dung" }));
     fireEvent.change(screen.getByLabelText("Nội dung · DEV"), { target: { value: "Edited body" } });
-    expect(screen.getByRole("button", { name: "Duyệt hết bài còn chờ (1)" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Hẹn lịch bài còn chờ" })).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "Lưu chỉnh sửa" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Duyệt hết bài còn chờ (1)" })).toBeEnabled());
-    expect(mocks.update).toHaveBeenCalledWith("variant-1", { title: "Original title", body: "Edited body" });
-    fireEvent.click(screen.getByRole("button", { name: "Duyệt hết bài còn chờ (1)" }));
+    expect(screen.getAllByText("Duyệt sẽ lưu luôn phần bạn đã sửa.").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "Duyệt & đăng bài đã xong (1)" }));
     await waitFor(() => expect(mocks.review).toHaveBeenCalledWith("campaign-1", "approve", { publishMode: "NOW" }));
+    expect(mocks.update).toHaveBeenCalledWith("variant-1", { title: "Original title", body: "Edited body" });
+    expect(mocks.update.mock.invocationCallOrder[0]).toBeLessThan(mocks.review.mock.invocationCallOrder[0]!);
+  });
+
+  it("saves the edit of one post when approving that post alone, and refuses an emptied post", async () => {
+    render(<AiContentView />);
+    fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit nội dung" }));
+    const card = screen.getByRole("group", { name: "Duyệt bài DEV" });
+    fireEvent.change(screen.getByLabelText("Nội dung · DEV"), { target: { value: "   " } });
+    expect(within(card).getByRole("button", { name: "Duyệt & đăng bài này" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Nội dung · DEV"), { target: { value: "Edited one" } });
+    fireEvent.click(within(card).getByRole("button", { name: "Duyệt & đăng bài này" }));
+    await waitFor(() => expect(mocks.reviewVariant).toHaveBeenCalledWith("campaign-1", "variant-1", "approve", { publishMode: "NOW" }));
+    expect(mocks.update).toHaveBeenCalledWith("variant-1", { title: "Original title", body: "Edited one" });
   });
 
   it("requires a future schedule and sends it as an explicit timestamp", async () => {
@@ -127,11 +139,23 @@ describe("AI content waiting for review", () => {
     fireEvent.change(screen.getByLabelText("Nội dung · DEV"), { target: { value: "Edited early" } });
     fireEvent.click(screen.getByRole("button", { name: "Lưu chỉnh sửa" }));
     await waitFor(() => expect(mocks.update).toHaveBeenCalledWith("variant-1", { title: "Original title", body: "Edited early" }));
-    expect(screen.getByRole("button", { name: "Duyệt hết bài còn chờ (1)" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Hẹn lịch bài còn chờ" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Từ chối bài còn chờ" })).toBeDisabled();
-    expect(screen.getByText(/nút duyệt mở khi tạo xong tất cả/)).toBeInTheDocument();
-    expect(mocks.review).not.toHaveBeenCalled();
+    // The finished platform is approved and published without waiting for the others.
+    expect(screen.getByText(/Kênh nào xong \(kèm ảnh\) là duyệt và đăng được ngay/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Duyệt & đăng bài đã xong (1)" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Từ chối bài còn chờ" })).toBeEnabled();
+    fireEvent.click(within(screen.getByRole("group", { name: "Duyệt bài DEV" })).getByRole("button", { name: "Duyệt & đăng bài này" }));
+    await waitFor(() => expect(mocks.reviewVariant).toHaveBeenCalledWith("campaign-1", "variant-1", "approve", { publishMode: "NOW" }));
+  });
+
+  it("waits for a post's image before it can be approved", () => {
+    mocks.image = { type: "image", status: "generating" };
+    render(<AiContentView />);
+    fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    const card = screen.getByRole("group", { name: "Duyệt bài DEV" });
+    expect(within(card).getByRole("button", { name: "Duyệt & đăng bài này" })).toBeDisabled();
+    expect(within(card).getByText("Đang tạo ảnh cho bài này; duyệt được ngay khi ảnh xong.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Duyệt & đăng bài đã xong (0)" })).toBeDisabled();
+    expect(within(card).getByRole("button", { name: "Từ chối bài này" })).toBeEnabled();
   });
 
   it("shows the platforms still missing after a failed run", () => {
@@ -148,7 +172,7 @@ describe("AI content waiting for review", () => {
     fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
     const bar = screen.getByRole("region", { name: "Duyệt nội dung" });
     expect(bar).toHaveClass("sticky");
-    expect(within(bar).getByRole("button", { name: "Duyệt hết bài còn chờ (1)" })).toBeEnabled();
+    expect(within(bar).getByRole("button", { name: "Duyệt & đăng bài đã xong (1)" })).toBeEnabled();
     fireEvent.click(screen.getByRole("tab", { name: "Xem trước như trên mạng xã hội" }));
     expect(await screen.findByRole("heading", { name: "Original title" })).toBeInTheDocument();
     expect(mocks.preview).toHaveBeenCalledWith("variant-1", { title: "Original title", body: "Original body", platformAccountId: "account-1" });
@@ -162,7 +186,7 @@ describe("AI content waiting for review", () => {
     render(<AiContentView />);
     fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
     const card = screen.getByRole("group", { name: "Duyệt bài DEV" });
-    fireEvent.click(within(card).getByRole("button", { name: "Duyệt bài này" }));
+    fireEvent.click(within(card).getByRole("button", { name: "Duyệt & đăng bài này" }));
     await waitFor(() => expect(mocks.reviewVariant).toHaveBeenCalledWith("campaign-1", "variant-1", "approve", { publishMode: "NOW" }));
     fireEvent.click(within(card).getByRole("button", { name: "Từ chối bài này" }));
     await waitFor(() => expect(mocks.reviewVariant).toHaveBeenLastCalledWith("campaign-1", "variant-1", "reject", undefined));
@@ -181,7 +205,7 @@ describe("AI content waiting for review", () => {
     fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
     expect(screen.queryByRole("group", { name: "Duyệt bài DEV" })).not.toBeInTheDocument();
     expect(screen.getByText(/Đã duyệt: bài vào hàng đợi đăng/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Duyệt hết bài còn chờ (0)" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Duyệt & đăng bài đã xong (0)" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "Edit nội dung" }));
     expect(screen.getByLabelText("Nội dung · DEV")).toHaveAttribute("readonly");
   });

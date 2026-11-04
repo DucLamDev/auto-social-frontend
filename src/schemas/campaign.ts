@@ -29,6 +29,8 @@ export const automationCampaignSchema = z.object({
   imageAltText: z.string().trim().max(500, "Mô tả ảnh tối đa 500 ký tự.").optional(),
   /** AI creates images for destinations that can attach one; absent means on. */
   generateImages: z.boolean().optional(),
+  /** Publish posts the AI check passed without waiting for review. */
+  autoPublish: z.boolean().optional(),
   accountIds: z.array(z.string()).min(1, "Chọn ít nhất một tài khoản đích."),
   aiProvider: z.enum(["openai", "deepseek", "gemini", "vpsttt"]),
   runMode: z.enum(["NOW", "SCHEDULED"]),
