@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label, Textarea } from "@/components/ui/form";
 import { useAiImageStatus, useMedia, useResourceMutation } from "@/hooks/use-resources";
 import { resourcesService } from "@/services/resources.service";
+import { cn } from "@/lib/utils";
 import { aiImageProviderLabel, type ContentVariant } from "@/types/domain";
 
 const errorText = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
@@ -17,7 +18,11 @@ const errorText = (error: unknown, fallback: string) => error instanceof Error ?
  * replaced it with), its alt text, and the actions available while the post is
  * still a draft. Text-only destinations say so instead of showing a picture.
  */
-export function VariantImagePanel({ variant, editable }: { variant: ContentVariant; editable: boolean }) {
+export function VariantImagePanel({ variant, editable, compact = false }: {
+  variant: ContentVariant; editable: boolean;
+  /** Under the post preview, which already shows the picture: keep only the status and the image buttons. */
+  compact?: boolean;
+}) {
   const plan = variant.image;
   // "pending": the post is written and its image is next in line.
   const generating = plan?.status === "generating" || plan?.status === "pending";
@@ -57,10 +62,11 @@ export function VariantImagePanel({ variant, editable }: { variant: ContentVaria
 
   return <section aria-label={`Ảnh · ${variant.platform}`} className="space-y-2 rounded-xl border border-border bg-slate-50/70 p-3">
     <div className="flex items-center justify-between gap-2"><p className="text-sm font-semibold text-slate-700">Ảnh kèm bài · {variant.platform}</p>{current?.generated && <span className="text-[11px] font-semibold text-indigo-700">Ảnh do AI tạo</span>}</div>
-    {generating ? <div role="status" className="flex h-40 items-center justify-center gap-2 rounded-lg bg-white text-sm text-indigo-700"><Loader2 className="size-4 animate-spin" />{provider} đang tạo ảnh, thường mất 30 giây đến 2 phút…</div>
-      : media.isPending ? <div className="h-40 animate-pulse rounded-lg bg-white" />
+    {generating ? <div role="status" className={cn("flex items-center gap-2 rounded-lg bg-white text-sm text-indigo-700", compact ? "px-3 py-2" : "h-40 justify-center")}><Loader2 className="size-4 animate-spin" />{provider} đang tạo ảnh, thường mất 30 giây đến 2 phút…</div>
+      : media.isPending ? <div className={cn("animate-pulse rounded-lg bg-white", compact ? "h-9" : "h-40")} />
         // A failed refresh keeps showing the image already loaded.
         : media.isError && !current ? <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">Không tải được ảnh của bài. <button type="button" className="font-semibold underline" onClick={() => void refetchMedia()}>Thử lại</button></p>
+          : compact ? <p className="text-xs text-muted">{current ? "Ảnh này đang hiện trong bản xem trước ở trên." : plan?.status === "removed" ? "Đã bỏ ảnh: bài sẽ đăng chỉ có chữ." : "Bài này chưa có ảnh."}</p>
           : current?.publicUrl ? <figure className="space-y-1">
             {/* Stored media is served from the configured storage host, outside next/image's domain list. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -79,7 +85,7 @@ export function VariantImagePanel({ variant, editable }: { variant: ContentVaria
         {promptOpen
           ? <><Button size="sm" disabled={busy} loading={regenerate.isPending} onClick={() => void startRegenerate(prompt)}><RefreshCw className="size-4" />Tạo ảnh mới</Button><Button size="sm" variant="ghost" disabled={regenerate.isPending} onClick={() => setPromptOpen(false)}>Huỷ</Button></>
           : noPlan && !current
-            ? <Button size="sm" disabled={busy} loading={regenerate.isPending} onClick={() => void startRegenerate("")}><Sparkles className="size-4" />Tạo ảnh bằng AI</Button>
+            ? <Button size="sm" variant="secondary" disabled={busy} loading={regenerate.isPending} onClick={() => void startRegenerate("")}><Sparkles className="size-4" />Tạo ảnh bằng AI</Button>
             : <Button size="sm" variant="secondary" disabled={busy} onClick={() => { setPrompt(plan?.prompt ?? ""); setPromptOpen(true); }}><RefreshCw className="size-4" />Tạo lại ảnh</Button>}
         <Button size="sm" variant="secondary" disabled={busy} loading={replace.isPending} onClick={() => fileInput.current?.click()}><ImagePlus className="size-4" />{current ? "Tải ảnh khác" : "Tải ảnh lên"}</Button>
         {current && <Button size="sm" variant="ghost" disabled={busy} loading={remove.isPending} onClick={() => void remove.mutateAsync(current.id).then(() => toast.success("Đã bỏ ảnh: bài sẽ đăng chỉ có chữ.")).catch((error: unknown) => toast.error(errorText(error, "Không thể bỏ ảnh")))}><Trash2 className="size-4" />Bỏ ảnh</Button>}

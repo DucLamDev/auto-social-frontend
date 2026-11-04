@@ -33,6 +33,16 @@ describe("image of a post under review", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
+  it("keeps only the status and the image buttons under a preview, which already shows the picture", async () => {
+    mocks.media = [asset];
+    render(<VariantImagePanel compact variant={variant({ type: "image", status: "generated", prompt: "A server rack" })} editable />);
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.getByText("Ảnh này đang hiện trong bản xem trước ở trên.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Tạo lại ảnh" }));
+    fireEvent.click(screen.getByRole("button", { name: "Tạo ảnh mới" }));
+    await waitFor(() => expect(mocks.regenerate).toHaveBeenCalledWith("variant-1", "A server rack"));
+  });
+
   it("creates an image with AI for a post without one, in one click and without choosing a file", async () => {
     render(<VariantImagePanel variant={variant({ type: "none" })} editable />);
     expect(screen.getByText(/Bài này chưa có ảnh/)).toBeInTheDocument();
