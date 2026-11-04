@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { CalendarClock, Check, CircleAlert, Clock3, Eye, LoaderCircle, Pencil, RefreshCw, Save, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/auth/permission-gate";
@@ -20,7 +19,7 @@ import { resourcesService } from "@/services/resources.service";
 import type { Campaign, ContentVariant, PlatformAccount } from "@/types/domain";
 import { isAutomationAccountEligible } from "./campaign-utils";
 import { VariantImagePanel } from "./variant-image-panel";
-import { PostPreview } from "./post-preview";
+import { useSlow, VariantPreviewCard } from "./variant-preview-card";
 
 const isGenerating = (campaign: Campaign) => campaign.automationState === "QUEUED" || campaign.automationState === "PROCESSING";
 
@@ -66,52 +65,16 @@ function GenerationProgress({ campaign, accounts }: { campaign: Campaign; accoun
   </div>;
 }
 
-/** True once `pending` has lasted a moment: a fast answer then never flashes a skeleton. */
-function useSlow(pending: boolean, after = 300) {
-  const [slow, setSlow] = useState(false);
-  useEffect(() => { if (!pending) return; const timer = setTimeout(() => setSlow(true), after); return () => clearTimeout(timer); }, [pending, after]);
-  return pending && slow;
-}
-
-function useDebounced<T>(value: T, delay: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => { const timer = setTimeout(() => setDebounced(value), delay); return () => clearTimeout(timer); }, [value, delay]);
-  return debounced;
-}
-
-/** The post mock-up of one platform, rendered from the server's publishing text (unsaved edits included). */
-function VariantPreviewCard({ variant, edit, account }: { variant: ContentVariant; edit?: { title: string; body: string }; account?: PlatformAccount }) {
-  const title = useDebounced(edit?.title ?? variant.title ?? "", 400);
-  const body = useDebounced(edit?.body ?? variant.body, 400);
-  const preview = useQuery({
-    queryKey: ["variant-preview", variant.id, title, body, account?.id ?? ""],
-    queryFn: () => resourcesService.previewVariant(variant.id, { title, body, ...(account ? { platformAccountId: account.id } : {}) }),
-    placeholderData: keepPreviousData,
-    staleTime: 30_000,
-  });
-  const media = useMedia({ variantId: variant.id, limit: 10 });
-  const asset = (media.data?.items ?? []).find((item) => item.type === "IMAGE" && item.publicUrl);
-  const slow = useSlow(preview.isPending);
-  if (preview.isPending) return slow ? <TableSkeleton rows={2} /> : <div aria-busy="true" className="min-h-40" />;
-  if (preview.isError) return <ErrorState compact error={preview.error} onRetry={() => void preview.refetch()} />;
-  const data = preview.data;
-  return <div className="space-y-2">
-    <div className="rounded-2xl bg-slate-100 p-2 sm:p-6"><PostPreview slug={variant.platformSlug} platformName={variant.platform} accountName={account?.name ?? "Tài khoản của bạn"} handle={account?.username}
-      preview={data} image={asset?.publicUrl ? { url: asset.publicUrl, alt: asset.altText } : null} imagePending={Boolean(variant.image) && !asset} /></div>
-    <p className={cn("text-xs", data.overLimit ? "font-semibold text-red-700" : "text-muted")}>
-      {data.maxChars ? `${data.length}/${data.maxChars} ký tự${data.overLimit ? " · vượt giới hạn, cần rút gọn trước khi đăng" : ""}` : `${data.length} ký tự`}
-      {data.tags.length ? ` · ${data.tags.length} tag gửi riêng` : ""} · Bản mô phỏng; giao diện thật của {variant.platform} có thể khác đôi chút.
-    </p>
-  </div>;
-}
-
 function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: PlatformAccount[] }) {
   const variants = useVariants(campaign.content?.id ?? "", true);
   const media = useMedia({ contentId: campaign.content?.id, limit: 100 });
   const [edits, setEdits] = useState<Record<string, { title: string; body: string }>>({});
   const [editing, setEditing] = useState(false);
   const [view, setView] = useState<"content" | "preview">("content");
-  const [scheduleOpen, setScheduleOpen] = useState(false);
+  // "all" schedules every draft still waiting; a variant id schedules only that platform.
+  const [scheduleTarget, setScheduleTarget] = useState<string | null>(null);
+  const scheduleOpen = scheduleTarget !== null;
+  const setScheduleOpen = (open: boolean) => setScheduleTarget(open ? "all" : null);
   const [accountIds, setAccountIds] = useState<string[]>([]);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
   const standalone = campaign.reviewMode === "CONTENT";
@@ -143,17 +106,32 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
     }
     await resourcesService.reviewAiCampaign(campaign.id, action, action === "approve" ? options : undefined);
   }, ["campaigns", "contents", "variants", "publish-jobs"]);
+  // AI reviews are decided post by post; "all" then means the drafts still waiting.
+  const perPost = campaign.reviewMode === "AUTOMATION";
+  const decide = useResourceMutation(({ variantId, action, schedule }: { variantId: string; action: "approve" | "reject"; schedule?: string }) => resourcesService.reviewAiVariant(
+    campaign.id, variantId, action, action === "approve" ? { publishMode: schedule ? "SCHEDULED" : "NOW", ...(schedule ? { scheduledAt: schedule } : {}) } : undefined,
+  ), ["campaigns", "contents", "variants", "publish-jobs"]);
+  const waiting = (variant: ContentVariant) => variant.status === "GENERATED";
+  const pendingCount = items.filter(waiting).length;
   // Drafts already written can be read and edited while the AI finishes the other
   // platforms; approving, scheduling or rejecting waits until every platform is done.
   const generating = isGenerating(campaign);
   const editable = campaign.reviewMode !== "EXISTING_CAMPAIGN" && (campaign.automationState === "WAITING_REVIEW" || generating || (standalone && campaign.automationState === "APPROVED"));
   const eligibleAccounts = accounts.filter((account) => isAutomationAccountEligible(account) && chosenVariants.some((variant) => variant.platformSlug === account.platform?.slug));
   const dirty = Object.keys(edits).length > 0;
-  const busy = save.isPending || review.isPending;
+  const busy = save.isPending || review.isPending || decide.isPending;
   const change = (variant: ContentVariant, patch: { title?: string; body?: string }) => {
     setEdits((current) => ({ ...current, [variant.id]: { title: variant.title ?? "", body: variant.body, ...current[variant.id], ...patch } }));
   };
-  const ready = !generating && items.length > 0 && items.length === campaign.automationVariantIds?.length && !dirty && !busy && (!standalone || (accountIds.length > 0 && accountIds.every((id) => eligibleAccounts.some((account) => account.id === id))));
+  const ready = !generating && items.length > 0 && items.length === campaign.automationVariantIds?.length && !dirty && !busy && (!perPost || pendingCount > 0) && (!standalone || (accountIds.length > 0 && accountIds.every((id) => eligibleAccounts.some((account) => account.id === id))));
+  const actOn = async (variant: ContentVariant, action: "approve" | "reject", schedule?: string) => {
+    try {
+      await decide.mutateAsync({ variantId: variant.id, action, schedule });
+      setScheduleTarget(null);
+      toast.success(action === "reject" ? `Đã từ chối bài ${variant.platform}. Bài này sẽ không được đăng.`
+        : schedule ? `Đã duyệt và hẹn lịch bài ${variant.platform}.` : `Đã duyệt bài ${variant.platform}, đưa vào hàng đợi đăng ngay.`);
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Không thể xử lý bài này"); }
+  };
   const act = async (action: "approve" | "reject", schedule?: string) => {
     try {
       await review.mutateAsync({ action, schedule });
@@ -161,6 +139,7 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
       toast.success(action === "approve" ? schedule ? "Đã duyệt và hẹn lịch đăng." : "Đã duyệt và đưa vào hàng đợi đăng ngay." : "Đã từ chối nội dung. Bài sẽ không được đăng.");
     } catch (error) { toast.error(error instanceof Error ? error.message : "Không thể xử lý nội dung"); }
   };
+  const scheduleVariant = scheduleTarget && scheduleTarget !== "all" ? items.find((variant) => variant.id === scheduleTarget) : undefined;
   const loadingSlowly = useSlow(variants.isPending);
   if (variants.isPending) return loadingSlowly ? <TableSkeleton /> : <div aria-busy="true" className="min-h-24" />;
   if (variants.isError) return <ErrorState error={variants.error} onRetry={() => void variants.refetch()} />;
@@ -171,14 +150,22 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
         className={cn("inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold transition", view === value ? "bg-white text-primary shadow-sm" : "text-slate-600 hover:text-slate-900")}><Icon aria-hidden className="size-4" />{label}</button>)}
     </div>
     {media.data?.items.map((asset) => <p key={asset.id} className="text-sm">{asset.publicUrl ? <a href={asset.publicUrl} target="_blank" rel="noreferrer" className="font-semibold text-primary underline">Xem tệp đính kèm{asset.altText ? `: ${asset.altText}` : ""}</a> : `Tệp đính kèm: ${asset.mimeType}`}</p>)}
-    {items.map((variant) => <div key={variant.id} className="space-y-3 rounded-xl border border-border p-4">
-      <div className="flex items-center justify-between gap-3"><h3 className="font-bold">{variant.platform}</h3><Badge value={variant.status} /></div>
+    {items.map((variant) => <div key={variant.id} className={cn("space-y-3 rounded-xl border border-border p-4", perPost && variant.status === "REJECTED" && "bg-slate-50 opacity-70")}>
+      <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-bold">{variant.platform}</h3><Badge value={perPost && waiting(variant) && !generating ? "WAITING_REVIEW" : variant.status} /></div>
+      {perPost && editable && !generating && waiting(variant) && <PermissionGate allow={["ADMIN", "EDITOR"]}><div role="group" aria-label={`Duyệt bài ${variant.platform}`} className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-2">
+        <Button size="sm" disabled={busy || Boolean(edits[variant.id])} loading={decide.isPending && decide.variables?.variantId === variant.id && decide.variables.action === "approve"} onClick={() => void actOn(variant, "approve")}><Check className="size-4" />Duyệt bài này</Button>
+        <Button size="sm" variant="secondary" disabled={busy || Boolean(edits[variant.id])} onClick={() => setScheduleTarget(variant.id)}><CalendarClock className="size-4" />Hẹn lịch bài này</Button>
+        <Button size="sm" variant="ghost" disabled={busy} onClick={() => void actOn(variant, "reject")}><X className="size-4" />Từ chối bài này</Button>
+        {edits[variant.id] && <span className="text-xs text-amber-700">Lưu chỉnh sửa trước khi duyệt bài này.</span>}
+      </div></PermissionGate>}
+      {perPost && variant.status === "APPROVED" && <p className="text-xs text-emerald-700">Đã duyệt: bài vào hàng đợi đăng. Theo dõi ở <Link href="/publishing" className="font-semibold underline">Publishing</Link>.</p>}
+      {perPost && variant.status === "REJECTED" && <p className="text-xs text-muted">Đã từ chối: bài này sẽ không được đăng.</p>}
       {standalone && editable && ["GENERATED", "APPROVED"].includes(variant.status) && <label className="flex items-center gap-2 text-sm text-primary"><input type="radio" name={`variant-${campaign.id}-${variant.platformSlug}`} checked={chosenVariants.some((chosen) => chosen.id === variant.id)} disabled={busy} onChange={() => setSelectedVariants((current) => ({ ...current, [variant.platformSlug]: variant.id }))} />Dùng biến thể này khi đăng · {variant.title || variant.platform}</label>}
       {variant.recommended === false && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">AI đề nghị kiểm tra: {variant.reason || "Nội dung cần được chỉnh sửa trước khi đăng."}</p>}
       {view === "preview" ? <VariantPreviewCard variant={variant} edit={edits[variant.id]} account={accountFor(variant)} /> : <>
-        <div><Label htmlFor={`title-${variant.id}`}>Tiêu đề</Label><Input id={`title-${variant.id}`} value={edits[variant.id]?.title ?? variant.title ?? ""} readOnly={!editable || !editing} disabled={busy} onChange={(event) => change(variant, { title: event.target.value })} /></div>
-        <div><Label htmlFor={`body-${variant.id}`}>Nội dung · {variant.platform}</Label><Textarea id={`body-${variant.id}`} className="min-h-64" value={edits[variant.id]?.body ?? variant.body} readOnly={!editable || !editing} disabled={busy} onChange={(event) => change(variant, { body: event.target.value })} /></div>
-        <VariantImagePanel variant={variant} editable={editable && !generating && ["GENERATED", "APPROVED"].includes(variant.status)} />
+        <div><Label htmlFor={`title-${variant.id}`}>Tiêu đề</Label><Input id={`title-${variant.id}`} value={edits[variant.id]?.title ?? variant.title ?? ""} readOnly={!editable || !editing || (perPost && !waiting(variant))} disabled={busy} onChange={(event) => change(variant, { title: event.target.value })} /></div>
+        <div><Label htmlFor={`body-${variant.id}`}>Nội dung · {variant.platform}</Label><Textarea id={`body-${variant.id}`} className="min-h-64" value={edits[variant.id]?.body ?? variant.body} readOnly={!editable || !editing || (perPost && !waiting(variant))} disabled={busy} onChange={(event) => change(variant, { body: event.target.value })} /></div>
+        <VariantImagePanel variant={variant} editable={editable && !generating && (perPost ? waiting(variant) : ["GENERATED", "APPROVED"].includes(variant.status))} />
         {!!variant.hashtags?.length && <p className="break-words text-sm text-muted">{variant.hashtags.map((tag) => `#${tag.replace(/^#/, "")}`).join(" ")}</p>}
         {variant.cta && <p className="text-sm text-muted">{variant.cta}</p>}
       </>}
@@ -187,24 +174,25 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
       {standalone && <fieldset className="rounded-xl border border-border p-4"><legend className="px-2 text-sm font-semibold">Chọn tài khoản để đăng biến thể đã có</legend><div className="grid gap-3 sm:grid-cols-2">{eligibleAccounts.map((account) => <label key={account.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={accountIds.includes(account.id)} disabled={busy} onChange={(event) => setAccountIds((current) => event.target.checked ? [...current, account.id] : current.filter((id) => id !== account.id))} />{account.name} · {account.platform?.name}</label>)}</div>{!eligibleAccounts.length && <p className="text-sm text-amber-700">Chưa có tài khoản sẵn sàng khớp với nền tảng của biến thể. Kiểm tra tại trang Tài khoản.</p>}</fieldset>}
       {/* Long reviews (13 platforms) pushed these buttons far below the fold: keep them in view while scrolling. */}
       <div role="region" aria-label="Duyệt nội dung" className="sticky bottom-0 z-20 -mx-5 -mb-5 flex flex-wrap items-center gap-2 border-t border-border bg-white/95 px-3 py-2 sm:px-5 sm:py-3 shadow-[0_-6px_16px_-12px_rgba(15,23,42,0.35)] backdrop-blur">
-      <p className="mr-auto hidden text-xs font-semibold text-slate-600 sm:block">{items.length} kênh{items.some((variant) => variant.recommended === false) ? ` · ${items.filter((variant) => variant.recommended === false).length} kênh AI đề nghị kiểm tra` : ""}</p>
+      <p className="mr-auto hidden text-xs font-semibold text-slate-600 sm:block">{perPost ? `${pendingCount} chờ duyệt · ${items.filter((variant) => variant.status === "APPROVED").length} đã duyệt · ${items.filter((variant) => variant.status === "REJECTED").length} từ chối · ` : ""}{items.length} kênh{items.some((variant) => variant.recommended === false) ? ` · ${items.filter((variant) => variant.recommended === false).length} kênh AI đề nghị kiểm tra` : ""}</p>
       {!editing && <Button size="sm" variant="secondary" disabled={busy} onClick={() => { setEditing(true); setView("content"); }}><Pencil className="size-4" />Edit nội dung</Button>}
       {editing && <Button size="sm" variant="secondary" disabled={!dirty || busy || Object.values(edits).some((edit) => !edit.body.trim())} loading={save.isPending} onClick={() => void save.mutateAsync().then(() => { setEdits({}); setEditing(false); toast.success("Đã lưu nội dung"); }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không thể lưu"))}><Save className="size-4" />Lưu chỉnh sửa</Button>}
-      <Button size="sm" variant="secondary" disabled={!ready} onClick={() => setScheduleOpen(true)}><CalendarClock className="size-4" />Hẹn lịch đăng</Button>
-      <Button size="sm" disabled={!ready} loading={review.isPending} onClick={() => void act("approve")}><Check className="size-4" />Duyệt đăng ngay</Button>
-      <Button size="sm" variant="ghost" disabled={busy || generating} onClick={() => void act("reject")}><X className="size-4" />Từ chối</Button>
+      <Button size="sm" variant="secondary" className={perPost ? "hidden sm:inline-flex" : undefined} disabled={!ready} onClick={() => setScheduleOpen(true)}><CalendarClock className="size-4" />{perPost ? "Hẹn lịch bài còn chờ" : "Hẹn lịch đăng"}</Button>
+      <Button size="sm" disabled={!ready} loading={review.isPending} onClick={() => void act("approve")}><Check className="size-4" />{perPost ? `Duyệt hết bài còn chờ (${pendingCount})` : "Duyệt đăng ngay"}</Button>
+      <Button size="sm" variant="ghost" className={perPost ? "hidden sm:inline-flex" : undefined} disabled={busy || generating || (perPost && !pendingCount)} onClick={() => void act("reject")}><X className="size-4" />{perPost ? "Từ chối bài còn chờ" : "Từ chối"}</Button>
       {dirty && <p className="text-xs text-amber-700">Lưu chỉnh sửa trước khi duyệt.</p>}
       {generating && <p className="text-xs text-indigo-700">AI đang tạo các kênh còn lại. Bạn xem và sửa được các kênh đã xong; nút duyệt mở khi tạo xong tất cả.</p>}
     </div></PermissionGate>}
-    <Modal open={scheduleOpen && editable} onClose={() => { if (!busy) setScheduleOpen(false); }} title="Hẹn lịch đăng" description="Duyệt toàn bộ nội dung của lượt này và đăng vào thời gian bạn chọn.">
+    <Modal open={scheduleOpen && editable} onClose={() => { if (!busy) setScheduleOpen(false); }} title="Hẹn lịch đăng" description={scheduleVariant ? `Duyệt bài ${scheduleVariant.platform} và đăng vào thời gian bạn chọn; các bài khác vẫn chờ duyệt.` : perPost ? "Duyệt các bài còn chờ và đăng vào thời gian bạn chọn." : "Duyệt toàn bộ nội dung của lượt này và đăng vào thời gian bạn chọn."}>
       <form className="space-y-4" onSubmit={(event) => {
         event.preventDefault();
         const date = new Date(scheduledAt);
         if (!Number.isFinite(date.getTime()) || date <= new Date()) { toast.error("Chọn thời gian đăng trong tương lai"); return; }
-        void act("approve", date.toISOString());
+        if (scheduleVariant) void actOn(scheduleVariant, "approve", date.toISOString());
+        else void act("approve", date.toISOString());
       }}>
         <div><Label htmlFor={`schedule-${campaign.id}`}>Ngày giờ đăng (giờ địa phương)</Label><Input id={`schedule-${campaign.id}`} type="datetime-local" required value={scheduledAt} disabled={busy} onChange={(event) => setScheduledAt(event.target.value)} /></div>
-        <Button type="submit" disabled={!ready || !scheduledAt} loading={review.isPending}>Duyệt & hẹn lịch</Button>
+        <Button type="submit" disabled={(scheduleVariant ? busy : !ready) || !scheduledAt} loading={review.isPending || decide.isPending}>Duyệt & hẹn lịch</Button>
       </form>
     </Modal>
   </div>;

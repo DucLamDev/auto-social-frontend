@@ -3,6 +3,19 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.10.0 · 04/11/2026
+### Tính năng
+- Duyệt, hẹn lịch hoặc từ chối từng bài theo nền tảng (cần backend 1.11.0)
+  Mỗi bài trong Review & duyệt có nút "Duyệt bài này", "Hẹn lịch bài này", "Từ chối bài này". Duyệt bài nào thì chỉ bài
+  của nền tảng đó vào hàng đợi đăng, các bài khác vẫn chờ. Bài đã duyệt / từ chối ghi rõ trạng thái và không sửa được
+  nữa. Thanh dưới cùng ghi số bài chờ / đã duyệt / từ chối, các nút chung áp dụng cho các bài còn chờ ("Duyệt hết bài còn
+  chờ"); trên điện thoại chỉ giữ Edit và Duyệt hết để thanh gọn.
+- Xem trước trên nền tảng trong Content Studio
+  Mỗi biến thể có nút "Xem trước": bài hiện như trên mạng xã hội đó, kể cả phần đang sửa chưa lưu.
+### Sửa lỗi
+- Xem trước báo rõ khi máy chủ chưa có chức năng này
+  Thay vì "Cannot POST …/preview", trang ghi cần cập nhật backend lên bản 1.10.0 trở lên.
+
 ## 1.9.0 · 03/11/2026
 ### Tính năng
 - Xem trước bài như khi đăng lên từng mạng xã hội (cần backend 1.10.0)
