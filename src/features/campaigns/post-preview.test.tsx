@@ -45,4 +45,31 @@ describe("post preview", () => {
     render(<PostPreview slug="pixelfed-social" platformName="pixelfed.social" accountName="vpsttt" preview={{ ...base, body: "Caption", group: "MEDIA", engine: "pixelfed" }} imagePending />);
     expect(screen.getByText("Ảnh sẽ được gắn vào đây khi đăng")).toBeInTheDocument();
   });
+
+  it("shows a plain-text post exactly as typed: list markers and line breaks stay characters", () => {
+    const { container } = render(<PostBody format="plain" accent="#4f46e5" text={"Trước khi đổi IP, thử:\n• delay 2-5 giây\n• giữ cookie\n\nBạn dùng gì? #VPS"} />);
+    expect(screen.queryByRole("list")).not.toBeInTheDocument();
+    expect(container.textContent).toContain("• delay 2-5 giây");
+    expect(container.querySelectorAll("p")).toHaveLength(2);
+    expect(screen.getByText("#VPS")).toHaveClass("font-medium");
+  });
+
+  it("draws Markdown tables and rules where the site renders Markdown, and a rich editor's post the same way", () => {
+    const table = "| You need | Use |\n|---|---|\n| A different exit IP | Proxy |\n| Root access | VPS |\n\n---\n\nDone";
+    const { unmount } = render(<PostBody format="markdown" appearance="markdown" accent="#4f46e5" text={table} />);
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.getAllByRole("row")).toHaveLength(3);
+    expect(screen.getByRole("columnheader", { name: "You need" })).toBeInTheDocument();
+    expect(screen.getByRole("separator")).toBeInTheDocument();
+    unmount();
+    // A formatting editor (Differ) receives the post already formatted: headings and lists, not raw symbols.
+    render(<PostBody format="markdown" appearance="rich" accent="#4f46e5" text={"## Khi nào cần VPS\n\n- Chạy website\n- Cron job"} />);
+    expect(screen.getByText("Khi nào cần VPS")).toHaveClass("font-bold");
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+  });
+
+  it("names the community a forum post goes to", () => {
+    render(<PostPreview slug="lemmy-world" platformName="Lemmy.World" accountName="vpsttt" preview={{ ...base, title: "Proxy or VPS?", body: "Body", format: "markdown", appearance: "markdown", group: "COMMUNITY", engine: "lemmy", destination: { community: "Technology", language: "en" } }} />);
+    expect(screen.getByText("Technology")).toBeInTheDocument();
+  });
 });

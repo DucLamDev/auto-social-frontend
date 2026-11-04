@@ -38,6 +38,8 @@ export interface PublishedPost {
 }
 export type PublishNeedsAction = {
   kind: "MODERATION" | "RECONCILIATION" | "BROWSER_LOGIN" | "BROWSER_REVIEW" | "POLICY_BLOCKED" | "EXTENSION_PENDING" | "EXTENSION_ACTION";
+  /** EXTENSION_PENDING: when a Chrome extension picked the job up (it is being posted); absent while still waiting. */
+  claimedAt?: string;
   externalPostId?: string;
   url?: string;
   canRetryAfterNotFound?: boolean;

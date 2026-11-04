@@ -102,6 +102,8 @@ export const imagePending = (variant: Pick<ContentVariant, "image">) => variant.
 export type ReviewOutcome = {
   skippedAccounts?: { name: string; platform: string; reasonLabel: string }[];
   waitingVariantIds?: string[];
+  /** Drafts kept waiting because they are longer than their destination allows (backend 1.17.0+). */
+  overLimitVariants?: { id: string; platform: string; length: number; maxChars: number; message: string }[];
 };
 
 /** One warning for the reviewer after an approval, or null when every account received its post. */
@@ -111,9 +113,15 @@ export function reviewOutcomeWarning(outcome: ReviewOutcome | void | undefined, 
   if (skipped.length) {
     parts.push(`Không đăng lên ${skipped.length} tài khoản chưa sẵn sàng: ${skipped.map((account) => `${account.name.includes(account.platform) ? account.name : `${account.name} · ${account.platform}`} (${account.reasonLabel})`).join("; ")}.`);
   }
-  const waiting = [...new Set((outcome?.waitingVariantIds ?? []).map((id) => platformOf(id) ?? "một nền tảng"))];
+  const overLimit = outcome?.overLimitVariants ?? [];
+  // Over-limit drafts are also listed as waiting; they wait for a shorter text, not for an account.
+  const tooLong = new Set(overLimit.map((variant) => variant.id));
+  const waiting = [...new Set((outcome?.waitingVariantIds ?? []).filter((id) => !tooLong.has(id)).map((id) => platformOf(id) ?? "một nền tảng"))];
   if (waiting.length) {
     parts.push(`Bài ${waiting.join(", ")} vẫn chờ duyệt vì chưa có tài khoản nào sẵn sàng. Kết nối lại tài khoản ở trang Tài khoản rồi bấm "Duyệt & đăng bài này".`);
+  }
+  if (overLimit.length) {
+    parts.push(`Chưa đăng ${overLimit.length} bài dài quá giới hạn ký tự: ${overLimit.map((variant) => `${variant.platform} ${variant.length}/${variant.maxChars}`).join(", ")}. Rút gọn bài (hoặc dùng "Viết lại bằng AI") rồi duyệt lại.`);
   }
   return parts.length ? parts.join(" ") : null;
 }

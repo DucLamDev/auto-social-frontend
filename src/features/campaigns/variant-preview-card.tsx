@@ -43,7 +43,14 @@ export function VariantPreviewCard({ variant, edit, account }: { variant: Conten
   }
   if (preview.isError) return <ErrorState compact error={preview.error} onRetry={() => void preview.refetch()} />;
   const data = preview.data;
+  const destination = data.destination;
+  const where = destination?.community || destination?.category;
   return <div className="space-y-2">
+    {(where || destination?.language) && <p className="text-xs text-muted">
+      {where ? <>Đăng vào <span className="font-semibold text-slate-700">{where}</span></> : null}
+      {where && destination?.language ? " · " : null}
+      {destination?.language ? <>Ngôn ngữ bài: <span className="font-semibold text-slate-700">{destination.language === "vi" ? "Tiếng Việt" : "English"}</span></> : null}
+    </p>}
     <div className="rounded-2xl bg-slate-100 p-2 sm:p-6"><PostPreview slug={variant.platformSlug} platformName={variant.platform} accountName={account?.name ?? "Tài khoản của bạn"} handle={account?.username}
       preview={data} image={asset?.publicUrl ? { url: asset.publicUrl, alt: asset.altText } : null} imagePending={Boolean(variant.image) && !asset} /></div>
     <p className={cn("text-xs", data.overLimit ? "font-semibold text-red-700" : "text-muted")}>

@@ -1255,6 +1255,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/extension/agent/tasks/{id}/form-fill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask the AI which values the extra controls of the post form need (language, community…); answers within ~8 s or poll */
+        post: operations["ExtensionAgent_formFillRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extension/agent/tasks/{id}/form-fill/{hintId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Poll an AI form fill: actions the backend checked against the controls the extension sent */
+        get: operations["ExtensionAgent_formFillStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/extension/agent/tasks/{id}/auth": {
         parameters: {
             query?: never;
@@ -1425,6 +1459,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["AccountImport_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extension/accounts/import/one": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AccountImport_one"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1850,15 +1900,30 @@ export interface components {
             body: string;
             hashtags?: string[];
         };
+        PreviewDestinationDto: {
+            /** @description Lemmy / Discuit community or Reddit subreddit (r/name) set on the account. */
+            community?: string;
+            /** @description Forum category or box set on the account. */
+            category?: string;
+            flair?: string;
+            /** @enum {string} */
+            language: "vi" | "en";
+        };
         VariantPreviewDto: {
-            /** @description Empty for destinations without a title field. */
+            /** @description Empty for destinations without a title field (short-form social, Quora). */
             title: string;
-            /** @description Body exactly as the destination receives it. */
+            /** @description Body exactly as the destination receives it; for appearance "rich" it keeps the Markdown the extension turns into HTML. */
             body: string;
             /** @enum {string} */
             format: "plain" | "markdown" | "html";
-            /** @description Tags sent in the destination tag field. */
+            /**
+             * @description How to show the body: rendered Markdown, plain paragraphs, or rich text (pasted HTML editor or HTML field).
+             * @enum {string}
+             */
+            appearance: "markdown" | "plain" | "rich";
+            /** @description Tags really sent in the destination tag field (for a Chrome extension account: its own tags, then the AI tags the site accepts); empty when hashtags stay in the text. */
             tags: string[];
+            destination: components["schemas"]["PreviewDestinationDto"];
             /** @description Platform group (SOCIAL, FORUM, DEVELOPER, BLOGGING…). */
             group: string;
             engine?: string | null;
@@ -2016,6 +2081,17 @@ export interface components {
             /** @description Vietnamese explanation shown to the reviewer. */
             reasonLabel: string;
         };
+        OverLimitVariantContractDto: {
+            /** Format: uuid */
+            id: string;
+            /** @description Platform display name. */
+            platform: string;
+            /** @description Characters the destination counts. */
+            length: number;
+            maxChars: number;
+            /** @description Vietnamese explanation shown to the reviewer. */
+            message: string;
+        };
         AutomatedCampaignContractDto: {
             campaign: components["schemas"]["CampaignContractDto"];
             content: components["schemas"]["ContentContractDto"];
@@ -2027,6 +2103,8 @@ export interface components {
             skippedAccounts?: components["schemas"]["SkippedReviewAccountContractDto"][];
             /** @description Review decisions only: drafts left waiting because their platform had no ready account. */
             waitingVariantIds?: string[];
+            /** @description Review decisions only: drafts left waiting because they exceed their destination character limit. */
+            overLimitVariants?: components["schemas"]["OverLimitVariantContractDto"][];
         };
         ReviewExistingContentDto: {
             /**
@@ -2405,6 +2483,34 @@ export interface components {
             url: string;
             candidates: components["schemas"]["UiCandidateDto"][];
         };
+        FormOptionDto: {
+            value: string;
+            label: string;
+        };
+        FormControlDto: {
+            index: number;
+            /** @enum {string} */
+            kind: "select" | "checkbox" | "radio" | "combobox" | "text";
+            tag: string;
+            type?: string;
+            label?: string;
+            name?: string;
+            id?: string;
+            required: boolean;
+            /** @description The page marks the control invalid (aria-invalid, :invalid) */
+            invalid: boolean;
+            checked?: boolean;
+            /** @description Label of the option currently chosen */
+            selected?: string;
+            options?: components["schemas"]["FormOptionDto"][];
+            /** @description Unique CSS path of the control in its document or shadow root */
+            selector: string;
+        };
+        FormFillRequestDto: {
+            /** @description Current page URL; must be on the task destination */
+            url: string;
+            controls: components["schemas"]["FormControlDto"][];
+        };
         ExtensionAuthStepDto: Record<string, never>;
         ClaimExtensionTaskDto: {
             /** @description Origins already running a flow in this Chrome */
@@ -2416,14 +2522,45 @@ export interface components {
             /** @description Thread URL once the post exists */
             url?: string;
             /** @enum {string} */
-            reason?: "CAPTCHA_REQUIRED" | "WAITING_USER" | "SUBMIT_UNCONFIRMED" | "SUBMIT_REJECTED" | "MODERATION_PENDING" | "AUTH_REQUIRED" | "ACCOUNT_MISMATCH" | "LOGIN_REQUIRED" | "EDITOR_NOT_FOUND" | "PERMISSION_REQUIRED" | "PAGE_LOAD_FAILED" | "CANCELLED" | "MEDIA_REQUIRED" | "PLATFORM_UNAVAILABLE";
+            reason?: "CAPTCHA_REQUIRED" | "WAITING_USER" | "SUBMIT_UNCONFIRMED" | "SUBMIT_REJECTED" | "MODERATION_PENDING" | "AUTH_REQUIRED" | "ACCOUNT_MISMATCH" | "LOGIN_REQUIRED" | "EDITOR_NOT_FOUND" | "PERMISSION_REQUIRED" | "PAGE_LOAD_FAILED" | "CANCELLED" | "MEDIA_REQUIRED" | "PLATFORM_UNAVAILABLE" | "CONTENT_MISMATCH";
             /** @description Short text shown to the operator (forum error banner, etc.) */
             message?: string;
+            /** @description Username the sign-in check found in Chrome (account mismatch); kept in the attempt details only */
+            detectedUsername?: string;
+            /** @description Google asked for a verification the extension cannot complete; kept in the attempt details only */
+            googleBlocked?: boolean;
         };
         QueueChecksDto: Record<string, never>;
         ClaimChecksDto: Record<string, never>;
         LoginResultDto: Record<string, never>;
         ImportAccountsDto: Record<string, never>;
+        ImportOneAccountDto: {
+            /**
+             * Format: uuid
+             * @description Paired Chrome that signs in and posts for this account.
+             */
+            deviceId: string;
+            /** @description Platform slug, e.g. daily-dev. */
+            platform: string;
+            /** @enum {string} */
+            provider: "password" | "google";
+            /** @description Email or username used to sign in. */
+            loginUsername: string;
+            /** @description Password of the platform, or of the Google account for Google sign-in. */
+            password?: string;
+            /** @description Authenticator setup key (not a 6-digit code). */
+            totpSecret?: string;
+            /** @description Handle on the platform; found after the first login when omitted. */
+            expectedUsername?: string;
+            /** @description Own profile page on the platform. */
+            profileUrl?: string;
+            /** @description New-post page; the flow default is used when omitted. */
+            targetUrl?: string;
+            /** @description Forum category or community, when the flow needs one. */
+            category?: string;
+            /** @description Comma-separated fixed tags. */
+            tags?: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -6762,6 +6899,93 @@ export interface operations {
             };
         };
     };
+    ExtensionAgent_formFillRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FormFillRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ExtensionAgent_formFillStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                hintId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
     ExtensionAgent_authStep: {
         parameters: {
             query?: never;
@@ -7240,6 +7464,49 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ImportAccountsDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    AccountImport_one: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportOneAccountDto"];
             };
         };
         responses: {
