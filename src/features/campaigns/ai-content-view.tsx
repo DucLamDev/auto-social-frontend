@@ -116,18 +116,12 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
   }, ["campaigns", "contents", "variants", "publish-jobs"]);
   // AI reviews are decided post by post; "all" then means the drafts still waiting.
   const perPost = campaign.reviewMode === "AUTOMATION";
-
-  const decide = useResourceMutation(({ variantId, action, schedule }: { variantId: string; action: "approve" | "reject" | "restore"; schedule?: string }) => resourcesService.reviewAiVariant(
-    campaign.id, variantId, action, action === "approve" ? { publishMode: schedule ? "SCHEDULED" : "NOW", ...(schedule ? { scheduledAt: schedule } : {}) } : undefined,
-  ), ["campaigns", "contents", "variants", "publish-jobs"]);
-
-  const decide = useResourceMutation(async ({ variantId, action, schedule }: { variantId: string; action: "approve" | "reject"; schedule?: string }) => {
+  const decide = useResourceMutation(async ({ variantId, action, schedule }: { variantId: string; action: "approve" | "reject" | "restore"; schedule?: string }) => {
     if (action === "approve") await saveEdits([variantId]);
     return resourcesService.reviewAiVariant(
       campaign.id, variantId, action, action === "approve" ? { publishMode: schedule ? "SCHEDULED" : "NOW", ...(schedule ? { scheduledAt: schedule } : {}) } : undefined,
     );
   }, ["campaigns", "contents", "variants", "publish-jobs"]);
-
   const waiting = (variant: ContentVariant) => variant.status === "GENERATED";
   const pendingCount = items.filter(waiting).length;
   // A platform can be approved (and goes out) as soon as its post and image are
@@ -142,16 +136,11 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
   const change = (variant: ContentVariant, patch: { title?: string; body?: string }) => {
     setEdits((current) => ({ ...current, [variant.id]: { title: variant.title ?? "", body: variant.body, ...current[variant.id], ...patch } }));
   };
-
-  const ready = !generating && items.length > 0 && items.length === campaign.automationVariantIds?.length && !dirty && !busy && (!perPost || pendingCount > 0) && (!standalone || (accountIds.length > 0 && accountIds.every((id) => eligibleAccounts.some((account) => account.id === id))));
-  const actOn = async (variant: ContentVariant, action: "approve" | "reject" | "restore", schedule?: string) => {
-
   const emptyEdit = Object.values(edits).some((edit) => !edit.body.trim());
   const ready = perPost
     ? readyCount > 0 && !busy && !emptyEdit
     : !generating && items.length > 0 && items.length === campaign.automationVariantIds?.length && !dirty && !busy && (!standalone || (accountIds.length > 0 && accountIds.every((id) => eligibleAccounts.some((account) => account.id === id))));
-  const actOn = async (variant: ContentVariant, action: "approve" | "reject", schedule?: string) => {
-
+  const actOn = async (variant: ContentVariant, action: "approve" | "reject" | "restore", schedule?: string) => {
     try {
       await decide.mutateAsync({ variantId: variant.id, action, schedule });
       setScheduleTarget(null);
@@ -177,19 +166,11 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
         className={cn("inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold transition", view === value ? "bg-white text-primary shadow-sm" : "text-slate-600 hover:text-slate-900")}><Icon aria-hidden className="size-4" />{label}</button>)}
     </div>
     {media.data?.items.map((asset) => <p key={asset.id} className="text-sm">{asset.publicUrl ? <a href={asset.publicUrl} target="_blank" rel="noreferrer" className="font-semibold text-primary underline">Xem tệp đính kèm{asset.altText ? `: ${asset.altText}` : ""}</a> : `Tệp đính kèm: ${asset.mimeType}`}</p>)}
-
     {items.map((variant) => <div key={variant.id} className={cn("space-y-3 rounded-xl border border-border p-4", perPost && variant.status === "REJECTED" && "bg-slate-50")}>
-      <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-bold">{variant.platform}</h3><Badge value={perPost && waiting(variant) && !generating ? "WAITING_REVIEW" : variant.status} /></div>
-      {perPost && editable && !generating && waiting(variant) && <PermissionGate allow={["ADMIN", "EDITOR"]}><div role="group" aria-label={`Duyệt bài ${variant.platform}`} className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-2">
-        <Button size="sm" disabled={busy || Boolean(edits[variant.id])} loading={decide.isPending && decide.variables?.variantId === variant.id && decide.variables.action === "approve"} onClick={() => void actOn(variant, "approve")}><Check className="size-4" />Duyệt bài này</Button>
-        <Button size="sm" variant="secondary" disabled={busy || Boolean(edits[variant.id])} onClick={() => setScheduleTarget(variant.id)}><CalendarClock className="size-4" />Hẹn lịch bài này</Button>
-
-    {items.map((variant) => <div key={variant.id} className={cn("space-y-3 rounded-xl border border-border p-4", perPost && variant.status === "REJECTED" && "bg-slate-50 opacity-70")}>
       <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-bold">{variant.platform}</h3><Badge value={perPost && waiting(variant) ? "WAITING_REVIEW" : variant.status} /></div>
       {perPost && editable && waiting(variant) && <PermissionGate allow={["ADMIN", "EDITOR"]}><div role="group" aria-label={`Duyệt bài ${variant.platform}`} className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-2">
         <Button size="sm" disabled={busy || imagePending(variant) || edits[variant.id]?.body.trim() === ""} loading={decide.isPending && decide.variables?.variantId === variant.id && decide.variables.action === "approve"} onClick={() => void actOn(variant, "approve")}><Check className="size-4" />Duyệt & đăng bài này</Button>
         <Button size="sm" variant="secondary" disabled={busy || imagePending(variant) || edits[variant.id]?.body.trim() === ""} onClick={() => setScheduleTarget(variant.id)}><CalendarClock className="size-4" />Hẹn lịch bài này</Button>
-
         <Button size="sm" variant="ghost" disabled={busy} onClick={() => void actOn(variant, "reject")}><X className="size-4" />Từ chối bài này</Button>
         {imagePending(variant) ? <span className="text-xs text-indigo-700">Đang tạo ảnh cho bài này; duyệt được ngay khi ảnh xong.</span>
           : edits[variant.id] && <span className="text-xs text-muted">Duyệt sẽ lưu luôn phần bạn đã sửa.</span>}
