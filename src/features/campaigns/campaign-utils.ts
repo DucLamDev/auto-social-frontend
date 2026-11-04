@@ -97,3 +97,23 @@ export function includeImageAltText(brief: string, altText?: string) {
 
 /** A planned image not created yet: the post is not ready to approve. */
 export const imagePending = (variant: Pick<ContentVariant, "image">) => variant.image?.status === "pending" || variant.image?.status === "generating";
+
+/** What an approval left out: accounts of the approved platform that were not ready, drafts kept waiting. */
+export type ReviewOutcome = {
+  skippedAccounts?: { name: string; platform: string; reasonLabel: string }[];
+  waitingVariantIds?: string[];
+};
+
+/** One warning for the reviewer after an approval, or null when every account received its post. */
+export function reviewOutcomeWarning(outcome: ReviewOutcome | void | undefined, platformOf: (variantId: string) => string | undefined): string | null {
+  const parts: string[] = [];
+  const skipped = outcome?.skippedAccounts ?? [];
+  if (skipped.length) {
+    parts.push(`Không đăng lên ${skipped.length} tài khoản chưa sẵn sàng: ${skipped.map((account) => `${account.name.includes(account.platform) ? account.name : `${account.name} · ${account.platform}`} (${account.reasonLabel})`).join("; ")}.`);
+  }
+  const waiting = [...new Set((outcome?.waitingVariantIds ?? []).map((id) => platformOf(id) ?? "một nền tảng"))];
+  if (waiting.length) {
+    parts.push(`Bài ${waiting.join(", ")} vẫn chờ duyệt vì chưa có tài khoản nào sẵn sàng. Kết nối lại tài khoản ở trang Tài khoản rồi bấm "Duyệt & đăng bài này".`);
+  }
+  return parts.length ? parts.join(" ") : null;
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ContentVariant, PlatformAccount } from "@/types/domain";
-import { canAddAutomationAccount, countAutomationPlatforms, defaultAutomationAccountIds, deriveAutomationCampaignName, getApprovedVariantForAccount, getAutomationAccountBlocker, getEligibleAccounts, includeImageAltText, isAutomationAccountEligible, isCampaignReadyContent, MAX_AUTOMATION_PLATFORMS, normalizeAutomationAccountIds } from "./campaign-utils";
+import { canAddAutomationAccount, countAutomationPlatforms, defaultAutomationAccountIds, deriveAutomationCampaignName, getApprovedVariantForAccount, getAutomationAccountBlocker, getEligibleAccounts, includeImageAltText, isAutomationAccountEligible, isCampaignReadyContent, MAX_AUTOMATION_PLATFORMS, normalizeAutomationAccountIds, reviewOutcomeWarning } from "./campaign-utils";
 
 const account: PlatformAccount = { id: "a1", platformId: "p1", platform: { id: "p1", name: "LinkedIn", slug: "linkedin" }, name: "Company", enabled: true, status: "CONNECTED" };
 const variants: ContentVariant[] = [
@@ -77,5 +77,21 @@ describe("campaign eligibility", () => {
     };
     expect(isAutomationAccountEligible(manual)).toBe(false);
     expect(getAutomationAccountBlocker(manual)).toContain("chỉ hỗ trợ bàn giao thủ công");
+  });
+});
+
+describe("review outcome warning", () => {
+  const platformOf = (id: string) => ({ "variant-x": "X" } as Record<string, string>)[id];
+
+  it("stays silent when every account received its post", () => {
+    expect(reviewOutcomeWarning(undefined, platformOf)).toBeNull();
+    expect(reviewOutcomeWarning({ skippedAccounts: [], waitingVariantIds: [] }, platformOf)).toBeNull();
+  });
+
+  it("names each skipped account with its reason and each platform kept waiting", () => {
+    expect(reviewOutcomeWarning({
+      skippedAccounts: [{ name: "Main", platform: "DEV", reasonLabel: "tài khoản đang tắt" }, { name: "DEV · team", platform: "DEV", reasonLabel: "chưa bật \"Tự bấm Đăng\"" }],
+      waitingVariantIds: ["variant-x", "gone"],
+    }, platformOf)).toBe("Không đăng lên 2 tài khoản chưa sẵn sàng: Main · DEV (tài khoản đang tắt); DEV · team (chưa bật \"Tự bấm Đăng\"). Bài X, một nền tảng vẫn chờ duyệt vì chưa có tài khoản nào sẵn sàng. Kết nối lại tài khoản ở trang Tài khoản rồi bấm \"Duyệt & đăng bài này\".");
   });
 });
