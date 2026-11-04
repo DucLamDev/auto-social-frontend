@@ -4,7 +4,7 @@ import { Bookmark, ChevronDown, ChevronUp, Heart, MessageCircle, Repeat2, Reply,
 import { Fragment, type ReactNode } from "react";
 import { glyphColor, platformBrand, PlatformMark } from "@/components/platforms/platform-mark";
 import { cn } from "@/lib/utils";
-import type { VariantPreview } from "@/services/resources.service";
+import type { PreviewAppearance, VariantPreview } from "@/services/resources.service";
 
 export type PreviewLayout = "microblog" | "photo" | "forum" | "qa" | "article";
 
@@ -59,21 +59,38 @@ function lines(text: string, markdown: boolean, accent: string) {
   return text.split("\n").map((line, index, all) => <Fragment key={index}>{inline(line, markdown, accent)}{index < all.length - 1 && <br />}</Fragment>);
 }
 
-/** Paragraphs, lists, headings, quotes and code blocks; anything else stays text. */
-export function PostBody({ text, format, accent }: { text: string; format: VariantPreview["format"]; accent: string }) {
+/** How the site shows this post: the backend says so, older backends only give the text format. */
+export function previewAppearance(preview: Pick<VariantPreview, "format" | "appearance">): PreviewAppearance {
+  return preview.appearance ?? (preview.format === "markdown" ? "markdown" : "plain");
+}
+
+const TABLE_ROW = /^\s*\|.*\|\s*$/;
+const TABLE_RULE = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/;
+const cells = (row: string) => row.trim().replace(/^\||\|$/g, "").split("|").map((cell) => cell.trim());
+
+/**
+ * Paragraphs, lists, headings, quotes, tables and code blocks as the site shows them. A plain-text site shows
+ * the text exactly as typed (list markers and line breaks stay characters); anything else stays text.
+ */
+export function PostBody({ text, format, accent, appearance }: { text: string; format: VariantPreview["format"]; accent: string; appearance?: PreviewAppearance }) {
   if (format === "html") {
     // HTML posts (WordPress, Blogger) render in a sandbox without scripts or same-origin access.
     const document = `<!doctype html><meta charset="utf-8"><style>body{font:15px/1.65 system-ui,sans-serif;color:#0f172a;margin:0}img{max-width:100%}a{color:${accent}}</style>${text}`;
     return <iframe title="Nội dung HTML" sandbox="" srcDoc={document} className="h-80 w-full rounded-lg border border-border bg-white" />;
   }
-  const markdown = format === "markdown";
+  const markdown = (appearance ?? previewAppearance({ format })) !== "plain";
+  if (!markdown) {
+    // What a plain-text composer shows: paragraphs and line breaks, links and hashtags highlighted, nothing else.
+    const paragraphs = text.replace(/\r\n?/g, "\n").split(/\n{2,}/).filter((paragraph) => paragraph.trim());
+    return <div className="space-y-3 break-words">{paragraphs.map((paragraph, index) => <p key={index} className="whitespace-pre-wrap">{lines(paragraph, false, accent)}</p>)}</div>;
+  }
   const blocks: ReactNode[] = [];
   const source = text.replace(/\r\n?/g, "\n").split("\n");
   let index = 0;
   while (index < source.length) {
     const line = source[index]!;
     if (!line.trim()) { index++; continue; }
-    if (markdown && /^\s*(```|~~~)/.test(line)) {
+    if (/^\s*(```|~~~)/.test(line)) {
       const code: string[] = [];
       index++;
       while (index < source.length && !/^\s*(```|~~~)/.test(source[index]!)) code.push(source[index++]!);
@@ -81,7 +98,19 @@ export function PostBody({ text, format, accent }: { text: string; format: Varia
       blocks.push(<pre key={blocks.length} className="overflow-x-auto rounded-lg bg-slate-900 p-3 text-[13px] leading-5 text-slate-100"><code>{code.join("\n")}</code></pre>);
       continue;
     }
-    const heading = markdown ? /^\s{0,3}(#{1,6})\s+(.*?)\s*#*\s*$/.exec(line) : null;
+    if (/^\s{0,3}([-*_])(\s*\1){2,}\s*$/.test(line)) { blocks.push(<hr key={blocks.length} className="border-slate-200" />); index++; continue; }
+    if (TABLE_ROW.test(line) && TABLE_RULE.test(source[index + 1] ?? "")) {
+      const head = cells(line);
+      index += 2;
+      const rows: string[][] = [];
+      while (index < source.length && TABLE_ROW.test(source[index]!)) rows.push(cells(source[index++]!));
+      blocks.push(<div key={blocks.length} className="overflow-x-auto"><table className="w-full border-collapse text-sm">
+        <thead><tr>{head.map((cell, cellIndex) => <th key={cellIndex} className="border border-slate-200 bg-slate-50 px-2 py-1 text-left font-semibold">{inline(cell, true, accent)}</th>)}</tr></thead>
+        <tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{head.map((_, cellIndex) => <td key={cellIndex} className="border border-slate-200 px-2 py-1 align-top">{inline(row[cellIndex] ?? "", true, accent)}</td>)}</tr>)}</tbody>
+      </table></div>);
+      continue;
+    }
+    const heading = /^\s{0,3}(#{1,6})\s+(.*?)\s*#*\s*$/.exec(line);
     if (heading) {
       blocks.push(<p key={blocks.length} className={cn("font-bold", heading[1]!.length <= 2 ? "text-lg" : "text-base")}>{inline(heading[2]!, true, accent)}</p>);
       index++;
@@ -98,14 +127,14 @@ export function PostBody({ text, format, accent }: { text: string; format: Varia
       blocks.push(<List key={blocks.length} className={cn("space-y-1 pl-5", ordered ? "list-decimal" : "list-disc")}>{items.map((item, itemIndex) => <li key={itemIndex}>{inline(item, markdown, accent)}</li>)}</List>);
       continue;
     }
-    if (markdown && /^\s*>/.test(line)) {
+    if (/^\s*>/.test(line)) {
       const quote: string[] = [];
       while (index < source.length && /^\s*>/.test(source[index]!)) quote.push(source[index++]!.replace(/^\s*>\s?/, ""));
       blocks.push(<blockquote key={blocks.length} className="border-l-4 border-slate-200 pl-3 text-slate-600">{lines(quote.join("\n"), true, accent)}</blockquote>);
       continue;
     }
     const paragraph: string[] = [];
-    while (index < source.length && source[index]!.trim() && !(markdown && /^\s*(```|~~~|#{1,6}\s|>)/.test(source[index]!)) && !bullet.test(source[index]!) && !numbered.test(source[index]!)) paragraph.push(source[index++]!);
+    while (index < source.length && source[index]!.trim() && !/^\s*(```|~~~|#{1,6}\s|>)/.test(source[index]!) && !bullet.test(source[index]!) && !numbered.test(source[index]!) && !(TABLE_ROW.test(source[index]!) && TABLE_RULE.test(source[index + 1] ?? ""))) paragraph.push(source[index++]!);
     blocks.push(<p key={blocks.length}>{lines(paragraph.join("\n"), markdown, accent)}</p>);
   }
   return <div className="space-y-3 break-words">{blocks}</div>;
@@ -149,7 +178,7 @@ export function PostPreview({ slug, platformName, accountName, handle, preview, 
   const layout = previewLayout(slug, preview);
   const display = accountName.replace(new RegExp(`^${platformName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*·\\s*`, "i"), "") || accountName;
   const at = handle ? `@${handle.replace(/^@/, "")}` : `@${display.toLowerCase().replace(/\s+/g, "")}`;
-  const body = <PostBody text={preview.body} format={preview.format} accent={accent} />;
+  const body = <PostBody text={preview.body} format={preview.format} accent={accent} appearance={previewAppearance(preview)} />;
   const placeholder = "Ảnh sẽ được gắn vào đây khi đăng";
   const header = <div className="flex items-center gap-3"><Avatar name={display} color={accent} /><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{display}</p><p className="truncate text-xs text-slate-500">{at} · vừa xong</p></div><PlatformMark slug={slug} name={platformName} size="sm" /></div>;
 
@@ -187,7 +216,7 @@ export function PostPreview({ slug, platformName, accountName, handle, preview, 
   }
   if (layout === "forum") {
     return <article className="w-full overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
-      <div className="space-y-2 border-b border-border p-4"><p className="text-xs font-semibold" style={{ color: accent }}>{platformName}</p><h4 className="text-xl font-bold leading-snug">{preview.title || "(Chưa có tiêu đề)"}</h4><Tags tags={preview.tags} accent={accent} /></div>
+      <div className="space-y-2 border-b border-border p-4"><p className="text-xs font-semibold" style={{ color: accent }}>{preview.destination?.community || preview.destination?.category || platformName}</p><h4 className="text-xl font-bold leading-snug">{preview.title || "(Chưa có tiêu đề)"}</h4><Tags tags={preview.tags} accent={accent} /></div>
       <div className="flex gap-3 p-4"><Avatar name={display} color={accent} /><div className="min-w-0 flex-1 space-y-3"><p className="text-sm"><span className="font-bold">{display}</span><span className="ml-2 text-xs text-slate-500">vừa xong</span></p><div className="text-[15px] leading-6">{body}</div><Picture image={image} pending={imagePending} label={placeholder} /></div></div>
       <div className="flex justify-end gap-4 border-t border-border px-4 py-2"><Action icon={Heart} label="Thích" /><Action icon={Reply} label="Trả lời" /></div>
     </article>;

@@ -88,6 +88,14 @@ describe("review outcome warning", () => {
     expect(reviewOutcomeWarning({ skippedAccounts: [], waitingVariantIds: [] }, platformOf)).toBeNull();
   });
 
+  it("says which drafts wait for a shorter text instead of an account", () => {
+    const platformOf = (id: string) => ({ v1: "Mastodon", v2: "Bluesky" } as Record<string, string>)[id];
+    const warning = reviewOutcomeWarning({ waitingVariantIds: ["v1", "v2"], overLimitVariants: [{ id: "v1", platform: "Mastodon", length: 545, maxChars: 500, message: "…" }] }, platformOf);
+    expect(warning).toContain("Chưa đăng 1 bài dài quá giới hạn ký tự: Mastodon 545/500.");
+    expect(warning).toContain("Bài Bluesky vẫn chờ duyệt vì chưa có tài khoản nào sẵn sàng.");
+    expect(warning).not.toContain("Bài Mastodon, Bluesky");
+  });
+
   it("names each skipped account with its reason and each platform kept waiting", () => {
     expect(reviewOutcomeWarning({
       skippedAccounts: [{ name: "Main", platform: "DEV", reasonLabel: "tài khoản đang tắt" }, { name: "DEV · team", platform: "DEV", reasonLabel: "chưa bật \"Tự bấm Đăng\"" }],

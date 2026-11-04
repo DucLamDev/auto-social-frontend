@@ -18,11 +18,28 @@ const extensionMessages: Record<string, string> = {
   SUBMIT_REJECTED: "Diễn đàn từ chối bài sau khi bấm Đăng. Xem tab diễn đàn, sửa rồi bấm Đăng lại hoặc Giao lại cho tiện ích.",
   SUBMIT_UNCONFIRMED: "Đã bấm Đăng nhưng chưa thấy bài mới. Kiểm tra diễn đàn: có bài thì bấm Đã đăng, chưa có thì Giao lại cho tiện ích.",
   RESULT_UNKNOWN: "Tiện ích không báo kết quả. Kiểm tra diễn đàn: có bài thì bấm Đã đăng, chưa có thì Giao lại cho tiện ích.",
+  CONTENT_TOO_LONG: "Bài dài hơn giới hạn ký tự của kênh này nên chưa giao cho tiện ích. Rút gọn bài trên web rồi Giao lại cho tiện ích.",
+  CONTENT_MISMATCH: "Trình soạn thảo của trang không giữ đúng nội dung bài nên tiện ích chưa bấm Đăng. Xem tab trong Chrome, sửa rồi bấm Đăng hoặc Giao lại cho tiện ích.",
+  EDITOR_NOT_FOUND: "Tiện ích không thấy ô soạn bài trên trang. Kiểm tra trang đăng của tài khoản; trang vừa đổi giao diện thì cần cập nhật tiện ích.",
 };
+
+/** A claimed extension job without any report for this long is treated as hung; it can be handed out again. */
+export const EXTENSION_CLAIM_TIMEOUT_MS = 10 * 60 * 1000;
+
+/** True when the extension took this job more than 10 minutes ago and has not reported back. */
+export function isExtensionClaimStuck(action: PublishNeedsAction | undefined, now = Date.now()): boolean {
+  if (action?.kind !== "EXTENSION_PENDING" || !action.claimedAt) return false;
+  const claimed = Date.parse(action.claimedAt);
+  return Number.isFinite(claimed) && now - claimed > EXTENSION_CLAIM_TIMEOUT_MS;
+}
 
 export function getNeedsActionMessage(action?: PublishNeedsAction) {
   if (!action) return undefined;
-  if (action.kind === "EXTENSION_PENDING") return "Đang chờ tiện ích Chrome đăng (Chrome cần mở và đã đăng nhập diễn đàn).";
+  if (action.kind === "EXTENSION_PENDING") {
+    return action.claimedAt
+      ? "Tiện ích Chrome đang đăng bài này. Quá 10 phút chưa xong thì kiểm tra tab trong Chrome rồi Giao lại cho tiện ích."
+      : "Đang chờ tiện ích Chrome đăng (Chrome cần mở và đã đăng nhập diễn đàn).";
+  }
   if (action.kind === "EXTENSION_ACTION") return action.message?.trim() || (action.reason && extensionMessages[action.reason]);
   if (action.kind === "POLICY_BLOCKED") {
     return "Automation bị vô hiệu hóa theo chính sách của nền tảng. Dùng luồng bàn giao an toàn thay vì cố chạy Playwright.";

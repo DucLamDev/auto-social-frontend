@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getNeedsActionMessage } from "./needs-action-feedback";
+import { getNeedsActionMessage, isExtensionClaimStuck } from "./needs-action-feedback";
 
 describe("getNeedsActionMessage", () => {
   it("preserves the specific reason that the extension could not submit", () => {
@@ -14,5 +14,23 @@ describe("getNeedsActionMessage", () => {
 
   it("does not suggest bypassing platform policy", () => {
     expect(getNeedsActionMessage({ kind: "POLICY_BLOCKED", message: "Blocked" })).toContain("bàn giao an toàn");
+  });
+
+  it("explains the new extension stops: too long, editor did not keep the text, job being posted", () => {
+    expect(getNeedsActionMessage({ kind: "EXTENSION_ACTION", reason: "CONTENT_TOO_LONG" })).toContain("Rút gọn bài");
+    expect(getNeedsActionMessage({ kind: "EXTENSION_ACTION", reason: "CONTENT_MISMATCH" })).toContain("không giữ đúng nội dung");
+    expect(getNeedsActionMessage({ kind: "EXTENSION_PENDING", claimedAt: "2026-11-04T09:00:00Z" })).toContain("đang đăng");
+    expect(getNeedsActionMessage({ kind: "EXTENSION_PENDING" })).toContain("Đang chờ tiện ích");
+  });
+});
+
+describe("isExtensionClaimStuck", () => {
+  it("is true only for a job claimed more than 10 minutes ago", () => {
+    const now = Date.parse("2026-11-04T10:00:00Z");
+    expect(isExtensionClaimStuck({ kind: "EXTENSION_PENDING", claimedAt: "2026-11-04T09:49:00Z" }, now)).toBe(true);
+    expect(isExtensionClaimStuck({ kind: "EXTENSION_PENDING", claimedAt: "2026-11-04T09:55:00Z" }, now)).toBe(false);
+    expect(isExtensionClaimStuck({ kind: "EXTENSION_PENDING" }, now)).toBe(false);
+    expect(isExtensionClaimStuck({ kind: "EXTENSION_ACTION", claimedAt: "2026-11-04T09:00:00Z" }, now)).toBe(false);
+    expect(isExtensionClaimStuck(undefined, now)).toBe(false);
   });
 });

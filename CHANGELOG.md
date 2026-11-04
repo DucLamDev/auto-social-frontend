@@ -3,6 +3,24 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.21.0 · 04/11/2026
+### Tính năng
+- Theo dõi bài tiện ích đang đăng, xem trước khớp bài thật, báo bài quá dài
+  Cần backend 1.17.0 trở lên (tiện ích Chrome 1.12.0).
+  - **Trang Publishing:**
+    - Job tiện ích đã nhận hiện **Tiện ích đang đăng** (khác với **Chờ tiện ích** khi chưa ai nhận).
+    - Nhận quá 10 phút mà chưa có kết quả thì có nút **Giao lại cho tiện ích**.
+    - Lý do mới có lời giải thích: bài quá dài, trình soạn thảo không giữ đúng nội dung, không thấy ô soạn bài.
+  - **Bản xem trước** vẽ theo cách nền tảng thật hiển thị (trường `appearance` của backend):
+    - kênh chữ thường (Mastodon, Bluesky…) hiện đúng chữ đã gõ: dấu "•" và xuống dòng giữ nguyên, không vẽ thành
+      danh sách;
+    - kênh Markdown có thêm bảng và đường kẻ;
+    - trình soạn thảo có định dạng (Differ…) vẽ như bài đã định dạng.
+    Xem trước hiện **community / chuyên mục** và **ngôn ngữ bài** sẽ đăng, cùng tag thật sự được gửi.
+  - **Duyệt bài:** "Duyệt tất cả" còn bài dài quá giới hạn ký tự thì cảnh báo tên kênh và số ký tự (ví dụ "Mastodon
+    545/500"), không gộp chung với bài chờ tài khoản. Duyệt hay sửa một bài quá dài hiện câu báo lỗi của máy chủ.
+  - Kiểu dữ liệu API sinh lại theo backend 1.17.0.
+
 ## 1.20.0 · 04/11/2026
 ### Tính năng
 - Content đợi duyệt: thu gọn từng bài, xem trước theo từng bài

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PublishJob } from "@/types/domain";
 import { PublishingView } from "./publishing-view";
@@ -52,6 +52,25 @@ const baseJob: PublishJob = {
   attempt: 1,
   maxAttempts: 3,
 };
+
+describe("PublishingView extension jobs", () => {
+  it("tells a job the extension is posting apart from one still waiting, and hands a hung one out again", async () => {
+    mocks.mutateAsync.mockReset().mockResolvedValue({ queued: true });
+    renderJob({ ...baseJob, needsAction: { kind: "EXTENSION_PENDING", claimedAt: new Date(Date.now() - 60_000).toISOString() } });
+    // The status badge and the action column both say so.
+    expect(screen.getAllByText("Tiện ích đang đăng")).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "Giao lại cho tiện ích" })).not.toBeInTheDocument();
+    cleanup();
+    renderJob({ ...baseJob, needsAction: { kind: "EXTENSION_PENDING", claimedAt: new Date(Date.now() - 11 * 60_000).toISOString() } });
+    fireEvent.click(screen.getByRole("button", { name: "Giao lại cho tiện ích" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Chưa có bài, giao lại" }));
+    await waitFor(() => expect(mocks.mutateAsync).toHaveBeenCalledWith("job-1"));
+    cleanup();
+    renderJob({ ...baseJob, needsAction: { kind: "EXTENSION_PENDING" } });
+    expect(screen.getByText("Chờ tiện ích Chrome")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Giao lại cho tiện ích" })).not.toBeInTheDocument();
+  });
+});
 
 describe("PublishingView provider reconciliation", () => {
   it("requests the moderation queue and labels the forum link separately from a post permalink", () => {

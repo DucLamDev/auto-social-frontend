@@ -30,7 +30,20 @@ export type ExtensionLoginCheckRow = { id: string; name: string; platform: strin
   posting?: { status: string; implemented: boolean; engine?: string; message: string; url?: string };
   attempts?: Array<{ method: string; available: boolean; check: { status: string; message?: string | null; finishedAt?: string | null } | null }>;
   check: { id: string; status: string; message?: string | null; detectedUsername?: string | null; finishedAt?: string | null } | null };
-export type VariantPreview = { title: string; body: string; format: "plain" | "markdown" | "html"; tags: string[]; group: string; engine: string | null; maxChars: number | null; length: number; overLimit: boolean };
+/**
+ * How a destination shows the post: `markdown` renders Markdown, `plain` shows the text as typed, `rich` is a
+ * formatting editor that receives the post already formatted. Older backends omit it (then `format` decides).
+ */
+export type PreviewAppearance = "markdown" | "plain" | "rich";
+export type VariantPreview = {
+  title: string; body: string; format: "plain" | "markdown" | "html";
+  /** Tags really sent in the destination's tag field. */
+  tags: string[];
+  group: string; engine: string | null; maxChars: number | null; length: number; overLimit: boolean;
+  appearance?: PreviewAppearance;
+  /** Where on the site the post goes, from the account's settings. */
+  destination?: { community?: string; category?: string; flair?: string; language?: "vi" | "en" };
+};
 export type ExtensionEngine = "xenforo" | "discourse" | "phpbb" | "medium" | "substack" | "quora" | "reddit" | "slideshare" | "aws-builder" | "tinhte" | "pixelfed" | "mastodon" | "bluesky" | "tumblr" | "devto" | "minds" | "stackexchange" | "lemmy" | "discuit" | "linkedin" | "differ" | "dzone" | "dailydev";
 export type ExtensionDeliveryInput = { enabled: boolean; engine?: ExtensionEngine; targetUrl?: string; autoSubmit?: boolean; tags?: string[]; category?: string; flair?: string };
 export type ExtensionSessionInput = { deviceId: string; expectedUsername: string; profileUrl?: string; identitySelector?: string; provider: "password" | "google"; autoLogin: boolean; autoTotp: boolean; loginUrl?: string; loginUsername?: string; password?: string; totpSecret?: string };
@@ -57,7 +70,7 @@ type RawPublishedPost = {
   platformAccount: PublishedPost["account"] & { platform: PublishedPost["platform"] };
   job: { target: { campaign: PublishedPost["campaign"]; contentVariant: { title: string | null } } };
 };
-type RawJob = { reviewUrl?: string; reviewUrlKind?: PublishJob["reviewUrlKind"]; id: string; status: Status; scheduledAt?: string | null; attemptCount: number; maxAttempts: number; lastErrorCode?: string | null; lastErrorMessage?: string | null; platformAccount?: { id?: string; name: string; enabled?: boolean; status?: PlatformAccount["status"]; platform?: { slug: string; name: string } }; target?: { campaign?: { id: string; name: string }; contentVariant?: { id?: string; title?: string | null } }; publishedPost?: { url?: string | null } | null; attempts?: RawAttempt[] };
+type RawJob = { reviewUrl?: string; reviewUrlKind?: PublishJob["reviewUrlKind"]; id: string; status: Status; scheduledAt?: string | null; lockedAt?: string | null; attemptCount: number; maxAttempts: number; lastErrorCode?: string | null; lastErrorMessage?: string | null; platformAccount?: { id?: string; name: string; enabled?: boolean; status?: PlatformAccount["status"]; platform?: { slug: string; name: string } }; target?: { campaign?: { id: string; name: string }; contentVariant?: { id?: string; title?: string | null } }; publishedPost?: { url?: string | null } | null; attempts?: RawAttempt[] };
 type RawPrompt = Omit<Contract["PromptTemplateContractDto"], "platform"> & { platform?: { slug: string; name: string } | null };
 type RawSetting = Contract["SystemSettingContractDto"];
 type RawPublishLog = Omit<Contract["PublishAttemptLogContractDto"], "job"> & { job: RawJob };
@@ -158,7 +171,7 @@ const mapJob = (item: RawJob): PublishJob => {
     : metadata.extensionQueued === true && item.status === "NEEDS_ACTION"
     ? extensionCode
       ? { kind: "EXTENSION_ACTION" as const, reason: extensionCode, ...(item.lastErrorMessage ? { message: item.lastErrorMessage } : {}) }
-      : { kind: "EXTENSION_PENDING" as const }
+      : { kind: "EXTENSION_PENDING" as const, ...(item.lockedAt ? { claimedAt: item.lockedAt } : {}) }
     : metadata.reconciliationRequired === true || workerCrashUncertain
       ? {
           kind: "RECONCILIATION" as const,
