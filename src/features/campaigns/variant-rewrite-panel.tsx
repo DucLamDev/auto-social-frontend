@@ -41,16 +41,19 @@ export function VariantRewritePanel({ variant, editable, unsaved, actions }: {
     } catch (error) { toast.error(error instanceof Error ? error.message : "Không thể viết lại bài này"); }
   };
 
+  // What the rewrite follows: the typed instruction, or the review points ticked in "Sửa theo khuyến nghị".
+  const basis = revision?.instruction ? ` theo hướng dẫn “${revision.instruction}”` : revision?.notes?.length ? ` theo ${revision.notes.length} khuyến nghị đã chọn` : "";
+
   if (rewriting) {
     return <p role="status" className="flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-800">
       <Loader2 aria-hidden className="size-4 shrink-0 animate-spin motion-reduce:animate-none" />
-      AI đang viết lại bài này{revision?.instruction ? ` theo hướng dẫn “${revision.instruction}”` : ""}, thường mất 1–3 phút. Bài mới sẽ tự hiện và được chấm lại.
+      AI đang viết lại bài này{basis}, thường mất 1–3 phút. Bài mới sẽ tự hiện và được chấm lại.
     </p>;
   }
 
   return <div className="space-y-2">
     {revision?.status === "failed" && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">Chưa viết lại được: {revision.error || "AI không trả về bài mới."}</p>}
-    {revision?.status === "done" && <p className="text-xs text-emerald-700">AI đã viết lại bài này{revision.instruction ? ` theo hướng dẫn “${revision.instruction}”` : ""} và chấm lại.</p>}
+    {revision?.status === "done" && <p className="text-xs text-emerald-700">AI đã viết lại bài này{basis} và chấm lại.</p>}
     {!editable && actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     {editable && <PermissionGate allow={["ADMIN", "EDITOR"]}>
       {open ? <div className="space-y-2 rounded-lg border border-border bg-white p-3">

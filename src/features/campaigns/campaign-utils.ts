@@ -124,6 +124,16 @@ export function aiScore(reason?: string | null): number | null {
   return match ? Number(match[1]) : null;
 }
 
+/**
+ * The separate fixes in a "Cần xem lại (AI chấm 7/10): a; b; c" review note. The
+ * server joins them with "; ", and a fix may itself contain "; " followed by a
+ * lower-case word, so only a "; " before a capital letter or a quote starts a new one.
+ */
+export function reviewPoints(reason?: string | null): string[] {
+  const text = (reason ?? "").replace(/^\s*Cần xem lại\s*\([^)]*\)\s*:\s*/u, "").trim();
+  return text ? [...new Set(text.split(/;\s+(?=[\p{Lu}"'“‘(])/u).map((point) => point.trim()).filter(Boolean))] : [];
+}
+
 export const DEFAULT_APPROVE_MIN_SCORE = 7;
 const APPROVE_MIN_SCORE_KEY = "auto-social:approve-min-score";
 

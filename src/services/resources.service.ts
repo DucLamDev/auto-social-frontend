@@ -116,7 +116,8 @@ const mapAiRevision = (value: unknown): VariantAiRevision | null => {
   const text = (key: string) => typeof revision[key] === "string" ? revision[key] as string : undefined;
   const status = text("status");
   if (status !== "generating" && status !== "done" && status !== "failed") return null;
-  return { status, instruction: text("instruction") ?? "", startedAt: text("startedAt"), finishedAt: text("finishedAt") ?? null, error: text("error") ?? null };
+  const notes = Array.isArray(revision.notes) ? revision.notes.filter((note): note is string => typeof note === "string") : undefined;
+  return { status, instruction: text("instruction") ?? "", ...(notes ? { notes } : {}), startedAt: text("startedAt"), finishedAt: text("finishedAt") ?? null, error: text("error") ?? null };
 };
 const mapVariant = (item: RawVariant): ContentVariant => ({ image: mapImagePlan(item.mediaRecommendation), aiRevision: mapAiRevision(item.aiRevision), id: item.id, contentId: item.contentId, platform: item.platform?.name ?? item.platform?.slug ?? "Platform", platformSlug: item.platform?.slug ?? "unknown", title: item.title, body: item.body, summary: item.summary, hashtags: item.hashtags, cta: item.cta, status: item.status, recommended: item.recommended, reason: item.reason, updatedAt: item.updatedAt });
 const mapContent = (item: RawContent): Content => ({ id: item.id, title: item.title, body: item.body, description: item.summary, canonicalUrl: item.canonicalUrl, status: item.status, source: item.sourceArticle?.source ?? null, variantsCount: item._count?.variants ?? item.variants?.length ?? 0, createdAt: item.createdAt, updatedAt: item.updatedAt });
@@ -225,7 +226,8 @@ export const resourcesService = {
   /** The post as its destination will show it (same rendering as publishing); unsaved edits can be passed in. */
   previewVariant: (variantId: string, input: { title?: string; body?: string; hashtags?: string[]; platformAccountId?: string }) => apiRequest<VariantPreview>(`/content-variants/${variantId}/preview`, { method: "POST", body: input }),
   /** Starts "Viết lại bằng AI" for one draft; the variant list follows `aiRevision`. */
-  rewriteVariant: (variantId: string, instruction?: string) => apiRequest<{ status: "generating" }>(`/content-variants/${variantId}/rewrite`, { method: "POST", body: instruction?.trim() ? { instruction: instruction.trim() } : {} }),
+  /** `notes`: the review points to fix ("Sửa theo khuyến nghị"); they replace the automatic review notes on the server. */
+  rewriteVariant: (variantId: string, instruction?: string, notes?: string[]) => apiRequest<{ status: "generating" }>(`/content-variants/${variantId}/rewrite`, { method: "POST", body: { ...(instruction?.trim() ? { instruction: instruction.trim() } : {}), ...(notes ? { notes } : {}) } }),
   removeVariantImage: (variantId: string, mediaId: string) => apiRequest<{ removed: boolean }>(`/content-variants/${variantId}/image/${mediaId}`, { method: "DELETE" }),
   geminiKeys: () => apiRequest<GeminiKeysSettings>("/ai/gemini-keys"),
   updateGeminiKeys: (input: GeminiKeysUpdate) => apiRequest<GeminiKeysSettings>("/ai/gemini-keys", { method: "PUT", body: input }),

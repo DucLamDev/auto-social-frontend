@@ -18,22 +18,13 @@ import { cn, formatDate } from "@/lib/utils";
 import { resourcesService } from "@/services/resources.service";
 import type { Campaign, ContentVariant, PlatformAccount } from "@/types/domain";
 import { aiScore, imagePending, isAutomationAccountEligible, normalizeMinScore, readApproveMinScore, reviewOutcomeWarning, saveApproveMinScore } from "./campaign-utils";
+import { ReviewAdvice } from "./review-advice";
 import { isRewriting, VariantRewritePanel } from "./variant-rewrite-panel";
 import { VariantImagePanel } from "./variant-image-panel";
 import { useSlow, VariantPreviewCard } from "./variant-preview-card";
 
 const isGenerating = (campaign: Campaign) => campaign.automationState === "QUEUED" || campaign.automationState === "PROCESSING";
 const without = <T,>(record: Record<string, T>, key: string) => Object.fromEntries(Object.entries(record).filter(([id]) => id !== key));
-
-/** Long AI review notes are cut to three lines until opened, so the post itself stays in view. */
-function ReviewNote({ text }: { text: string }) {
-  const [open, setOpen] = useState(false);
-  const long = text.length > 240;
-  return <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-    <p className={cn(long && !open && "line-clamp-3")}><span className="font-semibold">AI đề nghị kiểm tra: </span>{text}</p>
-    {long && <button type="button" aria-expanded={open} className="mt-1 inline-flex min-h-8 items-center text-xs font-semibold text-amber-800 underline" onClick={() => setOpen(!open)}>{open ? "Thu gọn ghi chú" : "Xem đủ ghi chú"}</button>}
-  </div>;
-}
 
 /** Where a post stands in a per-post review: drives its colour edge and its dot in the jump list. */
 type PostState = "waiting" | "approved" | "rejected" | "other";
@@ -268,7 +259,8 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
         </header>
         {!folded && <div className="space-y-3 p-4">
           {standalone && editable && ["GENERATED", "APPROVED"].includes(variant.status) && <label className="flex items-center gap-2 text-sm text-primary"><input type="radio" name={`variant-${campaign.id}-${variant.platformSlug}`} checked={chosenVariants.some((chosen) => chosen.id === variant.id)} disabled={busy} onChange={() => setSelectedVariants((current) => ({ ...current, [variant.platformSlug]: variant.id }))} />Dùng biến thể này khi đăng · {variant.title || variant.platform}</label>}
-          {variant.recommended === false && <ReviewNote text={variant.reason || "Nội dung cần được chỉnh sửa trước khi đăng."} />}
+          {variant.recommended === false && <ReviewAdvice key={variant.reason ?? ""} variant={variant} unsaved={Boolean(edit)}
+            editable={editable && (perPost ? waiting(variant) : ["GENERATED", "APPROVED"].includes(variant.status))} />}
           <VariantRewritePanel variant={variant} unsaved={Boolean(edit)} actions={editTools}
             editable={editable && (perPost ? waiting(variant) : ["GENERATED", "APPROVED"].includes(variant.status))} />
           {view === "preview" ? <>
