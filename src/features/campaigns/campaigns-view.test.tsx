@@ -124,6 +124,21 @@ describe("CampaignsView automation media retries", () => {
     expect(screen.getByText(/Tự động qua Playwright/)).toBeInTheDocument();
   });
 
+  it("opened from the API accounts tab, preselects API accounts even when Chrome accounts were chosen in an import", () => {
+    const chrome = (id: string, name: string, selected: boolean) => ({
+      id, name, platformId: "platform-voz", platform: { id: "platform-voz", name: "Voz Forums", slug: "voz-forums", mode: "MANUAL" }, enabled: true, status: "CONNECTED",
+      settings: { delivery: "extension", extensionEngine: "xenforo", extensionTargetUrl: "https://voz.vn/f/a.17/post-thread", extensionAutoSubmit: true, extensionImport: { selected }, extensionSession: { deviceId: "chrome" } },
+    });
+    mocks.accountItems = [...mocks.accountItems, chrome("chrome-new", "Chrome chosen", true), chrome("chrome-old", "Chrome old import", false)];
+    mocks.platformItems = [...mocks.platformItems, { id: "platform-voz", name: "Voz Forums", slug: "voz-forums", mode: "MANUAL", enabled: true, capabilities: {} }];
+
+    render(<CampaignsView initialAutomationOpen initialChannel="api" />);
+
+    expect(screen.getByRole("checkbox", { name: /DEV Production/ })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /Chrome chosen/ })).not.toBeChecked();
+    expect(screen.queryByText("Chrome old import")).not.toBeInTheDocument();
+  });
+
   it("closes the form as soon as the background request is accepted without activating publication", async () => {
     mocks.automateCampaign.mockReset().mockResolvedValue({ campaign: { automationState: "QUEUED" }, generatedVariants: 0, jobsCreated: 0, activated: false });
     render(<CampaignsView initialAutomationOpen />);

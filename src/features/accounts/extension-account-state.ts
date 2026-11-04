@@ -25,9 +25,40 @@ export function countConnectionStates(accounts: PlatformAccount[], statusOf: (ac
   }
   return counts;
 }
-export function extensionSetupMessage(account: PlatformAccount) {
+/**
+ * Accounts tab: posting through the Chrome extension (extension delivery, a bound
+ * Chrome profile or a row of the extension accounts file) or through an API /
+ * OAuth / Playwright / manual route.
+ */
+export type AccountChannel = "extension" | "api";
+export const accountChannel = (account: PlatformAccount): AccountChannel =>
+  account.settings?.delivery === "extension" || isChromeBound(account) || Object.keys(record(account.settings?.extensionImport)).length > 0 ? "extension" : "api";
+
+/** Flow audit statuses for which signing in again cannot make the account post. */
+const CANNOT_POST = new Set(["FLOW_REQUIRED", "UNAVAILABLE", "MANUAL_ONLY", "DESTINATION_UNAVAILABLE"]);
+export type PostingAudit = { status: string; implemented?: boolean; message?: string };
+/**
+ * True when the account has no posting flow, so signing in again cannot make it
+ * post. The backend audit wins; without it the platform's flow id decides (a
+ * stored setup status may predate the flow).
+ */
+export function cannotPostAutomatically(account: PlatformAccount, posting?: PostingAudit) {
+  if (account.settings?.delivery === "extension") return false;
+  if (posting) return CANNOT_POST.has(posting.status);
+  return typeof account.platform?.defaultSettings?.extensionFlowId !== "string";
+}
+
+/**
+ * Where a Chrome account stands for posting. `posting` is the backend flow audit
+ * (from the login checks): it knows the flow's default page even when the
+ * platform defaults stored in the database are older.
+ */
+export function extensionSetupMessage(account: PlatformAccount, posting?: PostingAudit) {
   if (record(account.settings?.extensionSetup).status === "ACCESS_RESTRICTED") return "Đã gán Chrome · quyền đăng bài bị hạn chế";
   if (account.settings?.delivery === "extension") return account.settings.extensionAutoSubmit === false ? "Chờ bạn bấm Đăng" : "Tự bấm Đăng";
-  return typeof account.platform?.defaultSettings?.extensionFlowId === "string"
-    ? "Cần cấu hình nơi đăng bài" : "Đã gán Chrome · chưa có luồng đăng tự động";
+  if (cannotPostAutomatically(account, posting)) {
+    return `Chưa đăng tự động được${posting?.message ? `: ${posting.message.split(/(?<=\.)\s/)[0]}` : " (chưa có luồng đăng)"}`;
+  }
+  if ((posting?.status ?? record(account.settings?.extensionSetup).status) === "DESTINATION_REQUIRED") return "Cần chọn trang đăng · bấm Tiện ích";
+  return "Bấm Test để tự kết nối";
 }

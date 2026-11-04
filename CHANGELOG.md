@@ -3,6 +3,28 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.16.0 · 04/11/2026
+### Tính năng
+- Trang Tài khoản chia 2 tab, bỏ trang Nền tảng (cần backend 1.15.0)
+  - Tab **Đăng bằng tiện ích Chrome** gồm: Chrome đã ghép nối, **Thêm social**, **Nhập file tài khoản**, **Kết nối /
+    cấu hình** (luồng Chrome). Tab **Đăng qua API** gồm: **Kết nối tài khoản API** (OAuth, API key, Playwright, bàn
+    giao thủ công), **Nhập file cấu hình API**. Tab đang mở được giữ trên địa chỉ (`?tab=api`).
+  - Mỗi tab có nút **Tạo nội dung hàng loạt & đăng**, mở hộp tạo bài AI và chọn sẵn tài khoản sẵn sàng của tab đó; vẫn
+    tích thêm được tài khoản của tab kia. Tài khoản API luôn có trong hộp tạo bài, kể cả khi đã chọn một nhóm tài khoản
+    Chrome lúc nhập file.
+  - Trang Nền tảng bỏ khỏi menu; địa chỉ cũ `/platforms` chuyển sang tab API. Không cần bật nền tảng bằng tay nữa:
+    thêm tài khoản cho nền tảng đang tắt thì hệ thống tự bật.
+- **Thêm social**: thêm từng social vào luồng đăng bằng tiện ích, giống một dòng trong file tài khoản. Chỉ social đó được
+  Chrome đăng nhập thử; các social đang chạy giữ nguyên. Hộp hiện hướng dẫn của luồng và trang đăng mặc định.
+- Nhập lại file tài khoản báo rõ "bỏ qua N social đã có không đổi"; chỉ social mới (hoặc đổi tài khoản đăng nhập) được
+  đăng nhập lại.
+- Cột **Kiểu kết nối** nói rõ vì sao tài khoản đã đăng nhập chưa đăng được: "Bấm Test để tự kết nối", "Cần chọn trang
+  đăng · bấm Tiện ích", hoặc "Chưa đăng tự động được: …" (kênh chưa có luồng đăng, công tắc bị khoá).
+
+### Gỡ bỏ
+- Bỏ 2 nút **Kiểm tra tất cả** và **Test đăng nhập hàng loạt**: bấm nhầm là Chrome đăng nhập lại cả loạt. Kiểm tra từng
+  tài khoản bằng nút **Test** ở dòng của tài khoản đó.
+
 ## 1.15.0 · 04/11/2026
 ### Tính năng
 - Duyệt & đăng các bài từ N điểm AI, bài đã duyệt được thu gọn

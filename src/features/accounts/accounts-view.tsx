@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, HeartPulse, Puzzle, KeyRound, Link2, LockKeyhole, LogIn, MonitorPlay, PlugZap, RefreshCw, Settings2, ShieldCheck, ShieldOff, TestTube2, Upload } from "lucide-react";
+import { ExternalLink, Puzzle, KeyRound, Link2, LockKeyhole, LogIn, MonitorPlay, Plus, PlugZap, RefreshCw, Settings2, ShieldCheck, ShieldOff, Sparkles, TestTube2, Upload } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
@@ -32,13 +32,18 @@ import { ExtensionSessionForm } from "./extension-session-form";
 import { ExtensionLoginCheckPanel } from "./extension-login-check-panel";
 import { AccountImportModal } from "./account-import-modal";
 import { ApiImportModal } from "./api-import-modal";
-import { accountConnectionState, chromeSession, countConnectionStates, extensionSetupMessage, isChromeBound, isSelectedExtensionAccount, type ConnectionState } from "./extension-account-state";
+import { accountChannel, accountConnectionState, cannotPostAutomatically, chromeSession, countConnectionStates, extensionSetupMessage, isChromeBound, isSelectedExtensionAccount, type AccountChannel, type ConnectionState } from "./extension-account-state";
+import { AddExtensionAccountModal } from "./add-extension-account-modal";
 import { ExtensionConnectionHelpModal } from "./extension-connection-help-modal";
 import { extensionConnectionHelp } from "./extension-connection-help";
 
 interface CredentialTarget { platform: Pick<Platform, "id" | "slug" | "name"> & Partial<Pick<Platform, "connectorKey" | "mode" | "defaultSettings">>; account?: PlatformAccount }
 
 const DESTINATION_PAGE_SIZE = 8;
+const TABS: Array<{ value: AccountChannel; label: string; hint: string }> = [
+  { value: "extension", label: "Đăng bằng tiện ích Chrome", hint: "Social đăng qua Chrome đã đăng nhập: nhập file, thêm từng social, kiểm tra đăng nhập." },
+  { value: "api", label: "Đăng qua API", hint: "Social đăng qua API, OAuth hoặc bàn giao thủ công: kết nối bằng key / đăng nhập một lần." },
+];
 const CONNECTION_FILTERS: Array<{ value: ConnectionState; label: string; short: string; dot: string }> = [
   { value: "connected", label: "Đã kết nối · có thể đăng", short: "Đã kết nối", dot: "bg-emerald-500" },
   { value: "needs_action", label: "Cần thao tác", short: "Cần thao tác", dot: "bg-amber-500" },
@@ -155,7 +160,9 @@ function CredentialAccountForm({ target, onClose, onBrowserLogin, onExtensionCon
   </form>;
 }
 
-export function AccountsView() {
+export function AccountsView({ initialTab = "extension" }: { initialTab?: AccountChannel } = {}) {
+  const [tab, setTab] = useState<AccountChannel>(initialTab);
+  const [addOpen, setAddOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [accountScope, setAccountScope] = useState("selected");
   const [connectionFilter, setConnectionFilter] = useState("");
@@ -178,20 +185,22 @@ export function AccountsView() {
   const refetchAccounts = query.refetch;
   const loginChecks = useExtensionLoginChecks();
   const checksByAccount = new Map((loginChecks.data ?? []).map(row => [row.id, row.check]));
-  // Test, "Kiểm tra tất cả" and turning an account on log in when Chrome has no session yet
-  // (saved password first, then Google), like "Test đăng nhập hàng loạt". Only "Tôi đã đăng
-  // nhập · Kiểm tra" in the connection help stays a session-only check.
+  const postingByAccount = new Map((loginChecks.data ?? []).map(row => [row.id, row.posting]));
+  // "Test" and turning an account on log in when Chrome has no session yet (saved password
+  // first, then Google). There is no "check everything" button: one mis-click signed every
+  // account in again. Only "Tôi đã đăng nhập · Kiểm tra" in the help stays session-only.
   const testChrome = useResourceMutation((ids: string[]) => resourcesService.queueExtensionLoginChecks(ids, false, true), ["extension-login-checks", "accounts"]);
-  const testChromeBulk = useResourceMutation((ids: string[]) => resourcesService.queueExtensionLoginChecks(ids, false, true, true), ["extension-login-checks", "accounts"]);
   const platforms = usePlatforms({ limit: 100 });
   const providers = useOAuthProviders();
   const update = useResourceMutation(({ id, enabled }: { id: string; enabled: boolean }) => resourcesService.updateAccount(id, { enabled }), ["accounts"]);
   const test = useResourceMutation((id: string) => resourcesService.testAccount(id), ["accounts"]);
   const revokeBrowserSession = useResourceMutation((id: string) => resourcesService.revokeBrowserSession(id), ["accounts"]);
   const setPublishMode = useResourceMutation(({ id, publishImmediately }: { id: string; publishImmediately: boolean }) => resourcesService.updateAccountSettings(id, { publishImmediately }), ["accounts"]);
-  const checkAll = useResourceMutation(() => resourcesService.runAccountCheck(), ["accounts", "account-health"]);
   const readyProviders = new Set((providers.data ?? []).filter((provider) => provider.status === "READY").map((provider) => provider.provider));
-  const allAccounts = query.data?.items ?? [];
+  const everyAccount = query.data?.items ?? [];
+  const tabCounts = { extension: everyAccount.filter(account => accountChannel(account) === "extension").length, api: everyAccount.filter(account => accountChannel(account) === "api").length };
+  // Each tab lists its own accounts; filters and counts below apply within the tab.
+  const allAccounts = everyAccount.filter(account => accountChannel(account) === tab);
   const selectedCount = allAccounts.filter(isSelectedExtensionAccount).length;
   const checkStatusOf = (item: PlatformAccount) => checksByAccount.get(item.id)?.status;
   const inScope = (item: PlatformAccount) => !selectedCount || accountScope === "all" || isSelectedExtensionAccount(item);
@@ -209,7 +218,8 @@ export function AccountsView() {
   const catalogPlatforms = useMemo(() => platforms.data?.items ?? [], [platforms.data?.items]);
   // Platforms that have matching accounts come first; the rest keep catalogue order.
   const platformOptions = [...catalogPlatforms].sort((a, b) => Number(platformCounts.has(b.id)) - Number(platformCounts.has(a.id)));
-  const configurablePlatforms = useMemo(() => catalogPlatforms.filter((platform) => platform.enabled && getCredentialConfig(platform)), [catalogPlatforms]);
+  // Every catalogue platform: adding an account switches a disabled platform on (backend 1.15.0).
+  const configurablePlatforms = useMemo(() => catalogPlatforms.filter((platform) => getCredentialConfig(platform)), [catalogPlatforms]);
   const normalizedDestinationSearch = destinationSearch.trim().toLowerCase();
   const matchingPlatforms = configurablePlatforms.filter((platform) => !normalizedDestinationSearch
     || `${platform.name} ${platform.slug}`.toLowerCase().includes(normalizedDestinationSearch));
@@ -228,6 +238,15 @@ export function AccountsView() {
   useEffect(() => {
     if (loginChecks.data?.some(row => row.check)) void refetchAccounts();
   }, [loginChecks.data, refetchAccounts]);
+
+  // The tab is kept in the address (?tab=api) so a reload or a shared link opens it again.
+  const chooseTab = (next: AccountChannel) => {
+    setTab(next);
+    setPlatformId(""); setConnectionFilter("");
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", next);
+    window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+  };
 
   useEffect(() => {
     const outcome = readOAuthResult(window.location.search);
@@ -269,26 +288,6 @@ export function AccountsView() {
       toast.error(error instanceof Error ? error.message : "Không thể bắt đầu OAuth");
     }
   };
-  const runCheckAll = async () => {
-    try {
-      const chromeAccounts = items.filter(isChromeBound);
-      if (chromeAccounts.length) {
-        // Accounts already signed in are left out; "Test" on a row still checks that one again.
-        const result = await testChromeBulk.mutateAsync(chromeAccounts.map(account => account.id));
-        const skipped = result.skipped ? `, bỏ qua ${result.skipped} tài khoản đã đăng nhập thành công` : "";
-        if (result.queued) toast.success(`Đã giao Chrome kiểm tra ${result.queued} tài khoản trong danh sách đang hiển thị${skipped}.`);
-        else toast.info(`Không có tài khoản nào cần kiểm tra${skipped}.`);
-        return;
-      }
-      const { tokens, connections } = await checkAll.mutateAsync(undefined);
-      const failed = (tokens.failed ?? 0) + (connections.failed ?? 0);
-      const summary = `Đã kiểm tra ${connections.checked ?? 0} tài khoản, gia hạn ${tokens.refreshed ?? 0} token.`;
-      if (failed) toast.warning(`${summary} ${failed} mục lỗi — xem cột Trạng thái.`);
-      else toast.success(summary);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Không thể chạy kiểm tra");
-    }
-  };
   const confirmBrowserSessionRevoke = async () => {
     if (!browserSessionRevokeTarget) return;
     try {
@@ -328,17 +327,36 @@ export function AccountsView() {
   </div>;
 
   return <div className="animate-enter">
-    <PageHeader eyebrow="Destinations" title="Tài khoản" description="Nhập file để kết nối social, lọc kênh sẵn sàng rồi tạo và đăng bài tự động." action={<div className="flex flex-wrap gap-2"><Link href="/campaigns?automate=1" className="inline-flex items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white">Tạo bài & đăng tự động</Link><PermissionGate allow={["ADMIN"]}><Button variant="secondary" onClick={() => setImportOpen(true)}><Upload className="size-4" />Nhập file tài khoản</Button><Button variant="secondary" onClick={() => setApiImportOpen(true)}><KeyRound className="size-4" />Nhập file cấu hình API</Button><Button variant="secondary" onClick={() => setConnectOpen(true)}><Link2 className="size-4" />Kết nối / cấu hình</Button></PermissionGate></div>} />
+    <PageHeader eyebrow="Destinations" title="Tài khoản" description="Mọi social ở một nơi: tab tiện ích Chrome và tab API. Mỗi tab tạo nội dung hàng loạt và tự đăng lên các social của tab đó." action={<div className="flex flex-wrap gap-2">
+      <Link href={`/campaigns?automate=1&channel=${tab}`} className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white"><Sparkles className="size-4" />Tạo nội dung hàng loạt & đăng</Link>
+      <PermissionGate allow={["ADMIN"]}>{tab === "extension" ? <>
+        <Button variant="secondary" onClick={() => setAddOpen(true)}><Plus className="size-4" />Thêm social</Button>
+        <Button variant="secondary" onClick={() => setImportOpen(true)}><Upload className="size-4" />Nhập file tài khoản</Button>
+        <Button variant="secondary" onClick={() => setConnectOpen(true)} title="Tạo tài khoản theo luồng đăng Chrome rồi tự chọn trang đăng, chuyên mục, tag (Chrome đã đăng nhập sẵn)"><Link2 className="size-4" />Kết nối / cấu hình</Button>
+      </> : <>
+        <Button variant="secondary" onClick={() => setConnectOpen(true)}><Link2 className="size-4" />Kết nối tài khoản API</Button>
+        <Button variant="secondary" onClick={() => setApiImportOpen(true)}><KeyRound className="size-4" />Nhập file cấu hình API</Button>
+      </>}</PermissionGate>
+    </div>} />
+    <div role="tablist" aria-label="Cách đăng bài" className="mb-5 flex flex-wrap gap-2">
+      {TABS.map(item => <button key={item.value} type="button" role="tab" id={`accounts-tab-${item.value}`} aria-selected={tab === item.value} aria-controls="accounts-tab-panel" onClick={() => chooseTab(item.value)}
+        className={cn("inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-semibold transition", tab === item.value ? "border-primary bg-primary-soft text-primary" : "border-border bg-white text-slate-600 hover:bg-slate-50")}>
+        {item.value === "extension" ? <Puzzle className="size-4" /> : <KeyRound className="size-4" />}{item.label}
+        <span className={cn("min-w-6 rounded-full px-1.5 py-0.5 text-center text-[11px] tabular-nums", tab === item.value ? "bg-white text-primary" : "bg-slate-100 text-slate-700")}>{tabCounts[item.value]}</span>
+      </button>)}
+    </div>
+    <p className="-mt-3 mb-4 text-xs text-muted">{TABS.find(item => item.value === tab)?.hint}</p>
     <AccountImportModal open={importOpen} onClose={() => setImportOpen(false)} />
+    <AddExtensionAccountModal open={addOpen} onClose={() => setAddOpen(false)} />
     <ApiImportModal open={apiImportOpen} onClose={() => setApiImportOpen(false)} />
-    <ExtensionPanel />
-    <ExtensionLoginCheckPanel />
+    <div role="tabpanel" id="accounts-tab-panel" aria-labelledby={`accounts-tab-${tab}`}>
+    {tab === "extension" && <><ExtensionPanel /><ExtensionLoginCheckPanel /></>}
     <Card className="overflow-hidden">
       <Toolbar search={search} onSearch={setSearch} searchPlaceholder="Tìm tài khoản…" filters={<>
         {selectedCount > 0 && <Select aria-label="Phạm vi tài khoản" value={accountScope} onChange={event => setAccountScope(event.target.value)}><option value="selected">{selectedCount} tài khoản đã chọn</option><option value="all">Toàn bộ tài khoản ({allAccounts.length})</option></Select>}
         <Select aria-label="Lọc nền tảng" className="w-56" value={platformId} onChange={(event) => setPlatformId(event.target.value)}><option value="">Mọi nền tảng ({platformTotal})</option>{platformOptions.map((platform) => <option value={platform.id} key={platform.id}>{platform.name} ({platformCounts.get(platform.id) ?? 0})</option>)}</Select>
         <Select aria-label="Lọc trạng thái kết nối" value={connectionFilter} onChange={event => setConnectionFilter(event.target.value)}><option value="">Mọi trạng thái ({connectionCounts.total})</option>{CONNECTION_FILTERS.map(filter => <option key={filter.value} value={filter.value}>{filter.label} ({connectionCounts[filter.value]})</option>)}</Select>
-      </>} end={<div className="flex gap-1"><PermissionGate allow={["ADMIN"]}><Button variant="ghost" size="sm" loading={checkAll.isPending || testChromeBulk.isPending} onClick={() => void runCheckAll()} title={items.some(isChromeBound) ? "Kiểm tra và tự đăng nhập Chrome cho các tài khoản đang hiển thị chưa đăng nhập (thử mật khẩu đã lưu, rồi Google); tài khoản đã đăng nhập được bỏ qua" : "Gia hạn token đến hạn và kiểm tra kết nối mọi tài khoản ngay"}><HeartPulse className="size-4" />Kiểm tra tất cả</Button></PermissionGate><Button variant="ghost" size="sm" onClick={() => void query.refetch()}><RefreshCw className="size-4" />Refresh</Button></div>} />
+      </>} end={<Button variant="ghost" size="sm" onClick={() => void query.refetch()}><RefreshCw className="size-4" />Refresh</Button>} />
       {query.isSuccess && allAccounts.length > 0 && <div role="group" aria-label="Số tài khoản theo trạng thái kết nối" className="flex flex-wrap gap-2 border-b border-border px-4 py-3">
         {[{ value: "", label: "Tất cả", short: "Tất cả", dot: "bg-slate-400", count: connectionCounts.total }, ...CONNECTION_FILTERS.map(filter => ({ ...filter, count: connectionCounts[filter.value] }))].map(chip => {
           const active = connectionFilter === chip.value;
@@ -347,7 +365,9 @@ export function AccountsView() {
           </button>;
         })}
       </div>}
-      {query.isPending ? <div className="p-5"><TableSkeleton /></div> : query.isError ? <ErrorState error={query.error} onRetry={() => void query.refetch()} /> : items.length === 0 && allAccounts.length > 0 ? <EmptyState title="Không có tài khoản khớp bộ lọc" description="Đổi nền tảng, trạng thái hoặc từ khoá tìm để xem các tài khoản khác." action={<Button variant="secondary" onClick={() => { setPlatformId(""); setConnectionFilter(""); setSearch(""); }}>Bỏ lọc</Button>} /> : items.length === 0 ? <EmptyState title="Chưa có tài khoản" description="Kết nối API hoặc thêm điểm đến bàn giao thủ công đầu tiên." action={<PermissionGate allow={["ADMIN"]}><Button onClick={() => setConnectOpen(true)}><PlugZap className="size-4" />Cấu hình ngay</Button></PermissionGate>} /> : <TableWrap><Table><thead><tr><Th>Nền tảng / tài khoản</Th><Th>Trạng thái</Th><Th>Kiểu kết nối</Th><Th>Kiểm tra gần nhất</Th><Th>Đang bật</Th><Th className="text-right">Thao tác</Th></tr></thead><tbody>{items.map((account) => {
+      {query.isPending ? <div className="p-5"><TableSkeleton /></div> : query.isError ? <ErrorState error={query.error} onRetry={() => void query.refetch()} /> : items.length === 0 && allAccounts.length > 0 ? <EmptyState title="Không có tài khoản khớp bộ lọc" description="Đổi nền tảng, trạng thái hoặc từ khoá tìm để xem các tài khoản khác." action={<Button variant="secondary" onClick={() => { setPlatformId(""); setConnectionFilter(""); setSearch(""); }}>Bỏ lọc</Button>} /> : items.length === 0 ? tab === "extension"
+        ? <EmptyState title="Chưa có social đăng bằng tiện ích" description="Nhập file tài khoản hoặc thêm từng social; Chrome đã ghép nối sẽ đăng nhập thử từng social mới." action={<PermissionGate allow={["ADMIN"]}><Button onClick={() => setAddOpen(true)}><Plus className="size-4" />Thêm social</Button></PermissionGate>} />
+        : <EmptyState title="Chưa có tài khoản đăng qua API" description="Kết nối bằng OAuth, API key hoặc thêm điểm đến bàn giao thủ công." action={<PermissionGate allow={["ADMIN"]}><Button onClick={() => setConnectOpen(true)}><PlugZap className="size-4" />Kết nối tài khoản API</Button></PermissionGate>} /> : <TableWrap><Table><thead><tr><Th>Nền tảng / tài khoản</Th><Th>Trạng thái</Th><Th>Kiểu kết nối</Th><Th>Kiểm tra gần nhất</Th><Th>Đang bật</Th><Th className="text-right">Thao tác</Th></tr></thead><tbody>{items.map((account) => {
         const platform = catalogPlatforms.find((item) => item.id === account.platformId) ?? account.platform;
         const config = getCredentialConfig(platform);
         const viaExtension = isExtensionAccount(account);
@@ -356,7 +376,7 @@ export function AccountsView() {
         const connectionHelp = extensionConnectionHelp(account, loginCheck ?? undefined);
         const restricted = typeof account.settings?.extensionSetup === "object" && account.settings.extensionSetup !== null && "status" in account.settings.extensionSetup && account.settings.extensionSetup.status === "ACCESS_RESTRICTED";
         const chromeStatus = restricted ? "NEEDS_ACTION" : loginCheck?.status === "AUTHENTICATED" ? viaExtension && account.enabled && account.status === "CONNECTED" ? "CONNECTED" : "AUTHENTICATED" : loginCheck?.status ?? "CHROME_BOUND";
-        const setupMessage = extensionSetupMessage(account);
+        const setupMessage = extensionSetupMessage(account, postingByAccount.get(account.id));
         const manual = platform?.mode === "MANUAL" && !viaExtension && !chromeBound;
         const browserAssisted = platform?.mode === "BROWSER_ASSISTED" && !viaExtension && !chromeBound;
         const oauthProvider = oauthProviderForPlatform(account.platform?.slug);
@@ -373,7 +393,7 @@ export function AccountsView() {
           <Td><PermissionGate allow={["ADMIN"]} fallback={<Badge value={account.enabled ? "ACTIVE" : "INACTIVE"} />}><Switch checked={account.enabled} disabled={update.isPending || (!account.enabled && chromeBound && !viaExtension)} label={`Bật ${account.name}`} onChange={(enabled) => void update.mutateAsync({ id: account.id, enabled }).then(async () => {
             if (enabled && chromeBound) await testChrome.mutateAsync([account.id]);
             toast.success(enabled && chromeBound ? "Đã bật và giao Chrome kiểm tra kết nối" : "Đã cập nhật");
-          }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Có lỗi"))} />{chromeBound && !viaExtension && <p className="mt-1 max-w-36 text-[10px] text-muted">Cần cấu hình đăng bằng tiện ích</p>}</PermissionGate></Td>
+          }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Có lỗi"))} />{chromeBound && !viaExtension && <p className="mt-1 max-w-36 text-[10px] text-muted">{cannotPostAutomatically(account, postingByAccount.get(account.id)) ? "Khoá: chưa có luồng đăng" : "Bật được khi đã kết nối"}</p>}</PermissionGate></Td>
           <Td><div className="flex flex-wrap justify-end gap-1">
             {chromeBound && <PermissionGate allow={["ADMIN"]}><Button variant="ghost" size="sm" onClick={() => setHelpAccount(account)}>Hướng dẫn kết nối</Button></PermissionGate>}
             <PermissionGate allow={chromeBound ? ["ADMIN"] : ["ADMIN", "EDITOR"]}>{(!browserAssisted || account.browserSessionConfigured === true) && <Button variant="ghost" size="sm" loading={chromeBound ? testChrome.isPending : test.isPending} onClick={() => void testConnection(account)}><TestTube2 className="size-4" />Test</Button>}</PermissionGate>
@@ -388,18 +408,20 @@ export function AccountsView() {
         </tr>;
       })}</tbody></Table></TableWrap>}
     </Card>
+    </div>
 
     <ExtensionConnectionHelpModal account={helpAccount} check={helpAccount ? checksByAccount.get(helpAccount.id) ?? undefined : undefined} onClose={() => setHelpAccount(null)} onSession={setSessionTarget} onDelivery={setExtensionTarget} />
 
-    <Modal open={connectOpen} onClose={() => setConnectOpen(false)} title="Kết nối / cấu hình điểm đến" description="Chọn luồng đăng cho từng nền tảng qua Chrome, API hoặc Playwright." className="max-w-3xl">
+    <Modal open={connectOpen} onClose={() => setConnectOpen(false)} title={tab === "api" ? "Kết nối tài khoản đăng qua API" : "Kết nối / cấu hình điểm đến"} description={tab === "api" ? "Chọn nền tảng để kết nối bằng OAuth, API key, Playwright hoặc bàn giao thủ công. Nền tảng đang tắt được bật khi thêm tài khoản." : "Tạo tài khoản theo luồng đăng bằng tiện ích Chrome rồi cấu hình trang đăng. Muốn Chrome tự đăng nhập bằng mật khẩu / Google thì dùng Thêm social."} className="max-w-3xl">
       <div className="space-y-7">
         <div><Label htmlFor="destination-search">Tìm điểm đến</Label><Input id="destination-search" value={destinationSearch} onChange={(event) => { setDestinationSearch(event.target.value); setAutomaticPage(1); setBrowserPage(1); setManualPage(1); setExtensionPage(1); }} placeholder="NGINX, Caddy, DirectAdmin…" /></div>
-        {extensionPlatforms.length > 0 && <section>
+        {tab === "extension" && extensionPlatforms.length > 0 && <section>
           <h3 className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">Luồng đăng bằng tiện ích Chrome</h3>
           <p className="mb-3 text-xs leading-5 text-muted">Mỗi nền tảng có trang đăng và cấu hình riêng. Chọn nhiều tài khoản trong cùng chiến dịch để chạy tối đa 3 nền tảng song song. Giữ Chrome mở và đăng nhập sẵn các tài khoản.</p>
           {destinationCards(extensionPlatforms.slice((extensionPage - 1) * DESTINATION_PAGE_SIZE, extensionPage * DESTINATION_PAGE_SIZE), "extension")}
           <Pagination page={extensionPage} totalPages={Math.ceil(extensionPlatforms.length / DESTINATION_PAGE_SIZE)} total={extensionPlatforms.length} onPage={setExtensionPage} />
         </section>}
+        {tab === "api" && <>
         <section><h3 className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">Đăng nhập một lần (OAuth chính thức)</h3><p className="mb-3 text-xs leading-5 text-muted">Bấm Kết nối, đăng nhập trên trang của nền tảng và cấp quyền. Hệ thống lưu token đã mã hoá; không cần dán token thủ công.</p>{providers.isPending ? <TableSkeleton rows={2} /> : providers.isError ? <ErrorState compact error={providers.error} onRetry={() => void providers.refetch()} /> : <div className="grid gap-3 sm:grid-cols-2">{providers.data.map((provider) => { const providerPlatform = provider.platform || provider.provider; const ready = provider.status === "READY"; return <div key={provider.provider} className="flex items-center gap-3 rounded-xl border border-border p-4"><PlatformMark slug={providerPlatform} name={providerPlatform} /><div className="min-w-0 flex-1"><p className="text-sm font-bold">{oauthProviderLabel(provider.provider)}</p><p className="mt-1 text-[11px] text-muted">{oauthProviderNote(provider.provider, provider.status)}</p>{!ready && <Badge value={provider.status} className="mt-2" />}</div>{ready && <Button size="sm" className="shrink-0" onClick={() => void connect(provider.provider)}><Link2 className="size-4" />Kết nối</Button>}</div>; })}</div>}</section>
         <section>
           <h3 className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">Kênh tự động qua API</h3>
@@ -416,6 +438,8 @@ export function AccountsView() {
           <p className="mb-3 text-xs leading-5 text-muted">AI vẫn tạo nội dung riêng cho từng kênh. Hệ thống mở trang đích, cho sao chép payload và chờ bạn xác nhận đã đăng; không yêu cầu credential giả.</p>
           {platforms.isPending ? <TableSkeleton rows={3} /> : platforms.isError ? <ErrorState compact error={platforms.error} onRetry={() => void platforms.refetch()} /> : manualPlatforms.length ? <>{destinationCards(visibleManualPlatforms, "manual")}<Pagination page={manualPage} totalPages={manualTotalPages} total={manualPlatforms.length} onPage={setManualPage} /></> : <p className="rounded-xl bg-slate-50 p-4 text-xs text-muted">Không tìm thấy kênh thủ công phù hợp.</p>}
         </section>
+        </>}
+        {tab === "extension" && (platforms.isPending ? <TableSkeleton rows={2} /> : platforms.isError ? <ErrorState compact error={platforms.error} onRetry={() => void platforms.refetch()} /> : !extensionPlatforms.length && <p className="rounded-xl bg-slate-50 p-4 text-xs text-muted">Không tìm thấy luồng đăng Chrome phù hợp.</p>)}
         <div className="flex gap-3 rounded-xl bg-slate-50 p-4 text-xs leading-5 text-muted"><ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" /><p>Frontend không đọc lại hoặc hiển thị secret đã lưu. Kênh thủ công chỉ lưu URL bàn giao công khai.</p></div>
       </div>
     </Modal>

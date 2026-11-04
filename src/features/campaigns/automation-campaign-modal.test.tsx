@@ -151,6 +151,21 @@ describe("AutomationCampaignModal", () => {
     }));
   });
 
+  it.each([
+    { channel: "extension" as const, checked: /Chrome forum/, unchecked: /DEV Production/ },
+    { channel: "api" as const, checked: /DEV Production/, unchecked: /Chrome forum/ },
+  ])("starting from the $channel accounts tab preselects only that tab's accounts", ({ channel, checked, unchecked }) => {
+    const chromeForum: PlatformAccount = {
+      ...accounts[0]!, id: "account-chrome", name: "Chrome forum",
+      platformId: "platform-voz", platform: { id: "platform-voz", name: "Voz", slug: "voz-forums", mode: "MANUAL" },
+      settings: { delivery: "extension", extensionEngine: "xenforo", extensionTargetUrl: "https://voz.vn/f/a.17/post-thread", extensionAutoSubmit: true },
+    };
+    render(<AutomationCampaignModal open accounts={[...accounts, chromeForum]} channel={channel} aiProviders={aiProviders} onClose={vi.fn()} onSubmit={vi.fn()} />);
+    expect(screen.getByRole("checkbox", { name: checked })).toBeChecked();
+    // The other tab's accounts stay selectable.
+    expect(screen.getByRole("checkbox", { name: unchecked })).not.toBeChecked();
+  });
+
   it("uses the named publish button as the single submission action", async () => {
     const onSubmit = vi.fn();
     render(<AutomationCampaignModal
