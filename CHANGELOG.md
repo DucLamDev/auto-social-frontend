@@ -3,6 +3,11 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.22.1 · 05/11/2026
+### Sửa lỗi
+- Hộp góp ý của AI ghi "AI đề nghị kiểm tra (6 góp ý)" thay cho "(6 điểm)": con số là số góp ý, không phải điểm AI
+  chấm, nên đặt cạnh "AI chấm 7/10" dễ đọc nhầm thành điểm 6.
+
 ## 1.22.0 · 05/11/2026
 ### Tính năng
 - Cấu hình đăng thread forum Product Hunt bằng tiện ích Chrome

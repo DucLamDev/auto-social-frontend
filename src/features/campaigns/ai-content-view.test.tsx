@@ -415,7 +415,7 @@ describe("AI content waiting for review", () => {
     fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
     openPost();
     const advice = screen.getByRole("region", { name: "Khuyến nghị của AI · DEV" });
-    expect(advice).toHaveTextContent("AI đề nghị kiểm tra (3 điểm)");
+    expect(advice).toHaveTextContent("AI đề nghị kiểm tra (3 góp ý)");
     expect(within(advice).getAllByRole("checkbox").every((box) => (box as HTMLInputElement).checked)).toBe(true);
     // Keep the disclosure: untick it.
     fireEvent.click(within(advice).getByRole("checkbox", { name: "Thông tin chưa có căn cứ: I write for vpsttt" }));
