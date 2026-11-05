@@ -48,7 +48,7 @@ export function ReviewAdvice({ variant, editable, unsaved }: { variant: ContentV
   </li>)}</ul>;
 
   return <section aria-label={`Khuyến nghị của AI · ${variant.platform}`} className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-    <p className="font-semibold">AI đề nghị kiểm tra ({points.length} điểm)</p>
+    <p className="font-semibold">AI đề nghị kiểm tra ({points.length} góp ý)</p>
     {canFix ? <PermissionGate allow={["ADMIN", "EDITOR"]} fallback={list(false)}>
       {list(true)}
       <div className="mt-3 flex flex-wrap items-center gap-2">
