@@ -3,6 +3,14 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.23.0 · 05/11/2026
+### Tính năng
+- Cấu hình đăng bằng tiện ích cho Discuss Disqus và MeWe (cần backend 1.19.0, tiện ích 1.14.0)
+  - Form **Tiện ích** của tài khoản có hai luồng mới: "Discuss Disqus · discussion" và "MeWe · dòng thời gian", kèm
+    trang đăng mặc định và hướng dẫn.
+  - Disqus có ô **Chuyên mục Discuss Disqus** chọn trong 8 chuyên mục của kênh (mặc định Community Growth) và ô
+    **Tags / Topics** cho topic cố định.
+
 ## 1.22.1 · 05/11/2026
 ### Sửa lỗi
 - Hộp góp ý của AI ghi "AI đề nghị kiểm tra (6 góp ý)" thay cho "(6 điểm)": con số là số góp ý, không phải điểm AI

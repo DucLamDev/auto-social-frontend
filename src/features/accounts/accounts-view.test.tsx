@@ -697,6 +697,36 @@ describe("AccountsView Chrome extension delivery", () => {
     }));
   });
 
+  it("configures Discuss Disqus with a category chosen from its list, Community Growth by default, and fixed topics", async () => {
+    const platform: Platform = { ...vozPlatform, id: "platform-disqus", slug: "disqus", name: "Disqus", mode: "MANUAL", connectorKey: "manual", defaultSettings: {
+      extensionFlowId: "disqus", extensionEngine: "disqus", extensionTargetUrl: "https://disqus.com/home/discuss/channel-discussdisqus/", extensionSetupHint: "Tạo discussion trong kênh Discuss Disqus.",
+    } };
+    mocks.platforms = [platform];
+    mocks.accounts = [{ id: "disqus-account", platformId: platform.id, platform, name: "Disqus · vpsttt", enabled: false, status: "RECONNECT_REQUIRED", settings: {} }];
+    render(<AccountsView initialTab="api" />);
+    fireEvent.click(screen.getByRole("button", { name: /Tiện ích$/ }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByLabelText("Luồng đăng")).toHaveValue("disqus");
+    expect(within(dialog).getByLabelText("Trang tạo chủ đề")).toHaveValue("https://disqus.com/home/discuss/channel-discussdisqus/");
+    const category = within(dialog).getByLabelText("Chuyên mục Discuss Disqus");
+    expect(category).toHaveValue("Community Growth");
+    expect(within(category).getAllByRole("option")).toHaveLength(8);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Lưu" }));
+    await waitFor(() => expect(mocks.configureExtensionDelivery).toHaveBeenLastCalledWith("disqus-account", expect.objectContaining({
+      engine: "disqus", targetUrl: "https://disqus.com/home/discuss/channel-discussdisqus/", category: "Community Growth", tags: [],
+    })));
+    // Saving closes the form: open it again to pick another category.
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /Tiện ích$/ }));
+    const again = screen.getByRole("dialog");
+    fireEvent.change(within(again).getByLabelText("Chuyên mục Discuss Disqus"), { target: { value: "Installation" } });
+    fireEvent.change(within(again).getByLabelText("Tags / Topics"), { target: { value: "comments, moderation" } });
+    fireEvent.click(within(again).getByRole("button", { name: "Lưu" }));
+    await waitFor(() => expect(mocks.configureExtensionDelivery).toHaveBeenLastCalledWith("disqus-account", expect.objectContaining({
+      category: "Installation", tags: ["comments", "moderation"],
+    })));
+  });
+
   it("labels accounts already posting through the extension", () => {
     mocks.accounts = [{ ...mocks.accounts[0]!, settings: { delivery: "extension", extensionEngine: "xenforo", extensionTargetUrl: "https://voz.vn/f/a.17/post-thread", extensionAutoSubmit: false } }];
     render(<AccountsView />);
