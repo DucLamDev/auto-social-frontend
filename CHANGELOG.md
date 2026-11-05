@@ -3,6 +3,16 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.24.0 · 05/11/2026
+### Tính năng
+- Cấu hình đăng bằng tiện ích cho Linux Foundation Forum, Ubiquiti Community, Blogger, Hugging Face Posts (cần backend
+  1.20.0, tiện ích 1.15.0)
+  - Form **Tiện ích** có 4 luồng mới kèm trang đăng mặc định và hướng dẫn: "Vanilla Forums", "Ubiquiti Community ·
+    Post", "Blogger · blog của tài khoản Google", "Hugging Face · Posts".
+  - Ubiquiti có ô **Chủ đề Ubiquiti** chọn trong danh sách chủ đề của trang (mặc định General).
+  - Diễn đàn chưa có luồng riêng chọn được thêm kiểu **Vanilla** bên cạnh XenForo, Discourse, phpBB.
+  - Hộp **Thêm social** hiện ô Chuyên mục cho Disqus và Ubiquiti.
+
 ## 1.23.0 · 05/11/2026
 ### Tính năng
 - Cấu hình đăng bằng tiện ích cho Discuss Disqus và MeWe (cần backend 1.19.0, tiện ích 1.14.0)

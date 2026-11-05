@@ -727,6 +727,33 @@ describe("AccountsView Chrome extension delivery", () => {
     })));
   });
 
+  it("configures Ubiquiti Community with a topic from its list, General by default", async () => {
+    const platform: Platform = { ...vozPlatform, id: "platform-ubnt", slug: "ubiquiti-community", name: "Ubiquiti Community", mode: "MANUAL", connectorKey: "manual", defaultSettings: {
+      extensionFlowId: "ubiquiti-community", extensionEngine: "ubiquiti", extensionTargetUrl: "https://community.ui.com/questions/create",
+    } };
+    mocks.platforms = [platform];
+    mocks.accounts = [{ id: "ubnt-account", platformId: platform.id, platform, name: "Ubiquiti · vpsttt", enabled: false, status: "RECONNECT_REQUIRED", settings: {} }];
+    render(<AccountsView initialTab="api" />);
+    fireEvent.click(screen.getByRole("button", { name: /Tiện ích$/ }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByLabelText("Luồng đăng")).toHaveValue("ubiquiti");
+    expect(within(dialog).getByLabelText("Chủ đề Ubiquiti")).toHaveValue("General");
+    fireEvent.change(within(dialog).getByLabelText("Chủ đề Ubiquiti"), { target: { value: "Network" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Lưu" }));
+    await waitFor(() => expect(mocks.configureExtensionDelivery).toHaveBeenLastCalledWith("ubnt-account", expect.objectContaining({
+      engine: "ubiquiti", targetUrl: "https://community.ui.com/questions/create", category: "Network",
+    })));
+  });
+
+  it("offers Vanilla next to XenForo, Discourse and phpBB for a forum without its own flow", () => {
+    render(<AccountsView initialTab="api" />);
+    fireEvent.click(screen.getByRole("button", { name: /Tiện ích$/ }));
+    const engines = within(screen.getByRole("dialog")).getByLabelText("Luồng đăng");
+    expect(within(engines).getByRole("option", { name: /Vanilla Forums/ })).toBeInTheDocument();
+    fireEvent.change(engines, { target: { value: "vanilla" } });
+    expect(within(screen.getByRole("dialog")).getByLabelText("Trang tạo chủ đề")).toHaveAttribute("placeholder", "https://forum.linuxfoundation.org/post/discussion/system-management");
+  });
+
   it("labels accounts already posting through the extension", () => {
     mocks.accounts = [{ ...mocks.accounts[0]!, settings: { delivery: "extension", extensionEngine: "xenforo", extensionTargetUrl: "https://voz.vn/f/a.17/post-thread", extensionAutoSubmit: false } }];
     render(<AccountsView />);
