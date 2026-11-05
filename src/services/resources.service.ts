@@ -44,7 +44,7 @@ export type VariantPreview = {
   /** Where on the site the post goes, from the account's settings. */
   destination?: { community?: string; category?: string; flair?: string; language?: "vi" | "en" };
 };
-export type ExtensionEngine = "xenforo" | "discourse" | "phpbb" | "medium" | "substack" | "quora" | "reddit" | "slideshare" | "aws-builder" | "tinhte" | "pixelfed" | "mastodon" | "bluesky" | "tumblr" | "devto" | "minds" | "stackexchange" | "lemmy" | "discuit" | "linkedin" | "differ" | "dzone" | "dailydev";
+export type ExtensionEngine = "xenforo" | "discourse" | "phpbb" | "medium" | "substack" | "quora" | "reddit" | "slideshare" | "aws-builder" | "tinhte" | "pixelfed" | "mastodon" | "bluesky" | "tumblr" | "devto" | "minds" | "stackexchange" | "lemmy" | "discuit" | "linkedin" | "differ" | "dzone" | "dailydev" | "producthunt";
 export type ExtensionDeliveryInput = { enabled: boolean; engine?: ExtensionEngine; targetUrl?: string; autoSubmit?: boolean; tags?: string[]; category?: string; flair?: string };
 export type ExtensionSessionInput = { deviceId: string; expectedUsername: string; profileUrl?: string; identitySelector?: string; provider: "password" | "google"; autoLogin: boolean; autoTotp: boolean; loginUrl?: string; loginUsername?: string; password?: string; totpSecret?: string };
 
@@ -272,7 +272,7 @@ export const resourcesService = {
   createExtensionDevice: (name: string) => apiRequest<ExtensionDevice & { token: string }>("/extension/devices", { method: "POST", body: { name } }),
   revokeExtensionDevice: (id: string) => apiRequest<{ revoked: boolean }>(`/extension/devices/${id}`, { method: "DELETE" }),
   configureExtensionDelivery: (accountId: string, input: ExtensionDeliveryInput) => apiRequest<{ enabled: boolean }>(`/extension/accounts/${accountId}`, { method: "PUT", body: input }),
-  configureExtensionSession: (accountId: string, input: ExtensionSessionInput) => apiRequest<{ deviceId: string; passwordConfigured: boolean; totpConfigured: boolean }>(`/extension/accounts/${accountId}/session`, { method: "PUT", body: input }),
+  configureExtensionSession: (accountId: string, input: ExtensionSessionInput) => apiRequest<{ deviceId: string; passwordConfigured: boolean; totpConfigured: boolean; sharedWith?: string[] }>(`/extension/accounts/${accountId}/session`, { method: "PUT", body: input }),
   requeueExtensionJob: (id: string) => apiRequest<{ queued: boolean }>(`/extension/jobs/${id}/requeue`, { method: "POST" }),
   async sources(params?: ListParams) { const raw = await apiList<RawSource>("/content-sources"); return result(raw, filterItems(raw.items.map(mapSource), params, (item) => `${item.name} ${item.url ?? ""}`, (item) => item.status)); },
   async createSource(input: { name: string; type: string; url?: string; content?: string }) { if (input.type === "MANUAL") return apiRequest<RawContent>("/contents", { method: "POST", body: { title: input.name, body: input.content, language: "vi" } }).then(mapContent); return apiRequest<RawSource>("/content-sources", { method: "POST", body: { name: input.name, type: input.type, url: input.url } }).then(mapSource); },
