@@ -30,7 +30,12 @@ export function canUseExtension(account: Pick<PlatformAccount, "platform">) {
   return account.platform?.mode !== undefined && (account.platform.mode !== "OFFICIAL_API" || typeof account.platform.defaultSettings?.extensionFlowId === "string");
 }
 
+/** Discuss Disqus categories, as listed on its "Choose Category" step. */
+export const DISQUS_CATEGORIES = ["Community Growth", "Reveal", "Installation", "Admin", "Plans and Pricing", "API", "Bug Reports & Feedback", "Embed"] as const;
+
 export const ENGINE_HELP: Record<ExtensionEngine, { label: string; placeholder: string; help: string }> = {
+  disqus: { label: "Discuss Disqus · discussion", placeholder: "https://disqus.com/home/discuss/channel-discussdisqus/", help: "Kênh Discuss Disqus dành cho chủ website nói về cộng đồng, bình luận. Tiện ích chọn chuyên mục, điền tiêu đề, topic, nội dung rồi bấm Create Discussion." },
+  mewe: { label: "MeWe · dòng thời gian", placeholder: "https://mewe.com/myworld", help: "Giữ nguyên trang này: tiện ích mở ô \"How is your day going?\", điền nội dung, gắn ảnh nếu có rồi bấm Post trên dòng thời gian của tài khoản đang đăng nhập." },
   differ: { label: "Differ", placeholder: "https://differ.blog/new-story", help: "Nhập tiêu đề, bài viết, Keyword rồi Publish." },
   dailydev: { label: "daily.dev · hồ sơ cá nhân", placeholder: "https://daily.dev/squads/create", help: "Giữ nguyên trang này: bài đăng lên hồ sơ daily.dev đang đăng nhập. Tự điền tiêu đề, nội dung và bấm Post. Chưa hỗ trợ đăng vào Squad." },
   dzone: { label: "DZone", placeholder: "https://dzone.com/content/article/post.html", help: "Nhập bài và tl;dr, gửi ban biên tập duyệt. Cần đủ thông tin mà form yêu cầu." },
@@ -192,7 +197,7 @@ export function ExtensionDeliveryForm({ account, onClose }: { account: PlatformA
     const selectedTags = [...new Set(tags.split(",").map(tag => tag.trim().replace(/^#/, "")).filter(Boolean))];
     if (social && selectedTags.length > 10) throw new Error("Chỉ cấu hình tối đa 10 tag.");
     return resourcesService.configureExtensionDelivery(account.id, enabled ? { enabled, engine, targetUrl: destination, autoSubmit,
-      ...(social ? { tags: selectedTags, category: category.trim(), flair: flair.trim() } : {}) } : { enabled: false });
+      ...(social ? { tags: selectedTags, category: (engine === "disqus" ? category.trim() || DISQUS_CATEGORIES[0] : category.trim()), flair: flair.trim() } : {}) } : { enabled: false });
   }, ["accounts", "account-health"]);
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -220,8 +225,9 @@ export function ExtensionDeliveryForm({ account, onClose }: { account: PlatformA
       }} /><p className="mt-1 text-[11px] leading-4 text-muted">{help.help}</p></div>
       {engine === "discourse" && <div><Label htmlFor="extension-category">Chuyên mục (slug hoặc ID)</Label><Input id="extension-category" value={category} onChange={(event) => setCategory(event.target.value)} placeholder="Ví dụ: projects/nginx hoặc 23" /><p className="mt-1 text-[11px] leading-4 text-muted">Chọn chuyên mục phù hợp với bài và được tài khoản của bạn cho phép đăng. Mỗi diễn đàn có chuyên mục riêng.</p></div>}
       {engine === "slideshare" && <div><Label htmlFor="extension-social-category">Chuyên mục</Label><Input id="extension-social-category" required value={category} onChange={event => setCategory(event.target.value)} placeholder="Tên chuyên mục có sẵn trên nền tảng" /></div>}
+      {engine === "disqus" && <div><Label htmlFor="extension-disqus-category">Chuyên mục Discuss Disqus</Label><Select id="extension-disqus-category" value={category || DISQUS_CATEGORIES[0]} onChange={event => setCategory(event.target.value)}>{DISQUS_CATEGORIES.map(name => <option key={name} value={name}>{name}</option>)}</Select><p className="mt-1 text-[11px] leading-4 text-muted">Community Growth hợp bài chia sẻ cách phát triển cộng đồng; các chuyên mục khác là hỏi đáp về chính Disqus.</p></div>}
       {engine === "reddit" && <div><Label htmlFor="extension-flair">Flair của subreddit</Label><Input id="extension-flair" value={flair} onChange={event => setFlair(event.target.value)} placeholder="Tên flair chính xác; để trống nếu không bắt buộc" /></div>}
-      {["medium", "substack", "aws-builder", "slideshare"].includes(engine) && <div><Label htmlFor="extension-social-tags">Tags / Topics</Label><Input id="extension-social-tags" value={tags} onChange={event => setTags(event.target.value)} placeholder="Các tag có sẵn, phân tách bằng dấu phẩy" /></div>}
+      {["medium", "substack", "aws-builder", "slideshare", "disqus"].includes(engine) && <div><Label htmlFor="extension-social-tags">Tags / Topics</Label><Input id="extension-social-tags" value={tags} onChange={event => setTags(event.target.value)} placeholder="Các tag có sẵn, phân tách bằng dấu phẩy" /></div>}
       {engine === "discourse" && <div><Label htmlFor="extension-tags">Tags</Label><Input id="extension-tags" value={tags} onChange={(event) => setTags(event.target.value)} placeholder="nginx-open-source, config" /><p className="mt-1 text-[11px] leading-4 text-muted">Nhập tag có sẵn và được phép trong chuyên mục, phân tách bằng dấu phẩy. Tiện ích chọn các tag này trước khi đăng; hashtag trong nội dung không thay thế tag diễn đàn.</p></div>}
       <div className="flex items-center justify-between gap-4 rounded-xl border border-border p-3"><div><p className="text-sm font-semibold">Tự bấm Đăng</p><p className="mt-1 text-xs text-muted">Bật để tiện ích tự gửi bài đã duyệt từ web. Tắt để chỉ điền sẵn. Nếu nền tảng yêu cầu CAPTCHA, luồng sẽ chờ bạn xử lý.</p></div><span className="shrink-0"><Switch checked={autoSubmit} onChange={setAutoSubmit} label="Tự bấm Đăng" /></span></div>
     </>}
