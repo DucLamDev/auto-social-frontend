@@ -3,13 +3,37 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
-## 1.22.0 · 05/11/2026
+## 1.23.0 · 05/11/2026
 ### Tính năng
-- Cấu hình đăng bằng tiện ích cho Discuss Disqus và MeWe (cần backend 1.18.0, tiện ích 1.13.0)
+- Cấu hình đăng bằng tiện ích cho Discuss Disqus và MeWe (cần backend 1.19.0, tiện ích 1.14.0)
   - Form **Tiện ích** của tài khoản có hai luồng mới: "Discuss Disqus · discussion" và "MeWe · dòng thời gian", kèm
     trang đăng mặc định và hướng dẫn.
   - Disqus có ô **Chuyên mục Discuss Disqus** chọn trong 8 chuyên mục của kênh (mặc định Community Growth) và ô
     **Tags / Topics** cho topic cố định.
+
+## 1.22.1 · 05/11/2026
+### Sửa lỗi
+- Hộp góp ý của AI ghi "AI đề nghị kiểm tra (6 góp ý)" thay cho "(6 điểm)": con số là số góp ý, không phải điểm AI
+  chấm, nên đặt cạnh "AI chấm 7/10" dễ đọc nhầm thành điểm 6.
+
+## 1.22.0 · 05/11/2026
+### Tính năng
+- Cấu hình đăng thread forum Product Hunt bằng tiện ích Chrome
+  Cần backend 1.18.0 (tiện ích 1.13.0). Trong cấu hình tiện ích của tài khoản Product Hunt:
+  - có luồng **Product Hunt · Forums**, trang đăng `https://www.producthunt.com/p/new`;
+  - hướng dẫn ghi forum / product ở ô **Chuyên mục**, đúng tên trong ô "Search for a product" (General, Vibecoding,
+    Introduce yourself, Self-Promotion hoặc tên product). Để trống thì đăng vào Self-Promotion.
+  Kiểu dữ liệu API sinh lại theo backend 1.18.0.
+
+## 1.21.1 · 05/11/2026
+### Sửa lỗi
+- Form Phiên Chrome / 2FA báo trước khi hồ sơ Chrome đang giữ tài khoản khác cùng nền tảng
+  Cần backend 1.17.2 để lưu được tài khoản đang dùng chung hồ sơ (ví dụ hai tài khoản MeWe cùng ở "Chrome VPS").
+  - **Dưới ô "Hồ sơ Chrome nhận bài"** hiện tên tài khoản cùng nền tảng đang ở hồ sơ được chọn:
+    - nếu tài khoản này vốn đã ở đó: vẫn sửa và lưu được, kèm lời nhắc mỗi lúc chỉ đăng nhập được một tài khoản;
+    - nếu đang chuyển sang hồ sơ đó: báo không nhận thêm, chọn hoặc ghép hồ sơ Chrome khác.
+  - **Sau khi lưu**, nếu máy chủ báo hồ sơ còn giữ tài khoản cùng nền tảng (`sharedWith`) thì hiện cảnh báo kèm cách chạy
+    cả hai: ghép thêm một hồ sơ Chrome.
 
 ## 1.21.0 · 04/11/2026
 ### Tính năng
