@@ -4,12 +4,13 @@ import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select, Switch } from "@/components/ui/form";
-import { useExtensionDevices, useResourceMutation } from "@/hooks/use-resources";
+import { useAccounts, useExtensionDevices, useResourceMutation } from "@/hooks/use-resources";
 import { resourcesService, type ExtensionSessionInput } from "@/services/resources.service";
 import type { PlatformAccount } from "@/types/domain";
 
 export function ExtensionSessionForm({ account, onClose }: { account: PlatformAccount; onClose: () => void }) {
   const devices = useExtensionDevices();
+  const accounts = useAccounts({ limit: 200 });
   const saved = (account.settings?.extensionSession ?? {}) as Partial<ExtensionSessionInput>;
   const [deviceId, setDeviceId] = useState(saved.deviceId ?? "");
   const [expectedUsername, setExpectedUsername] = useState(saved.expectedUsername ?? account.username ?? "");
@@ -22,19 +23,31 @@ export function ExtensionSessionForm({ account, onClose }: { account: PlatformAc
   const [loginUsername, setLoginUsername] = useState(saved.loginUsername ?? "");
   const [password, setPassword] = useState("");
   const [totpSecret, setTotpSecret] = useState("");
+  // Other accounts of this platform already signed in on the chosen Chrome profile (cookies hold one per site).
+  const sharing = (accounts.data?.items ?? []).filter(other => other.id !== account.id && other.platformId === account.platformId && deviceId
+    && (other.settings?.extensionSession as { deviceId?: string } | undefined)?.deviceId === deviceId).map(other => other.name);
+  const movingOnto = deviceId !== saved.deviceId;
+  const deviceName = (devices.data ?? []).find(device => device.id === deviceId)?.name ?? "Hồ sơ này";
   const save = useResourceMutation((input: ExtensionSessionInput) => resourcesService.configureExtensionSession(account.id, input), ["accounts", "account-health"]);
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
-      await save.mutateAsync({ deviceId, expectedUsername: expectedUsername.trim(), profileUrl: profileUrl.trim(), identitySelector: identitySelector.trim(),
+      const result = await save.mutateAsync({ deviceId, expectedUsername: expectedUsername.trim(), profileUrl: profileUrl.trim(), identitySelector: identitySelector.trim(),
         provider, autoLogin, autoTotp: autoLogin && autoTotp, loginUrl: autoLogin ? loginUrl.trim() : "", loginUsername: loginUsername.trim(),
         ...(autoLogin && password ? { password } : {}), ...(autoLogin && autoTotp && totpSecret ? { totpSecret: totpSecret.trim() } : {}) });
-      setPassword(""); setTotpSecret(""); toast.success("Đã lưu hồ sơ Chrome và cấu hình đăng nhập mã hóa"); onClose();
+      setPassword(""); setTotpSecret(""); toast.success("Đã lưu hồ sơ Chrome và cấu hình đăng nhập mã hóa");
+      if (result?.sharedWith?.length) {
+        toast.warning(`${deviceName} cũng đang giữ ${result.sharedWith.join(", ")} của cùng nền tảng. Một hồ sơ Chrome chỉ đăng nhập được một tài khoản mỗi lúc, nên tài khoản còn lại sẽ báo sai tài khoản khi kiểm tra. Ghép thêm một hồ sơ Chrome để chạy cả hai.`, { duration: 15_000 });
+      }
+      onClose();
     } catch (error) { toast.error(error instanceof Error ? error.message : "Không lưu được cấu hình đăng nhập"); }
   };
   return <form className="space-y-4" onSubmit={event => void submit(event)} autoComplete="off">
     <p className="rounded-xl bg-indigo-50 p-3 text-xs leading-5 text-indigo-900">Mỗi tài khoản trên cùng nền tảng cần một hồ sơ Chrome riêng. Một hồ sơ có thể dùng cho nhiều nền tảng; nếu đăng nhập qua Google, hãy dùng cùng một tài khoản Google trong hồ sơ đó. Tiện ích kiểm tra đúng tài khoản trước khi đăng.</p>
-    <div><Label htmlFor="session-device">Hồ sơ Chrome nhận bài</Label><Select id="session-device" required value={deviceId} onChange={event => setDeviceId(event.target.value)}><option value="">Chọn hồ sơ đã ghép nối</option>{(devices.data ?? []).map(device => <option key={device.id} value={device.id}>{device.name}</option>)}</Select><p className="mt-1 text-xs text-muted">Tạo hồ sơ Chrome và ghép nối tiện ích một lần cho từng tài khoản. Giữ các hồ sơ cần chạy mở.</p></div>
+    <div><Label htmlFor="session-device">Hồ sơ Chrome nhận bài</Label><Select id="session-device" required value={deviceId} onChange={event => setDeviceId(event.target.value)}><option value="">Chọn hồ sơ đã ghép nối</option>{(devices.data ?? []).map(device => <option key={device.id} value={device.id}>{device.name}</option>)}</Select><p className="mt-1 text-xs text-muted">Tạo hồ sơ Chrome và ghép nối tiện ích một lần cho từng tài khoản. Giữ các hồ sơ cần chạy mở.</p>
+      {sharing.length > 0 && <p role="note" className="mt-2 rounded-lg bg-amber-50 p-2 text-xs leading-5 text-amber-900">{movingOnto
+        ? `${deviceName} đang giữ ${sharing.join(", ")} của cùng nền tảng nên không nhận thêm tài khoản này. Chọn hoặc ghép một hồ sơ Chrome khác.`
+        : `${deviceName} cũng đang giữ ${sharing.join(", ")} của cùng nền tảng. Bạn vẫn sửa và lưu được, nhưng mỗi lúc hồ sơ chỉ đăng nhập được một tài khoản; ghép thêm một hồ sơ Chrome để chạy cả hai.`}</p>}</div>
     <div><Label htmlFor="session-identity">Username trên nền tảng đích</Label><Input id="session-identity" required value={expectedUsername} onChange={event => setExpectedUsername(event.target.value)} placeholder="Tên tài khoản sẽ đứng tên bài đăng" /></div>
     <div><Label htmlFor="session-profile">URL hồ sơ trên nền tảng</Label><Input id="session-profile" type="url" value={profileUrl} onChange={event => setProfileUrl(event.target.value)} placeholder="https://medium.com/@ten-cua-ban" /><p className="mt-1 text-xs text-muted">Dùng để đối chiếu tài khoản đang đăng nhập. Không dùng URL trang chủ hoặc trang hướng dẫn.</p></div>
     <div className="flex items-center justify-between gap-3"><Label htmlFor="session-auto-login">Tự đăng nhập khi hết phiên</Label><Switch checked={autoLogin} onChange={setAutoLogin} label="Tự đăng nhập khi hết phiên" /></div>
