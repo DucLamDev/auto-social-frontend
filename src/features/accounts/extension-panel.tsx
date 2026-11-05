@@ -32,6 +32,7 @@ export function canUseExtension(account: Pick<PlatformAccount, "platform">) {
 
 export const ENGINE_HELP: Record<ExtensionEngine, { label: string; placeholder: string; help: string }> = {
   differ: { label: "Differ", placeholder: "https://differ.blog/new-story", help: "Nhập tiêu đề, bài viết, Keyword rồi Publish." },
+  producthunt: { label: "Product Hunt · Forums", placeholder: "https://www.producthunt.com/p/new", help: "Start new thread: tự chọn forum / product ghi ở Chuyên mục (đúng tên trong ô \"Search for a product\": General, Vibecoding, Introduce yourself, Self-Promotion hoặc tên product; để trống là Self-Promotion), điền tiêu đề, nội dung rồi Submit." },
   dailydev: { label: "daily.dev · hồ sơ cá nhân", placeholder: "https://daily.dev/squads/create", help: "Giữ nguyên trang này: bài đăng lên hồ sơ daily.dev đang đăng nhập. Tự điền tiêu đề, nội dung và bấm Post. Chưa hỗ trợ đăng vào Squad." },
   dzone: { label: "DZone", placeholder: "https://dzone.com/content/article/post.html", help: "Nhập bài và tl;dr, gửi ban biên tập duyệt. Cần đủ thông tin mà form yêu cầu." },
   stackexchange: { label: "Stack Exchange · câu hỏi", placeholder: "https://serverfault.com/questions/ask", help: "Nhập ít nhất một tag đúng chuyên môn. Tự điền câu hỏi, Review rồi Post; Staging Ground được ghi nhận là chờ duyệt." },

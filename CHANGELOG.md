@@ -3,6 +3,15 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.22.0 · 05/11/2026
+### Tính năng
+- Cấu hình đăng thread forum Product Hunt bằng tiện ích Chrome
+  Cần backend 1.18.0 (tiện ích 1.13.0). Trong cấu hình tiện ích của tài khoản Product Hunt:
+  - có luồng **Product Hunt · Forums**, trang đăng `https://www.producthunt.com/p/new`;
+  - hướng dẫn ghi forum / product ở ô **Chuyên mục**, đúng tên trong ô "Search for a product" (General, Vibecoding,
+    Introduce yourself, Self-Promotion hoặc tên product). Để trống thì đăng vào Self-Promotion.
+  Kiểu dữ liệu API sinh lại theo backend 1.18.0.
+
 ## 1.21.1 · 05/11/2026
 ### Sửa lỗi
 - Form Phiên Chrome / 2FA báo trước khi hồ sơ Chrome đang giữ tài khoản khác cùng nền tảng
