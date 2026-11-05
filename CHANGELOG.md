@@ -3,6 +3,16 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.21.1 · 05/11/2026
+### Sửa lỗi
+- Form Phiên Chrome / 2FA báo trước khi hồ sơ Chrome đang giữ tài khoản khác cùng nền tảng
+  Cần backend 1.17.2 để lưu được tài khoản đang dùng chung hồ sơ (ví dụ hai tài khoản MeWe cùng ở "Chrome VPS").
+  - **Dưới ô "Hồ sơ Chrome nhận bài"** hiện tên tài khoản cùng nền tảng đang ở hồ sơ được chọn:
+    - nếu tài khoản này vốn đã ở đó: vẫn sửa và lưu được, kèm lời nhắc mỗi lúc chỉ đăng nhập được một tài khoản;
+    - nếu đang chuyển sang hồ sơ đó: báo không nhận thêm, chọn hoặc ghép hồ sơ Chrome khác.
+  - **Sau khi lưu**, nếu máy chủ báo hồ sơ còn giữ tài khoản cùng nền tảng (`sharedWith`) thì hiện cảnh báo kèm cách chạy
+    cả hai: ghép thêm một hồ sơ Chrome.
+
 ## 1.21.0 · 04/11/2026
 ### Tính năng
 - Theo dõi bài tiện ích đang đăng, xem trước khớp bài thật, báo bài quá dài
