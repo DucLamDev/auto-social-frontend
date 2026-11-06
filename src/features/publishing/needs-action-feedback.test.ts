@@ -21,6 +21,8 @@ describe("getNeedsActionMessage", () => {
     expect(getNeedsActionMessage({ kind: "EXTENSION_ACTION", reason: "CONTENT_MISMATCH" })).toContain("không giữ đúng nội dung");
     expect(getNeedsActionMessage({ kind: "EXTENSION_PENDING", claimedAt: "2026-11-04T09:00:00Z" })).toContain("đang đăng");
     expect(getNeedsActionMessage({ kind: "EXTENSION_PENDING" })).toContain("Đang chờ tiện ích");
+    expect(getNeedsActionMessage({ kind: "EXTENSION_PENDING", outdatedExtension: { deviceName: "Chrome VPS", engine: "vanilla" } }))
+      .toBe('Tiện ích Chrome trên "Chrome VPS" là bản cũ, chưa đăng được nền tảng này nên bỏ qua bài. Cập nhật tiện ích lên bản mới nhất rồi bấm Tải lại ở chrome://extensions; bài sẽ tự đăng.');
   });
 });
 

@@ -36,6 +36,9 @@ export function isExtensionClaimStuck(action: PublishNeedsAction | undefined, no
 export function getNeedsActionMessage(action?: PublishNeedsAction) {
   if (!action) return undefined;
   if (action.kind === "EXTENSION_PENDING") {
+    if (!action.claimedAt && action.outdatedExtension) {
+      return `Tiện ích Chrome trên "${action.outdatedExtension.deviceName}" là bản cũ, chưa đăng được nền tảng này nên bỏ qua bài. Cập nhật tiện ích lên bản mới nhất rồi bấm Tải lại ở chrome://extensions; bài sẽ tự đăng.`;
+    }
     return action.claimedAt
       ? "Tiện ích Chrome đang đăng bài này. Quá 10 phút chưa xong thì kiểm tra tab trong Chrome rồi Giao lại cho tiện ích."
       : "Đang chờ tiện ích Chrome đăng (Chrome cần mở và đã đăng nhập diễn đàn).";

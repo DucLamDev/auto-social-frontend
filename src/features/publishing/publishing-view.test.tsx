@@ -70,6 +70,13 @@ describe("PublishingView extension jobs", () => {
     expect(screen.getByText("Chờ tiện ích Chrome")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Giao lại cho tiện ích" })).not.toBeInTheDocument();
   });
+
+  it("asks to update the extension when the polling Chrome cannot post to this destination", () => {
+    renderJob({ ...baseJob, needsAction: { kind: "EXTENSION_PENDING", outdatedExtension: { deviceName: "Chrome VPS", engine: "huggingface" } } });
+    expect(screen.getByText("Tiện ích cần cập nhật")).toHaveAttribute("title", "Tiện ích trên \"Chrome VPS\" chưa có luồng đăng huggingface.");
+    expect(screen.queryByText("Chờ tiện ích Chrome")).not.toBeInTheDocument();
+    expect(screen.getByText(/Tiện ích Chrome trên "Chrome VPS" là bản cũ, chưa đăng được nền tảng này/)).toHaveClass("text-amber-700");
+  });
 });
 
 describe("PublishingView provider reconciliation", () => {

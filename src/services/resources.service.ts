@@ -183,6 +183,16 @@ const mapMedia = (item: RawMedia): MediaAsset => {
   };
 };
 const mapCampaign = (item: RawCampaign): Campaign => { const jobs = item.targets?.flatMap((target) => target.publishJobs ?? []) ?? []; return { id: item.id, name: item.name, content: item.content, status: item.status, reviewMode: item.reviewMode, automationState: item.automationState, automationErrorCode: item.automationErrorCode, automationErrorDetail: item.automationErrorDetail ?? null, automationVariantIds: item.automationVariantIds, automationAccountIds: item.automationAccountIds, targetsCount: item.progress?.total ?? item._count?.targets ?? item.targets?.length ?? 0, publishedCount: item.progress?.published ?? jobs.filter((job) => job.status === "PUBLISHED").length, failedCount: item.progress?.failed ?? jobs.filter((job) => ["FAILED", "POSSIBLE_DUPLICATE"].includes(job.status)).length, needsActionCount: item.progress?.needsAction ?? jobs.filter((job) => job.status === "NEEDS_ACTION").length, activeCount: item.progress?.active ?? jobs.filter((job) => ["QUEUED", "PUBLISHING", "PROCESSING", "RETRY"].includes(job.status)).length, scheduledCount: item.progress?.scheduled ?? jobs.filter((job) => job.status === "SCHEDULED").length, scheduledAt: item.scheduledAt, createdAt: item.createdAt }; };
+/** The server refreshes this note every few minutes while that Chrome polls; an older one is stale. */
+const OUTDATED_EXTENSION_NOTE_MS = 15 * 60 * 1000;
+/** "This Chrome's extension has no flow for this destination", while the note is recent. */
+function outdatedExtension(note: unknown, now = Date.now()): { outdatedExtension?: { deviceName: string; engine: string } } {
+  if (!note || typeof note !== "object" || Array.isArray(note)) return {};
+  const { deviceName, engine, at } = note as Record<string, unknown>;
+  const notedAt = typeof at === "string" ? Date.parse(at) : Number.NaN;
+  if (typeof engine !== "string" || !(now - notedAt < OUTDATED_EXTENSION_NOTE_MS)) return {};
+  return { outdatedExtension: { deviceName: typeof deviceName === "string" && deviceName.trim() ? deviceName.trim() : "Chrome", engine } };
+}
 const mapJob = (item: RawJob): PublishJob => {
   const latest = item.attempts?.[0];
   const metadata = latest?.responseMetadata
@@ -208,7 +218,7 @@ const mapJob = (item: RawJob): PublishJob => {
     : metadata.extensionQueued === true && item.status === "NEEDS_ACTION"
     ? extensionCode
       ? { kind: "EXTENSION_ACTION" as const, reason: extensionCode, ...(item.lastErrorMessage ? { message: item.lastErrorMessage } : {}) }
-      : { kind: "EXTENSION_PENDING" as const, ...(item.lockedAt ? { claimedAt: item.lockedAt } : {}) }
+      : { kind: "EXTENSION_PENDING" as const, ...(item.lockedAt ? { claimedAt: item.lockedAt } : outdatedExtension(metadata.extensionUnsupported)) }
     : metadata.reconciliationRequired === true || workerCrashUncertain
       ? {
           kind: "RECONCILIATION" as const,
