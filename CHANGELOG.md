@@ -3,6 +3,15 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.27.0 · 06/11/2026
+### Tính năng
+- Gợi ý chiến dịch bằng AI trong hộp Tạo nội dung hàng loạt (cần backend 1.23.0)
+  - Ô **Gợi ý chiến dịch bằng AI** ở đầu hộp: nhập hướng muốn nhắm (tuỳ chọn) rồi bấm **Gợi ý**. AI đưa 4 gợi ý cho
+    đúng các nền tảng của tài khoản đang chọn, dựa trên thông tin công ty và kết quả các chiến dịch trước.
+  - Mỗi gợi ý có tên chiến dịch, mô tả bài đăng, dạng bài, lý do hiệu quả và các nền tảng hợp nhất. Bấm **Dùng gợi ý
+    này** để điền tên chiến dịch và mô tả bài đăng; vẫn sửa tay được. **Gợi ý khác** để lấy bộ mới.
+  - Chưa chọn tài khoản hoặc nhà cung cấp AI chưa cấu hình thì nút bị khoá và có lời nhắc; lỗi AI hiện ngay dưới ô.
+
 ## 1.26.0 · 06/11/2026
 ### Tính năng
 - Xoá tài khoản social và thao tác hàng loạt trên danh sách tài khoản

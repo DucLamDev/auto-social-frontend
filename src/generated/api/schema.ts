@@ -208,6 +208,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform-accounts/bulk-delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PlatformAccounts_removeMany"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform-accounts/{id}/browser-session": {
         parameters: {
             query?: never;
@@ -330,6 +346,23 @@ export interface paths {
         get: operations["Ai_providers"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/campaign-suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gợi ý chiến dịch và mô tả bài đăng cho các nền tảng đã chọn (một lượt AI, không lưu gì). */
+        post: operations["Ai_suggestCampaigns"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1705,6 +1738,22 @@ export interface components {
         UpdatePlatformAccountDto: {
             enabled: boolean;
         };
+        AccountDeleteBlockedContractDto: {
+            id: string;
+            name: string;
+            /** @description Why the account was kept (Vietnamese, shown to the operator) */
+            reason: string;
+        };
+        AccountDeleteResultContractDto: {
+            deleted: string[];
+            blocked: components["schemas"]["AccountDeleteBlockedContractDto"][];
+            /** @description Ids that do not exist or belong to someone else */
+            notFound: string[];
+        };
+        DeletePlatformAccountsDto: {
+            /** @description Accounts to delete (at most 200 per request) */
+            ids: string[];
+        };
         ConnectionTestContractDto: {
             ok: boolean;
             accountName?: string;
@@ -1847,6 +1896,23 @@ export interface components {
             model: string;
             configured: boolean;
             isDefault: boolean;
+        };
+        CampaignSuggestionsDto: {
+            /**
+             * @description Slugs of the platforms chosen in the campaign form.
+             * @example [
+             *       "bluesky",
+             *       "nginx-community"
+             *     ]
+             */
+            platformSlugs: string[];
+            /**
+             * @description What the operator wants ideas about (optional).
+             * @example proxy dân cư cho người làm affiliate
+             */
+            hint?: string;
+            /** @enum {string} */
+            aiProvider?: "openai" | "deepseek" | "gemini" | "vpsttt";
         };
         AiImageStatusContractDto: {
             /** @description True when VPSTTT AI image generation is configured */
@@ -3417,6 +3483,56 @@ export interface operations {
             };
         };
     };
+    PlatformAccounts_removeMany: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeletePlatformAccountsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["AccountDeleteResultContractDto"];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
     PlatformAccounts_revokeBrowserSession: {
         parameters: {
             query?: never;
@@ -3882,6 +3998,49 @@ export interface operations {
                         meta: components["schemas"]["ApiMetaContractDto"];
                     };
                 };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    Ai_suggestCampaigns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CampaignSuggestionsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Standard application error envelope */
             default: {
