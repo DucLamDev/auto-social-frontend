@@ -3,6 +3,16 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.35.0 · 06/11/2026
+### Tính năng
+- Bấm chuông thông báo mở modal ngay trên trang đang xem
+  - Trước đây nút chuông chuyển sang Dashboard. Giờ bấm chuông mở hộp **Thông báo** liệt kê:
+    - tài khoản cần kết nối lại hoặc sắp hết hạn token;
+    - bài cần thao tác, thất bại, có thể đăng trùng, đang thử lại, chờ tiện ích Chrome.
+  - Hộp có nút **Mở Tài khoản**, **Mở Xuất bản**, **Xem trên Dashboard**; bấm một liên kết thì hộp tự đóng. Esc hoặc bấm ra
+    ngoài cũng đóng. Có trạng thái đang tải, không có việc và lỗi kèm nút Thử lại.
+  - Khung "Cần xử lý" trên Dashboard dùng chung nội dung với hộp này nên hai nơi luôn khớp.
+
 ## 1.34.0 · 06/11/2026
 ### Tính năng
 - Thêm social Unraid Forums, aaPanel Forum, cPanel Community vào luồng đăng bằng tiện ích (cần backend 1.29.0)
