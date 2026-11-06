@@ -302,4 +302,19 @@ describe("AutomationCampaignModal", () => {
     expect(thirteenth).not.toBeChecked();
     expect(await screen.findByText(/Tối đa 50 nền tảng khác nhau mỗi lần/)).toBeInTheDocument();
   });
+
+  it("shows in each account card's corner how many posts that account has published", () => {
+    const counted = [{ ...accounts[0]!, publishedCount: 12 }, { ...accounts[0]!, id: "devto-2", name: "DEV Second", publishedCount: 0 }];
+    render(<AutomationCampaignModal open accounts={counted} aiProviders={aiProviders} onClose={vi.fn()} onSubmit={vi.fn()} />);
+    expect(screen.getByLabelText("Đã đăng 12 bài")).toHaveTextContent("12");
+    expect(screen.getByLabelText("Đã đăng 12 bài")).toHaveAttribute("title", "Đã đăng 12 bài bằng tài khoản này");
+    expect(screen.getByLabelText("Đã đăng 0 bài")).toHaveTextContent("0");
+    expect(screen.getByText(/Số ở góc phải mỗi thẻ là số bài đã đăng/)).toBeInTheDocument();
+  });
+
+  it("shows no count when the server does not send one (older backend)", () => {
+    render(<AutomationCampaignModal open accounts={[accounts[0]!]} aiProviders={aiProviders} onClose={vi.fn()} onSubmit={vi.fn()} />);
+    expect(screen.queryByLabelText(/Đã đăng \d+ bài/)).not.toBeInTheDocument();
+  });
 });
+
