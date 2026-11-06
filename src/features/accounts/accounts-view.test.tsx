@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   updateAccount: vi.fn(),
   revokeBrowserSession: vi.fn(),
   testAccount: vi.fn(),
+  deleteAccounts: vi.fn(),
   queueExtensionLoginChecks: vi.fn(),
   loginChecks: [] as ExtensionLoginCheckRow[],
   refetchAccounts: vi.fn(),
@@ -64,6 +65,7 @@ vi.mock("@/services/resources.service", () => ({
     updateAccount: mocks.updateAccount,
     revokeBrowserSession: mocks.revokeBrowserSession,
     testAccount: mocks.testAccount,
+    deleteAccounts: mocks.deleteAccounts,
     queueExtensionLoginChecks: mocks.queueExtensionLoginChecks,
     oauthStart: mocks.oauthStart,
     runAccountCheck: mocks.runAccountCheck,
@@ -759,5 +761,59 @@ describe("AccountsView Chrome extension delivery", () => {
     render(<AccountsView />);
     expect(screen.getByText("Tiện ích Chrome")).toBeInTheDocument();
     expect(screen.getByText(/voz\.vn · chờ bạn bấm Đăng/)).toBeInTheDocument();
+  });
+});
+
+describe("AccountsView bulk actions", () => {
+  const keep: PlatformAccount = { ...browserAccount, id: "keep", name: "Voz · vpsttt", username: "vpsttt", status: "CONNECTED", publishedCount: 3 };
+  const copy: PlatformAccount = { ...browserAccount, id: "copy", name: "Voz · vpsttt bản 2", username: "@VPSTTT", status: "RECONNECT_REQUIRED" };
+  const other: PlatformAccount = { ...browserAccount, id: "other", name: "Voz · khác", username: "khac" };
+  beforeEach(() => {
+    mocks.role = "ADMIN";
+    mocks.platforms = [vozPlatform]; mocks.providers = []; mocks.devices = [];
+    mocks.accounts = [keep, copy, other];
+    mocks.deleteAccounts.mockReset().mockResolvedValue({ deleted: ["copy"], blocked: [], notFound: [] });
+  });
+
+  it("flags copies of one account, ticks the extra copy and deletes it after confirmation", async () => {
+    render(<AccountsView initialTab="api" />);
+    expect(within(screen.getByRole("row", { name: /bản 2/ })).getByText("Có thể trùng")).toBeInTheDocument();
+    expect(within(screen.getByRole("row", { name: /Voz · khác/ })).queryByText("Có thể trùng")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Chọn bản thừa để xoá" }));
+    // The connected account with posts is kept; only the copy is ticked and the list shows just the copies.
+    expect(screen.getByRole("checkbox", { name: "Chọn Voz · vpsttt bản 2" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Chọn Voz · vpsttt" })).not.toBeChecked();
+    expect(screen.queryByRole("row", { name: /Voz · khác/ })).not.toBeInTheDocument();
+    const bar = screen.getByRole("toolbar", { name: "Thao tác với tài khoản đã chọn" });
+    expect(within(bar).getByText("Đã chọn 1 tài khoản")).toBeInTheDocument();
+
+    fireEvent.click(within(bar).getByRole("button", { name: "Xoá" }));
+    expect(mocks.deleteAccounts).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole("button", { name: "Xoá vĩnh viễn" }));
+    await waitFor(() => expect(mocks.deleteAccounts).toHaveBeenCalledExactlyOnceWith(["copy"]));
+  });
+
+  it("deletes one account from its row and hides selection and delete from non-admins", async () => {
+    const { unmount } = render(<AccountsView initialTab="api" />);
+    fireEvent.click(within(screen.getByRole("row", { name: /Voz · khác/ })).getByRole("button", { name: "Xoá Voz · khác" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Xoá vĩnh viễn" }));
+    await waitFor(() => expect(mocks.deleteAccounts).toHaveBeenCalledExactlyOnceWith(["other"]));
+    unmount();
+    mocks.role = "EDITOR";
+    render(<AccountsView initialTab="api" />);
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Xoá / })).not.toBeInTheDocument();
+  });
+
+  it("checks ticked Chrome accounts without signing in those already signed in", async () => {
+    const chrome = (id: string, name: string): PlatformAccount => ({ ...browserAccount, id, name, settings: { extensionSession: { deviceId: "chrome" } } });
+    mocks.accounts = [chrome("c1", "Chrome một"), chrome("c2", "Chrome hai")];
+    mocks.queueExtensionLoginChecks.mockResolvedValue({ queued: 1, skipped: 1, batchId: "b" });
+    render(<AccountsView />);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Chọn mọi tài khoản đang hiện" }));
+    fireEvent.click(within(screen.getByRole("toolbar", { name: "Thao tác với tài khoản đã chọn" })).getByRole("button", { name: "Kiểm tra" }));
+    await waitFor(() => expect(mocks.queueExtensionLoginChecks).toHaveBeenCalledExactlyOnceWith(["c1", "c2"], false, true, true));
+    expect(mocks.testAccount).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, Puzzle, KeyRound, Link2, LockKeyhole, LogIn, MonitorPlay, Plus, PlugZap, RefreshCw, Settings2, ShieldCheck, ShieldOff, Sparkles, TestTube2, Upload } from "lucide-react";
+import { CopyX, ExternalLink, Puzzle, KeyRound, Link2, LockKeyhole, LogIn, MonitorPlay, Plus, PlugZap, RefreshCw, Settings2, ShieldCheck, ShieldOff, Sparkles, TestTube2, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
@@ -17,6 +17,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/ui/states";
 import { Table, TableWrap, Td, Th } from "@/components/ui/table";
 import { Toolbar } from "@/components/ui/toolbar";
+import { useCurrentUser } from "@/hooks/use-auth";
 import { useAccounts, useExtensionLoginChecks, useInvalidate, useOAuthProviders, usePlatforms, useResourceMutation } from "@/hooks/use-resources";
 import { cn, fromNow } from "@/lib/utils";
 import { ApiError } from "@/services/api/errors";
@@ -34,6 +35,8 @@ import { AccountImportModal } from "./account-import-modal";
 import { ApiImportModal } from "./api-import-modal";
 import { accountChannel, accountConnectionState, cannotPostAutomatically, chromeSession, countConnectionStates, extensionSetupMessage, isChromeBound, isSelectedExtensionAccount, type AccountChannel, type ConnectionState } from "./extension-account-state";
 import { AddExtensionAccountModal } from "./add-extension-account-modal";
+import { AccountBulkBar, DeleteAccountsDialog } from "./account-bulk-actions";
+import { accountIdentity, duplicateGroups, extraDuplicates } from "./account-bulk";
 import { ExtensionConnectionHelpModal } from "./extension-connection-help-modal";
 import { extensionConnectionHelp } from "./extension-connection-help";
 
@@ -181,6 +184,11 @@ export function AccountsView({ initialTab = "extension" }: { initialTab?: Accoun
   const [browserSessionRevokeTarget, setBrowserSessionRevokeTarget] = useState<PlatformAccount | null>(null);
   const [extensionTarget, setExtensionTarget] = useState<PlatformAccount | null>(null);
   const [sessionTarget, setSessionTarget] = useState<PlatformAccount | null>(null);
+  // Ticked rows; bulk actions apply to the ticked rows still shown by the filters.
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  const [deleteTargets, setDeleteTargets] = useState<PlatformAccount[]>([]);
+  const [duplicatesOnly, setDuplicatesOnly] = useState(false);
+  const isAdmin = useCurrentUser().data?.role === "ADMIN";
   const query = useAccounts({ limit: 100 });
   const refetchAccounts = query.refetch;
   const loginChecks = useExtensionLoginChecks();
@@ -209,11 +217,19 @@ export function AccountsView({ initialTab = "extension" }: { initialTab?: Accoun
   // ("Đã đăng nhập · chưa cấu hình đăng"); it is not listed as needing action.
   const matchesConnection = (item: PlatformAccount) => !connectionFilter || accountConnectionState(item, checkStatusOf(item)) === connectionFilter;
   const matchesSearch = (item: PlatformAccount) => `${item.name} ${item.username ?? ""} ${item.platform?.name ?? ""}`.toLowerCase().includes(search.toLowerCase());
-  const items = allAccounts.filter(item => inScope(item) && matchesPlatform(item) && matchesConnection(item) && matchesSearch(item));
+  // Same platform, site and username (or name): probably the same social account added twice.
+  const duplicateIds = new Set(duplicateGroups(allAccounts).flat().map(item => item.id));
+  const matchesDuplicate = (item: PlatformAccount) => !duplicatesOnly || duplicateIds.has(item.id);
+  const filtered = allAccounts.filter(item => inScope(item) && matchesPlatform(item) && matchesConnection(item) && matchesSearch(item) && matchesDuplicate(item));
+  // Copies of one account are listed next to each other.
+  const items = duplicatesOnly ? [...filtered].sort((a, b) => accountIdentity(a).localeCompare(accountIdentity(b))) : filtered;
+  const selectedItems = items.filter(item => selectedIds.has(item.id));
+  const allShownSelected = items.length > 0 && selectedItems.length === items.length;
+  const duplicateCount = allAccounts.filter(item => duplicateIds.has(item.id) && inScope(item) && matchesPlatform(item) && matchesConnection(item) && matchesSearch(item)).length;
   // Each filter counts what it would show with the other filters kept as they are.
-  const connectionCounts = countConnectionStates(allAccounts.filter(item => inScope(item) && matchesPlatform(item) && matchesSearch(item)), checkStatusOf);
+  const connectionCounts = countConnectionStates(allAccounts.filter(item => inScope(item) && matchesPlatform(item) && matchesSearch(item) && matchesDuplicate(item)), checkStatusOf);
   const platformCounts = new Map<string, number>();
-  for (const item of allAccounts) if (inScope(item) && matchesConnection(item) && matchesSearch(item)) platformCounts.set(item.platformId, (platformCounts.get(item.platformId) ?? 0) + 1);
+  for (const item of allAccounts) if (inScope(item) && matchesConnection(item) && matchesSearch(item) && matchesDuplicate(item)) platformCounts.set(item.platformId, (platformCounts.get(item.platformId) ?? 0) + 1);
   const platformTotal = [...platformCounts.values()].reduce((sum, count) => sum + count, 0);
   const catalogPlatforms = useMemo(() => platforms.data?.items ?? [], [platforms.data?.items]);
   // Platforms that have matching accounts come first; the rest keep catalogue order.
@@ -242,7 +258,7 @@ export function AccountsView({ initialTab = "extension" }: { initialTab?: Accoun
   // The tab is kept in the address (?tab=api) so a reload or a shared link opens it again.
   const chooseTab = (next: AccountChannel) => {
     setTab(next);
-    setPlatformId(""); setConnectionFilter("");
+    setPlatformId(""); setConnectionFilter(""); setDuplicatesOnly(false); setSelectedIds(new Set());
     const url = new URL(window.location.href);
     url.searchParams.set("tab", next);
     window.history.replaceState({}, "", `${url.pathname}${url.search}`);
@@ -309,6 +325,24 @@ export function AccountsView({ initialTab = "extension" }: { initialTab?: Accoun
     setConnectOpen(false);
     setCredentialTarget(target);
   };
+  const toggleSelected = (id: string, checked: boolean) => setSelectedIds(current => {
+    const next = new Set(current);
+    if (checked) next.add(id); else next.delete(id);
+    return next;
+  });
+  const toggleAllShown = (checked: boolean) => setSelectedIds(current => {
+    const next = new Set(current);
+    for (const item of items) if (checked) next.add(item.id); else next.delete(item.id);
+    return next;
+  });
+  // Ticks every copy except the best one of each group, and shows all of them.
+  const selectExtraDuplicates = () => {
+    const extras = extraDuplicates(allAccounts, item => accountConnectionState(item, checkStatusOf(item)));
+    setAccountScope("all"); setPlatformId(""); setConnectionFilter(""); setSearch(""); setDuplicatesOnly(true);
+    setSelectedIds(new Set(extras.map(item => item.id)));
+    toast.info(`Đã chọn ${extras.length} bản thừa, mỗi nhóm giữ lại tài khoản tốt nhất. Xem lại rồi bấm Xoá.`);
+  };
+  const forgetDeleted = (ids: string[]) => setSelectedIds(current => new Set([...current].filter(id => !ids.includes(id))));
 
   const destinationCards = (destinations: Platform[], kind: "api" | "browser" | "manual" | "extension") => <div className="grid gap-2 sm:grid-cols-2">
     {destinations.map((platform) => <button
@@ -364,10 +398,17 @@ export function AccountsView({ initialTab = "extension" }: { initialTab?: Accoun
             <span aria-hidden className={cn("size-2 rounded-full", chip.dot)} />{chip.short}{" "}<span className={cn("min-w-6 rounded-full px-1.5 py-0.5 text-center text-[11px] tabular-nums", active ? "bg-white text-primary" : "bg-slate-100 text-slate-700")}>{chip.count}</span>{" "}<span className="sr-only">tài khoản</span>
           </button>;
         })}
+        {duplicateIds.size > 0 && <>
+          <button type="button" aria-pressed={duplicatesOnly} title="Cùng nền tảng, cùng trang và cùng username (hoặc tên): có thể đã thêm hai lần" onClick={() => setDuplicatesOnly(value => !value)} className={cn("inline-flex min-h-9 items-center gap-2 rounded-full border px-3 text-xs font-semibold transition", duplicatesOnly ? "border-amber-400 bg-amber-50 text-amber-900" : "border-border bg-white text-slate-600 hover:bg-slate-50")}>
+            <CopyX aria-hidden className="size-3.5 text-amber-600" />Có thể trùng{" "}<span className={cn("min-w-6 rounded-full px-1.5 py-0.5 text-center text-[11px] tabular-nums", duplicatesOnly ? "bg-white text-amber-900" : "bg-slate-100 text-slate-700")}>{duplicateCount}</span>{" "}<span className="sr-only">tài khoản</span>
+          </button>
+          {isAdmin && <Button variant="ghost" size="sm" onClick={selectExtraDuplicates} title="Mỗi nhóm trùng giữ lại tài khoản đã kết nối / có nhiều bài nhất, chọn các bản còn lại">Chọn bản thừa để xoá</Button>}
+        </>}
       </div>}
-      {query.isPending ? <div className="p-5"><TableSkeleton /></div> : query.isError ? <ErrorState error={query.error} onRetry={() => void query.refetch()} /> : items.length === 0 && allAccounts.length > 0 ? <EmptyState title="Không có tài khoản khớp bộ lọc" description="Đổi nền tảng, trạng thái hoặc từ khoá tìm để xem các tài khoản khác." action={<Button variant="secondary" onClick={() => { setPlatformId(""); setConnectionFilter(""); setSearch(""); }}>Bỏ lọc</Button>} /> : items.length === 0 ? tab === "extension"
+      {isAdmin && selectedItems.length > 0 && <AccountBulkBar selected={selectedItems} onClear={() => setSelectedIds(new Set())} onDelete={setDeleteTargets} />}
+      {query.isPending ? <div className="p-5"><TableSkeleton /></div> : query.isError ? <ErrorState error={query.error} onRetry={() => void query.refetch()} /> : items.length === 0 && allAccounts.length > 0 ? <EmptyState title="Không có tài khoản khớp bộ lọc" description="Đổi nền tảng, trạng thái hoặc từ khoá tìm để xem các tài khoản khác." action={<Button variant="secondary" onClick={() => { setPlatformId(""); setConnectionFilter(""); setSearch(""); setDuplicatesOnly(false); }}>Bỏ lọc</Button>} /> : items.length === 0 ? tab === "extension"
         ? <EmptyState title="Chưa có social đăng bằng tiện ích" description="Nhập file tài khoản hoặc thêm từng social; Chrome đã ghép nối sẽ đăng nhập thử từng social mới." action={<PermissionGate allow={["ADMIN"]}><Button onClick={() => setAddOpen(true)}><Plus className="size-4" />Thêm social</Button></PermissionGate>} />
-        : <EmptyState title="Chưa có tài khoản đăng qua API" description="Kết nối bằng OAuth, API key hoặc thêm điểm đến bàn giao thủ công." action={<PermissionGate allow={["ADMIN"]}><Button onClick={() => setConnectOpen(true)}><PlugZap className="size-4" />Kết nối tài khoản API</Button></PermissionGate>} /> : <TableWrap><Table><thead><tr><Th>Nền tảng / tài khoản</Th><Th>Trạng thái</Th><Th>Kiểu kết nối</Th><Th>Kiểm tra gần nhất</Th><Th>Đang bật</Th><Th className="text-right">Thao tác</Th></tr></thead><tbody>{items.map((account) => {
+        : <EmptyState title="Chưa có tài khoản đăng qua API" description="Kết nối bằng OAuth, API key hoặc thêm điểm đến bàn giao thủ công." action={<PermissionGate allow={["ADMIN"]}><Button onClick={() => setConnectOpen(true)}><PlugZap className="size-4" />Kết nối tài khoản API</Button></PermissionGate>} /> : <TableWrap><Table><thead><tr>{isAdmin && <Th className="w-12 pr-0"><label className="flex size-11 cursor-pointer items-center justify-center"><input type="checkbox" className="size-4 accent-indigo-600" aria-label="Chọn mọi tài khoản đang hiện" checked={allShownSelected} ref={element => { if (element) element.indeterminate = selectedItems.length > 0 && !allShownSelected; }} onChange={event => toggleAllShown(event.target.checked)} /></label></Th>}<Th>Nền tảng / tài khoản</Th><Th>Trạng thái</Th><Th>Kiểu kết nối</Th><Th>Kiểm tra gần nhất</Th><Th>Đang bật</Th><Th className="text-right">Thao tác</Th></tr></thead><tbody>{items.map((account) => {
         const platform = catalogPlatforms.find((item) => item.id === account.platformId) ?? account.platform;
         const config = getCredentialConfig(platform);
         const viaExtension = isExtensionAccount(account);
@@ -385,8 +426,9 @@ export function AccountsView({ initialTab = "extension" }: { initialTab?: Accoun
         // Blogger, Tumblr and dev.to can save drafts instead of publishing; the connector publishes unless this is false.
         const draftCapable = ["blogger", "tumblr", "devto"].includes(account.platform?.slug ?? "");
         const publishImmediately = account.settings?.publishImmediately !== false;
-        return <tr key={account.id} className="group hover:bg-slate-50/70">
-          <Td><div className="flex items-center gap-3"><PlatformMark slug={account.platform?.slug} name={account.platform?.name ?? "Platform"} /><div><p className="font-bold text-foreground">{account.name}</p><p className="mt-0.5 text-xs text-muted">{account.platform?.name ?? "—"}{account.username ? ` · @${account.username}` : ""}</p></div></div></Td>
+        return <tr key={account.id} className={cn("group hover:bg-slate-50/70", selectedIds.has(account.id) && "bg-indigo-50/40")}>
+          {isAdmin && <Td className="w-12 pr-0"><label className="flex size-11 cursor-pointer items-center justify-center"><input type="checkbox" className="size-4 accent-indigo-600" aria-label={`Chọn ${account.name}`} checked={selectedIds.has(account.id)} onChange={event => toggleSelected(account.id, event.target.checked)} /></label></Td>}
+          <Td><div className="flex items-center gap-3"><PlatformMark slug={account.platform?.slug} name={account.platform?.name ?? "Platform"} /><div><p className="font-bold text-foreground">{account.name}{duplicateIds.has(account.id) && <span className="ml-2 inline-flex rounded-full bg-amber-50 px-2 py-0.5 align-middle text-[10px] font-semibold text-amber-800" title="Cùng nền tảng, cùng trang và cùng username với tài khoản khác">Có thể trùng</span>}</p><p className="mt-0.5 text-xs text-muted">{account.platform?.name ?? "—"}{account.username ? ` · @${account.username}` : ""}</p></div></div></Td>
           <Td><Badge value={chromeBound ? chromeStatus : account.status} />{chromeBound && <p className="mt-1 max-w-52 text-[10px] leading-4 text-muted" title={loginCheck?.message ?? undefined}>{restricted ? connectionHelp.reason : loginCheck?.message ?? "Đã gán hồ sơ Chrome; cần kiểm tra phiên đăng nhập."}</p>}{browserAssisted && <p className="mt-1 max-w-40 text-[10px] leading-4 text-muted">{account.status === "CONNECTED" ? "Session sẵn sàng cho worker" : account.browserSessionConfigured ? "Cần làm mới và kiểm tra session" : "Chưa lưu session đăng nhập"}</p>}</Td>
           <Td>{viaExtension || chromeBound ? <><span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600"><Puzzle className="size-3.5 text-indigo-600" />Tiện ích Chrome</span><p className="mt-1 max-w-48 text-[10px] text-muted" title={String(account.settings?.extensionTargetUrl ?? "")}>{viaExtension ? `${hostOf(account.settings?.extensionTargetUrl)} · ${account.settings?.extensionAutoSubmit === false ? "chờ bạn bấm Đăng" : "tự bấm Đăng"}` : setupMessage}</p>{chromeBound && chromeSession(account).provider === "google" && <p className="mt-1 max-w-48 break-all text-[10px] text-muted">Google · {String(chromeSession(account).loginUsername ?? "")}</p>}</> : <><span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">{manual ? <ExternalLink className="size-3.5 text-violet-600" /> : browserAssisted ? <MonitorPlay className="size-3.5 text-indigo-600" /> : account.oauthConfigured ? <Link2 className="size-3.5 text-sky-600" /> : <KeyRound className="size-3.5 text-amber-600" />}{manual ? "Bàn giao thủ công" : browserAssisted ? "Playwright" : account.oauthConfigured ? "OAuth" : account.credential ? "Credential" : "Chưa cấu hình"}</span><p className="mt-1 text-[10px] text-muted">{manual ? "Không lưu API key/token" : browserAssisted ? account.credential ? "Session đã mã hóa" : "Chưa đăng nhập trình duyệt" : autoRefresh ? "Token tự gia hạn" : account.oauthToken?.expiresAt ? `Hết hạn ${fromNow(account.oauthToken.expiresAt)}` : account.credential?.expiresAt ? `Hết hạn ${fromNow(account.credential.expiresAt)}` : account.credential?.status ?? (account.oauthConfigured ? "Token đã mã hóa" : "—")}</p>{draftCapable && <PermissionGate allow={["ADMIN"]} fallback={<p className="mt-1 text-[10px] text-muted">{publishImmediately ? "Đăng ngay" : "Lưu nháp"}</p>}><label className="mt-1.5 flex items-center gap-2 text-[10px] font-semibold text-slate-600"><Switch checked={publishImmediately} disabled={setPublishMode.isPending} label={`Đăng ngay trên ${account.name}`} onChange={(value) => void setPublishMode.mutateAsync({ id: account.id, publishImmediately: value }).then(() => toast.success(value ? "Bài mới sẽ được đăng ngay" : "Bài mới sẽ được lưu nháp để bạn duyệt")).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Có lỗi"))} />{publishImmediately ? "Đăng ngay" : "Lưu nháp"}</label></PermissionGate>}</>}</Td>
           <Td className="text-xs">{fromNow(chromeBound ? loginCheck?.finishedAt : account.lastCheckedAt)}</Td>
@@ -404,6 +446,7 @@ export function AccountsView({ initialTab = "extension" }: { initialTab?: Accoun
               <Button variant="secondary" size="sm" onClick={() => setBrowserLoginAccount(account)}><LogIn className="size-4" />{account.status === "CONNECTED" ? "Đăng nhập lại" : account.browserSessionConfigured ? "Kết nối lại" : "Đăng nhập"}</Button>
               {account.browserSessionConfigured === true && <Button variant="danger" size="sm" onClick={() => setBrowserSessionRevokeTarget(account)}><ShieldOff className="size-4" />Thu hồi session</Button>}
             </> : canReconnectOAuth && oauthProvider ? <Button variant={account.status === "CONNECTED" ? "ghost" : "secondary"} size="sm" onClick={() => void connect(oauthProvider)}><Link2 className="size-4" />Kết nối lại</Button> : config && !manual && platform ? <Button variant="secondary" size="sm" onClick={() => openCredential({ platform, account })}><KeyRound className="size-4" />Credential</Button> : account.status !== "CONNECTED" ? <Button variant="secondary" size="sm" onClick={() => setConnectOpen(true)}><ExternalLink className="size-4" />Reconnect</Button> : null}</PermissionGate>
+            {isAdmin && <Button variant="ghost" size="sm" aria-label={`Xoá ${account.name}`} title="Xoá tài khoản" className="text-danger hover:bg-red-50 hover:text-danger" onClick={() => setDeleteTargets([account])}><Trash2 className="size-4" /></Button>}
           </div></Td>
         </tr>;
       })}</tbody></Table></TableWrap>}
@@ -472,6 +515,7 @@ export function AccountsView({ initialTab = "extension" }: { initialTab?: Accoun
     <Modal open={Boolean(extensionTarget)} onClose={() => setExtensionTarget(null)} title={`Tiện ích Chrome · ${extensionTarget?.name ?? ""}`} description="Cấu hình luồng đăng bài. Với nhiều tài khoản hoặc tự đăng nhập, mở Phiên Chrome / 2FA sau khi lưu." className="max-w-xl">
       {extensionTarget && <ExtensionDeliveryForm key={extensionTarget.id} account={extensionTarget} onClose={() => setExtensionTarget(null)} />}
     </Modal>
+    <DeleteAccountsDialog accounts={deleteTargets} onClose={() => setDeleteTargets([])} onDeleted={forgetDeleted} />
     <BrowserLoginGuide
       account={browserLoginAccount}
       busy={test.isPending}
