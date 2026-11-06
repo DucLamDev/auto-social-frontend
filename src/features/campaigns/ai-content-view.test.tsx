@@ -5,7 +5,7 @@ import { AiContentView } from "./ai-content-view";
 
 const mocks = vi.hoisted(() => ({
   failure: undefined as Record<string, string> | undefined, role: "ADMIN", review: vi.fn(), reviewExisting: vi.fn(), update: vi.fn(), preview: vi.fn(), reviewVariant: vi.fn(), rewrite: vi.fn(), extra: [] as Array<Record<string, unknown>>, revision: null as null | { status: string; instruction?: string; error?: string }, review_: { recommended: true as boolean, reason: "" }, warning: vi.fn(), error: vi.fn(), variantStatus: "GENERATED", image: null as null | { type: string; status: string }, state: "WAITING_REVIEW", ids: ["variant-1"], mode: "AUTOMATION", multipleVersions: false, secondAccount: false,
-  roles: null as null | Record<string, unknown>, approval: null as null | Record<string, unknown>, approvalCurrent: undefined as boolean | undefined, requestApproval: vi.fn(), success: vi.fn(), live: [] as unknown[],
+  roles: null as null | Record<string, unknown>, approval: null as null | Record<string, unknown>, approvalCurrent: undefined as boolean | undefined, requestApproval: vi.fn(), success: vi.fn(), live: [] as unknown[], deleteCampaign: vi.fn(),
 }));
 vi.mock("@/hooks/use-auth", () => ({ useCurrentUser: () => ({ data: { role: mocks.role } }) }));
 vi.mock("@/hooks/use-resources", () => ({
@@ -19,7 +19,7 @@ vi.mock("@/hooks/use-resources", () => ({
   useResourceMutation: (fn: (...args: unknown[]) => unknown) => ({ mutateAsync: (...args: unknown[]) => fn(...args), isPending: false }),
 }));
 vi.mock("sonner", () => ({ toast: { success: mocks.success, error: mocks.error, warning: mocks.warning } }));
-vi.mock("@/services/resources.service", () => ({ resourcesService: { reviewAiCampaign: mocks.review, updateVariant: mocks.update, reviewExistingContent: mocks.reviewExisting, previewVariant: mocks.preview, reviewAiVariant: mocks.reviewVariant, rewriteVariant: mocks.rewrite, requestVariantApproval: mocks.requestApproval } }));
+vi.mock("@/services/resources.service", () => ({ resourcesService: { reviewAiCampaign: mocks.review, updateVariant: mocks.update, reviewExistingContent: mocks.reviewExisting, previewVariant: mocks.preview, reviewAiVariant: mocks.reviewVariant, rewriteVariant: mocks.rewrite, requestVariantApproval: mocks.requestApproval, deleteAiCampaign: mocks.deleteCampaign } }));
 
 /** Posts start folded to their header and decision buttons: open them to read, edit or preview. */
 const openPost = (platform = "DEV") => fireEvent.click(screen.getByRole("button", { name: `Xem nội dung bài ${platform}` }));
@@ -192,6 +192,9 @@ describe("AI content waiting for review", () => {
     const progress = screen.getByLabelText("Tiến độ tạo nội dung theo kênh");
     expect(within(progress).getByText("Tumblr").closest("li")).toHaveTextContent("Chưa tạo được");
     expect(within(progress).getByText("DEV").closest("li")).toHaveTextContent("Đã tạo");
+    // Hovering (or focusing) the status explains it; an older run kept only its code.
+    const status = within(within(progress).getByText("Tumblr").closest("li")!).getByRole("button", { name: /Chưa tạo được/ });
+    expect(document.getElementById(status.getAttribute("aria-describedby")!)).toHaveTextContent("không lưu chi tiết lỗi; bấm Thử lại để chạy lại và xem lỗi chi tiết");
   });
 
   it("says why a run failed and on which platform, and that the others were not started", () => {
@@ -206,6 +209,40 @@ describe("AI content waiting for review", () => {
     const progress = screen.getByLabelText("Tiến độ tạo nội dung theo kênh");
     expect(within(progress).getByText("DEV").closest("li")).toHaveTextContent("Lỗi ở kênh này");
     expect(within(progress).getByText("Tumblr").closest("li")).toHaveTextContent("Chưa chạy (dừng sau lỗi)");
+    // The "!" of each platform explains itself on hover / focus.
+    const tooltip = (platform: string) => within(within(progress).getByText(platform).closest("li")!).getByRole("tooltip", { hidden: true });
+    expect(tooltip("DEV")).toHaveTextContent("AI gặp lỗi khi viết bài cho kênh này");
+    expect(tooltip("DEV")).toHaveTextContent("Chi tiết: VPSTTT AI rate limit was reached. Try again later · mã PLATFORM_RATE_LIMITED · AI vpsttt");
+    expect(tooltip("Tumblr")).toHaveTextContent("Chưa chạy: lượt tạo dừng ở kênh DEV vì lỗi “VPSTTT AI rate limit was reached. Try again later” (mã PLATFORM_RATE_LIMITED)");
+    const devStatus = within(within(progress).getByText("DEV").closest("li")!).getByRole("button", { name: /Lỗi ở kênh này/ });
+    expect(devStatus).toHaveAttribute("aria-describedby", tooltip("DEV").id);
+  });
+
+  it("deletes a run after confirmation, says why the server refused, and never while the AI writes", async () => {
+    mocks.deleteCampaign.mockReset().mockResolvedValueOnce({ deleted: true, contentRemoved: true });
+    const { unmount } = render(<AiContentView />);
+    fireEvent.click(screen.getByRole("button", { name: "Xoá lượt Launch" }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("Xoá “Launch” khỏi Content đợi duyệt");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Xoá lượt này" }));
+    await waitFor(() => expect(mocks.deleteCampaign).toHaveBeenCalledWith("campaign-1"));
+    expect(mocks.success).toHaveBeenCalledWith("Đã xoá lượt “Launch”.");
+    // A refusal from the server is shown as it is.
+    mocks.deleteCampaign.mockRejectedValueOnce(new Error("Lượt này đã có 2 bài đăng lên social nên được giữ lại để còn lịch sử đăng."));
+    fireEvent.click(screen.getByRole("button", { name: "Xoá lượt Launch" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Xoá lượt này" }));
+    await waitFor(() => expect(mocks.error).toHaveBeenCalledWith("Lượt này đã có 2 bài đăng lên social nên được giữ lại để còn lịch sử đăng."));
+    unmount();
+    mocks.state = "PROCESSING";
+    mocks.ids = [];
+    render(<AiContentView />);
+    expect(screen.getByRole("button", { name: "Xoá lượt Launch" })).toBeDisabled();
+  });
+
+  it("offers no delete to viewers", () => {
+    mocks.role = "VIEWER";
+    render(<AiContentView />);
+    expect(screen.queryByRole("button", { name: "Xoá lượt Launch" })).not.toBeInTheDocument();
   });
 
   it("keeps the approval buttons in a bar that stays visible and previews each post as its platform shows it", async () => {

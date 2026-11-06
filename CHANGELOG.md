@@ -3,13 +3,28 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
-## 1.30.0 · 06/11/2026
+## 1.31.0 · 06/11/2026
 ### Tính năng
-- Gợi ý chiến dịch có điểm AI để chọn gợi ý phù hợp nhất (cần backend 1.25.0)
+- Gợi ý chiến dịch có điểm AI để chọn gợi ý phù hợp nhất (cần backend 1.26.0)
   - Mỗi thẻ gợi ý có nhãn **AI chấm X/10** (xanh từ 8, vàng 6–7, đỏ dưới 6), điểm từng tiêu chí (hợp mọi nền tảng, giá
     trị cho người đọc, gắn sản phẩm tự nhiên, khả năng tương tác) và **Điểm yếu** chính.
   - Gợi ý điểm cao nhất nằm đầu, có viền xanh và nhãn **Phù hợp nhất**. Lần nào AI chưa chấm được thì ghi rõ và giữ thứ
     tự AI đưa ra.
+
+## 1.30.0 · 06/11/2026
+### Tính năng
+- Content đợi duyệt: nút Xoá cho từng lượt và lỗi chi tiết khi rê chuột vào từng kênh
+  Nút Xoá cần backend 1.25.0.
+  - **Nút Xoá** (ADMIN, EDITOR) ở mỗi lượt AI:
+    - hỏi xác nhận trước, rồi xoá lượt cùng các bài chưa đăng và nội dung brief của lượt;
+    - khoá trong lúc AI đang viết;
+    - máy chủ từ chối thì hiện nguyên lý do, ví dụ lượt đã có bài lên social nên giữ lại lịch sử.
+  - **Lượt lỗi:** rê chuột hoặc dùng phím Tab lên trạng thái của từng kênh ("Lỗi ở kênh này" / "Chưa chạy (dừng sau
+    lỗi)" / "Chưa tạo được") để xem vì sao kênh đó chưa có bài:
+    - kênh gặp lỗi: nguyên nhân, thông điệp lỗi, mã lỗi, AI đang dùng, thời điểm;
+    - các kênh khác: lượt dừng ở kênh nào, vì lỗi gì, trước khi tới kênh này;
+    - lượt chạy trên bản cũ (chỉ còn mã lỗi): nói rõ không có chi tiết, bấm Thử lại để chạy lại và xem lỗi chi tiết.
+  Kiểu API sinh lại theo backend 1.25.0.
 
 ## 1.29.0 · 06/11/2026
 ### Tính năng

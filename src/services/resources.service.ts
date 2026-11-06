@@ -376,6 +376,8 @@ export const resourcesService = {
     };
   },
   async publishCampaign(id: string) { const campaign = await apiRequest<RawCampaign>(`/campaigns/${id}/publish`, { method: "POST" }); return { campaign: mapCampaign(campaign), jobsCreated: campaign.targets?.flatMap((target) => target.publishJobs ?? []).length ?? 0 }; },
+  /** Deletes an AI run from "Content đợi duyệt" (refused while writing, publishing or once a post is live). */
+  deleteAiCampaign: (id: string) => apiRequest<{ deleted: boolean; contentRemoved: boolean }>(`/campaigns/${id}`, { method: "DELETE" }),
   async reviewAiCampaign(id: string, action: "approve" | "reject" | "retry-generation" | "restore", options?: { publishMode: "NOW" | "SCHEDULED"; scheduledAt?: string }) {
     return apiRequest<RawAutomateCampaignResult>(`/campaigns/${id}/${action}`, { method: "POST", ...(options ? { body: options } : {}) });
   },

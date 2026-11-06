@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { CalendarClock, Check, ChevronDown, ChevronUp, CircleAlert, Clock3, Eye, FileText, LoaderCircle, Pencil, RefreshCw, Save, Sparkles, Star, Undo2, X } from "lucide-react";
+import { useId, useState, type ReactNode } from "react";
+import { CalendarClock, Check, ChevronDown, ChevronUp, CircleAlert, Clock3, Eye, FileText, LoaderCircle, Pencil, RefreshCw, Save, Sparkles, Star, Trash2, Undo2, X } from "lucide-react";
 import { toast } from "sonner";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import { PageHeader } from "@/components/layout/page-header";
@@ -10,6 +10,7 @@ import { PlatformMark } from "@/components/platforms/platform-mark";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input, Label, Textarea } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/ui/states";
@@ -65,6 +66,31 @@ export function failureSummary(campaign: Pick<Campaign, "automationErrorCode" | 
   return { cause, where, technical };
 }
 
+/** Why a platform of a failed run has no post: the error on the platform being written, or the stop before the others. */
+export function failureHint(campaign: Pick<Campaign, "automationErrorCode" | "automationErrorDetail">, slug: string): string {
+  const detail = campaign.automationErrorDetail;
+  const { cause, technical } = failureSummary(campaign);
+  const at = detail?.at ? ` Lúc ${formatDate(detail.at)}.` : "";
+  if (detail?.platform && detail.platform === slug) {
+    return `AI gặp lỗi khi viết bài cho kênh này: ${cause}${technical ? ` Chi tiết: ${technical}.` : ""}${at} Sửa nguyên nhân rồi bấm Thử lại để tạo các kênh chưa có bài.`;
+  }
+  if (detail?.platform) {
+    return `Chưa chạy: lượt tạo dừng ở kênh ${detail.platformName ?? detail.platform} vì lỗi${detail.message ? ` “${detail.message}”` : ""}${detail.code ? ` (mã ${detail.code})` : ""} trước khi tới kênh này. Bấm Thử lại để tạo tiếp.`;
+  }
+  const code = detail?.code ?? campaign.automationErrorCode;
+  return `Lượt tạo dừng vì lỗi${code ? ` (mã ${code})` : ""}${detail?.message ? `: ${detail.message}` : ""} trước khi viết xong kênh này.${detail ? "" : " Lượt này chạy trên bản cũ nên không lưu chi tiết lỗi; bấm Thử lại để chạy lại và xem lỗi chi tiết."}`;
+}
+
+/** A status that shows its explanation on hover or keyboard focus (the run-progress rows). */
+function HintStatus({ hint, className, children }: { hint: string; className?: string; children: ReactNode }) {
+  const id = useId();
+  return <span className="group relative inline-flex shrink-0">
+    <button type="button" aria-describedby={id} className={cn("inline-flex cursor-help items-center gap-1 rounded font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary", className)}>{children}</button>
+    {/* Opens upwards: the card clips anything below its bottom edge. */}
+    <span role="tooltip" id={id} className="pointer-events-none invisible absolute bottom-full right-0 z-30 mb-1.5 w-72 rounded-lg bg-slate-900 px-3 py-2 text-left text-[11px] font-normal leading-5 text-white opacity-0 shadow-lg transition group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">{hint}</span>
+  </span>;
+}
+
 /** One row per platform of the selected accounts: which ones the AI has already written. */
 export function generationProgress(campaign: Campaign, accounts: PlatformAccount[], variants: ContentVariant[]) {
   const saved = new Set(campaign.automationVariantIds ?? []);
@@ -104,7 +130,9 @@ function GenerationProgress({ campaign, accounts }: { campaign: Campaign; accoun
       return <li key={row.slug} className="flex min-w-0 items-center gap-2 rounded-lg bg-white px-2 py-1.5 text-xs">
         <PlatformMark slug={row.slug} name={row.name} size="sm" />
         <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{row.name}</span><span className="block truncate text-[11px] text-muted">{row.accounts.join(", ")}</span></span>
-        <span className={cn("inline-flex shrink-0 items-center gap-1 font-semibold", row.done ? "text-emerald-700" : failedHere ? "text-red-700" : pending.tone)}><Icon aria-hidden className={cn("size-3.5", !row.done && state === "PROCESSING" && "animate-spin motion-reduce:animate-none")} />{row.done ? "Đã tạo" : failedHere ? "Lỗi ở kênh này" : pending.label}</span>
+        {state === "FAILED" && !row.done
+          ? <HintStatus hint={failureHint(campaign, row.slug)} className={failedHere ? "text-red-700" : pending.tone}><Icon aria-hidden className="size-3.5" />{failedHere ? "Lỗi ở kênh này" : pending.label}</HintStatus>
+          : <span className={cn("inline-flex shrink-0 items-center gap-1 font-semibold", row.done ? "text-emerald-700" : pending.tone)}><Icon aria-hidden className={cn("size-3.5", !row.done && state === "PROCESSING" && "animate-spin motion-reduce:animate-none")} />{row.done ? "Đã tạo" : pending.label}</span>}
       </li>;
     })}</ul>
   </div>;
@@ -411,6 +439,8 @@ export function AiContentView() {
   const retry = useResourceMutation((id: string) => resourcesService.reviewAiCampaign(id, "retry-generation"), ["campaigns"]);
   const resume = useResourceMutation((id: string) => resourcesService.reviewAiCampaign(id, "approve"), ["campaigns", "publish-jobs"]);
   const restore = useResourceMutation((id: string) => resourcesService.reviewAiCampaign(id, "restore"), ["campaigns", "contents", "variants"]);
+  const remove = useResourceMutation((id: string) => resourcesService.deleteAiCampaign(id), ["campaigns", "contents", "variants", "publish-jobs"]);
+  const [deleteTarget, setDeleteTarget] = useState<Campaign | null>(null);
   const all = (query.data?.items ?? []).filter((campaign) => campaign.automationState);
   const items = all.filter((campaign) => filter === "ALL" || contentStatusOf(campaign) === filter);
   return <div className="animate-enter">
@@ -438,6 +468,9 @@ export function AiContentView() {
           <div className="flex flex-wrap items-center gap-2"><Badge value={state === "PROCESSING" ? "AI_GENERATING" : state} />
             {!!campaign.automationVariantIds?.length && <Button variant="secondary" size="sm" onClick={() => setExpanded(expanded === campaign.id ? null : campaign.id)}>{expanded === campaign.id ? "Thu gọn" : isGenerating(campaign) ? `Xem ${campaign.automationVariantIds?.length ?? 0} kênh đã tạo` : state === "WAITING_REVIEW" ? "Review & duyệt" : "Review nội dung"}</Button>}
             {state === "REJECTED" && campaign.reviewMode === "AUTOMATION" && !!campaign.automationVariantIds?.length && <PermissionGate allow={["ADMIN", "EDITOR"]}><Button variant="secondary" className="min-h-11" disabled={restore.isPending} loading={restore.isPending && restore.variables === campaign.id} onClick={() => void restore.mutateAsync(campaign.id).then(() => { setFilter("WAITING_REVIEW"); setExpanded(campaign.id); toast.success("Đã khôi phục về chờ duyệt. Nội dung được giữ nguyên; bạn có thể sửa và duyệt lại."); }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không thể khôi phục nội dung"))}><Undo2 className="size-4" />Khôi phục để duyệt</Button></PermissionGate>}
+            {campaign.reviewMode === "AUTOMATION" && <PermissionGate allow={["ADMIN", "EDITOR"]}><Button variant="ghost" size="sm" aria-label={`Xoá lượt ${campaign.name}`}
+              disabled={state === "PROCESSING"} title={state === "PROCESSING" ? "AI đang viết bài cho lượt này; đợi xong hoặc báo lỗi rồi xoá." : undefined}
+              onClick={() => setDeleteTarget(campaign)}><Trash2 className="size-4" />Xoá</Button></PermissionGate>}
             {state === "FAILED" && campaign.reviewMode !== "EXISTING_CAMPAIGN" && <PermissionGate allow={["ADMIN", "EDITOR"]}><Button size="sm" loading={retry.isPending} onClick={() => void retry.mutateAsync(campaign.id).then(() => toast.success("Đã đưa vào hàng đợi tạo lại")).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không thể thử lại"))}><RefreshCw className="size-4" />Thử lại</Button></PermissionGate>}
             {campaign.reviewMode === "EXISTING_CAMPAIGN" && !campaign.automationVariantIds?.length && campaign.content && <Link href={`/studio/${campaign.content.id}`} className={buttonVariants({ variant: "secondary", size: "sm" })}>Content Studio</Link>}
             {(state === "APPROVED" || campaign.reviewMode === "EXISTING_CAMPAIGN") && campaign.reviewMode !== "CONTENT" && !!campaign.automationVariantIds?.length && <Link href="/publishing" className={buttonVariants({ variant: "secondary", size: "sm" })}>Xem tiến độ đăng</Link>}
@@ -448,5 +481,23 @@ export function AiContentView() {
         {expanded === campaign.id && <ReviewContent campaign={campaign} accounts={accounts.data?.items ?? []} />}
       </Card>;
     })}</div>}
+    <ConfirmDialog
+      open={Boolean(deleteTarget)}
+      title="Xoá lượt nội dung này?"
+      description={`Xoá “${deleteTarget?.name ?? ""}” khỏi Content đợi duyệt, cùng các bài chưa đăng và nội dung brief của lượt này. Không xoá được khi AI đang viết, khi đang có bài được đăng, hoặc khi lượt đã có bài lên social (giữ lịch sử đăng).`}
+      confirmLabel="Xoá lượt này"
+      danger
+      busy={remove.isPending}
+      onClose={() => setDeleteTarget(null)}
+      onConfirm={async () => {
+        if (!deleteTarget) return;
+        try {
+          await remove.mutateAsync(deleteTarget.id);
+          if (expanded === deleteTarget.id) setExpanded(null);
+          toast.success(`Đã xoá lượt “${deleteTarget.name}”.`);
+          setDeleteTarget(null);
+        } catch (error) { toast.error(error instanceof Error ? error.message : "Không xoá được lượt này"); }
+      }}
+    />
   </div>;
 }
