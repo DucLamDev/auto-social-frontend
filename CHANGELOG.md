@@ -3,6 +3,15 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.25.0 · 06/11/2026
+### Tính năng
+- Hiện số bài đã đăng ở góc phải mỗi tài khoản khi chọn kênh để tạo nội dung
+  Cần backend 1.21.0. Trong hộp tạo nội dung AI, mục **Đăng tới tài khoản**:
+  - mỗi thẻ tài khoản có một số nhỏ ở góc phải: số bài đã đăng bằng tài khoản đó và vẫn còn trên nền tảng;
+  - số khác 0 hiện màu xanh, số 0 hiện màu xám;
+  - rê chuột lên số sẽ hiện "Đã đăng N bài bằng tài khoản này".
+  Nhờ đó dễ chọn các kênh còn ít bài cho đợt đăng hàng loạt tiếp theo. Backend cũ chưa có số này thì thẻ giữ như trước.
+
 ## 1.24.0 · 05/11/2026
 ### Tính năng
 - Cấu hình đăng bằng tiện ích cho Linux Foundation Forum, Ubiquiti Community, Blogger, Hugging Face Posts (cần backend

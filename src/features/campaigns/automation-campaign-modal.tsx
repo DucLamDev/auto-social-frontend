@@ -280,7 +280,7 @@ export function AutomationCampaignModal({
         <div className="mb-2 flex items-center justify-between gap-3">
           <div>
             <Label className="mb-0">Đăng tới tài khoản</Label>
-            <p className="mt-1 text-xs text-muted">Các tài khoản đã kết nối và bật đăng tự động được chọn sẵn. Bạn có thể bỏ những kênh không muốn đăng.</p>
+            <p className="mt-1 text-xs text-muted">Các tài khoản đã kết nối và bật đăng tự động được chọn sẵn. Bạn có thể bỏ những kênh không muốn đăng. Số ở góc phải mỗi thẻ là số bài đã đăng bằng tài khoản đó.</p>
             <p className="mt-1 text-[11px] font-semibold text-indigo-700">Đã chọn {selectedPlatformCount}/{MAX_AUTOMATION_PLATFORMS} nền tảng; có thể chọn nhiều tài khoản cùng nền tảng.</p>
           </div>
           {eligibleAccounts.length > 0 && <Controller
@@ -311,10 +311,17 @@ export function AutomationCampaignModal({
               : accountsError ? <p className="col-span-2 py-7 text-center text-sm text-danger">Không thể tải tài khoản. Hãy đóng cửa sổ và thử lại.</p>
                 : eligibleAccounts.length ? eligibleAccounts.map((account) => {
                   const checked = field.value.includes(account.id);
+                  const published = account.publishedCount;
                   return <label
                     key={account.id}
-                    className={`flex cursor-pointer items-center gap-3 rounded-xl border bg-white p-3 transition ${checked ? "border-indigo-300 ring-2 ring-indigo-100" : "border-border hover:border-slate-300"}`}
+                    className={`relative flex cursor-pointer items-center gap-3 rounded-xl border bg-white p-3 transition ${checked ? "border-indigo-300 ring-2 ring-indigo-100" : "border-border hover:border-slate-300"}`}
                   >
+                    {/* Posts already live through this account, to spread a new batch over less-used channels. */}
+                    {published !== undefined && <span
+                      title={`Đã đăng ${published} bài bằng tài khoản này`}
+                      aria-label={`Đã đăng ${published} bài`}
+                      className={`absolute right-2 top-1.5 min-w-5 rounded-full px-1.5 text-center text-[10px] font-bold leading-4 tabular-nums ${published ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" : "bg-slate-100 text-slate-500"}`}
+                    >{published}</span>}
                     <input
                       type="checkbox"
                       className="size-4 shrink-0 accent-indigo-600"
@@ -336,7 +343,7 @@ export function AutomationCampaignModal({
                       }}
                     />
                     <PlatformMark slug={account.platform?.slug} name={account.platform?.name ?? "P"} size="sm" />
-                    <span className="min-w-0">
+                    <span className={`min-w-0 ${published !== undefined ? "pr-7" : ""}`}>
                       <span className="block truncate text-xs font-bold text-foreground">{account.name}</span>
                       <span className="block truncate text-[10px] text-muted">
                         {account.platform?.name ?? "Nền tảng"}{account.username ? ` · @${account.username.replace(/^@/, "")}` : ""}

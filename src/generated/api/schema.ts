@@ -1664,6 +1664,8 @@ export interface components {
             oauthToken?: components["schemas"]["OAuthTokenSummaryContractDto"] | null;
             /** @description True only when an encrypted Playwright storage state is configured; the state itself is never returned. */
             browserSessionConfigured?: boolean;
+            /** @description Account list only: posts this account has published that are still live (status PUBLISHED). */
+            publishedCount?: number;
             /** Format: date-time */
             createdAt?: string;
             /** Format: date-time */
