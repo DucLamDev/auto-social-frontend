@@ -1892,7 +1892,7 @@ export interface components {
             mediaRecommendation?: {
                 [key: string]: unknown;
             } | null;
-            /** @description Last "rewrite with AI" request: status generating | done | failed, instruction, notes (review points chosen by the operator, when sent), startedAt, finishedAt, error. */
+            /** @description Last "rewrite with AI" request: status generating | done | failed, instruction, notes (review points chosen by the operator, when sent), provider and writerLabel of the AI that edits (AI_REVISER, e.g. "Claude Opus"), startedAt, finishedAt, error (also why a lower-scoring edit was not saved). */
             aiRevision?: {
                 [key: string]: unknown;
             } | null;
@@ -1957,6 +1957,8 @@ export interface components {
             reviewer: components["schemas"]["AiRoleContractDto"];
             /** @description Final gate on the finished draft (AI_APPROVER). */
             approver: components["schemas"]["AiRoleContractDto"];
+            /** @description Writes "Viết lại bằng AI" / "Sửa theo khuyến nghị" (AI_REVISER); the campaign writer when its provider has no key. */
+            reviser: components["schemas"]["AiRoleContractDto"];
             /** @description AI_APPROVAL_ENABLED: whether drafts go through the final approver. */
             approvalEnabled: boolean;
         };

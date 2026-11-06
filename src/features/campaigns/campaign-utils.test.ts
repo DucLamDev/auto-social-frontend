@@ -199,6 +199,20 @@ describe("recommendations in a review note", () => {
     expect(reviewPoints("AI duyệt cuối (GPT (VPSTTT AI)) từ chối: Giọng quảng cáo lộ liễu; Seeding vụng (AI chấm 6/10)")).toEqual(["Giọng quảng cáo lộ liễu", "Seeding vụng"]);
     expect(reviewPoints("AI duyệt cuối (Claude Opus) từ chối: Nhắc tên đối thủ")).toEqual(["Nhắc tên đối thủ"]);
   });
+
+  it("separates a refusal from the review after it, and takes the approver's full reasons over a shortened note", () => {
+    // As older backends stored it: the refusal cut at 450 characters, then the review.
+    const note = "AI duyệt cuối (Claude Opus) từ chối: Không phải câu hỏi thật; Xoá ghi chú nội bộ cho operator, k. Cần xem lại (AI chấm 6/10): AI đánh giá không hợp nơi đăng: cần ca lỗi thật; Câu discl";
+    expect(reviewPoints(note)).toEqual([
+      "Không phải câu hỏi thật", "Xoá ghi chú nội bộ cho operator, k", "AI đánh giá không hợp nơi đăng: cần ca lỗi thật", "Câu discl",
+    ]);
+    expect(reviewPoints(note, ["Không phải câu hỏi thật", "Xoá ghi chú nội bộ cho operator", "Câu 'Disclosure: this brief…' lộ brief: viết lại tự nhiên"])).toEqual([
+      "Không phải câu hỏi thật", "Xoá ghi chú nội bộ cho operator", "Câu 'Disclosure: this brief…' lộ brief: viết lại tự nhiên",
+      "AI đánh giá không hợp nơi đăng: cần ca lỗi thật", "Câu discl",
+    ]);
+    // A note without a refusal ignores the approver's reasons.
+    expect(reviewPoints("Cần xem lại (AI chấm 5/10): Thiếu số liệu", ["Khác"])).toEqual(["Thiếu số liệu"]);
+  });
 });
 
 describe("minimum AI score to approve", () => {

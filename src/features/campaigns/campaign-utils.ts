@@ -143,15 +143,26 @@ export function aiScore(reason?: string | null): number | null {
  * The separate fixes in a "Cần xem lại (AI chấm 7/10): a; b; c" review note. The
  * server joins them with "; ", and a fix may itself contain "; " followed by a
  * lower-case word, so only a "; " before a capital letter or a quote starts a new one.
+ * A note the final approver leads ("AI duyệt cuối (Claude Opus) từ chối: a; b. Cần xem
+ * lại (AI chấm 6/10): c") gives its refusal reasons then the review's; the stored note may
+ * shorten the refusal, so `approvalReasons` (the verdict's full list) replace that part.
  */
-export function reviewPoints(reason?: string | null): string[] {
-  const text = (reason ?? "")
-    .replace(/^\s*Cần xem lại\s*\([^)]*\)\s*:\s*/u, "")
-    // A post the final approver refused: "AI duyệt cuối (Claude Opus) từ chối: a; b (AI chấm 6/10)".
-    .replace(/^\s*AI duyệt cuối\s*\(.*?\)\s*từ chối\s*:\s*/u, "")
-    .replace(/\s*\(AI chấm \d{1,2}\/10\)\s*$/u, "")
-    .trim();
-  return text ? [...new Set(text.split(/;\s+(?=[\p{Lu}"'“‘(])/u).map((point) => point.trim()).filter(Boolean))] : [];
+export function reviewPoints(reason?: string | null, approvalReasons?: readonly string[] | null): string[] {
+  const split = (text: string) => text.split(/;\s+(?=[\p{Lu}"'“‘(])/u).map((point) => point.trim()).filter(Boolean);
+  const score = /\s*\(AI chấm \d{1,2}\/10\)\s*$/u;
+  const verdict = /^\s*AI duyệt cuối\s*\(.*?\)\s*từ chối\s*:\s*/u;
+  let text = reason ?? "";
+  let refusal: string[] = [];
+  if (verdict.test(text)) {
+    text = text.replace(verdict, "");
+    const review = /\.\s+Cần xem lại\s*\([^)]*\)\s*:\s*/u.exec(text);
+    const given = (approvalReasons ?? []).map((point) => point.trim()).filter(Boolean);
+    refusal = given.length ? given : split((review ? text.slice(0, review.index) : text).replace(score, ""));
+    text = review ? text.slice(review.index + review[0].length) : "";
+  } else {
+    text = text.replace(/^\s*Cần xem lại\s*\([^)]*\)\s*:\s*/u, "");
+  }
+  return [...new Set([...refusal, ...split(text.replace(score, "").trim())])];
 }
 
 export const DEFAULT_APPROVE_MIN_SCORE = 7;
