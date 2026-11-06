@@ -29,7 +29,9 @@ export type ImportOneAccountInput = {
 export type ApiAccountImportStatus = "CONNECTED" | "CHECK_FAILED" | "OAUTH_REQUIRED" | "INVALID_ROW" | "NOT_SUPPORTED" | "ACCOUNT_BUSY" | "DUPLICATE_ROW";
 export type ApiAccountImportResult = { total: number; connected: number; needsAttention: number; rows: Array<{ row: number; platform: string; slug?: string; name: string; status: ApiAccountImportStatus; message: string; accountId?: string }> };
 /** One AI campaign idea for all chosen platforms: name and brief fill the campaign form; angle, whyEffective and platformFit explain it. */
-export type CampaignSuggestion = { name: string; brief: string; angle: string; whyEffective: string; platformFit: string };
+/** The reviewer's 1-10 scores of one idea (backend 1.25.0); absent when scoring was unavailable. */
+export type CampaignSuggestionReview = { score: number; platformFit: number; readerValue: number; brandFit: number; engagement: number; weakness: string };
+export type CampaignSuggestion = { name: string; brief: string; angle: string; whyEffective: string; platformFit: string; review?: CampaignSuggestionReview; recommended?: boolean };
 export type ExtensionLoginCheckRow = { id: string; name: string; platform: string; configured: boolean; autoLogin?: boolean; issues: string[]; deviceId?: string;
   posting?: { status: string; implemented: boolean; engine?: string; message: string; url?: string };
   attempts?: Array<{ method: string; available: boolean; check: { status: string; message?: string | null; finishedAt?: string | null } | null }>;
@@ -269,7 +271,7 @@ export const resourcesService = {
   queueExtensionLoginChecks: (accountIds?: string[], verifyOnly = false, tryBoth = false, skipAuthenticated = false) => apiRequest<{ batchId: string; queued: number; skipped?: number }>("/extension/login-checks", { method: "POST", body: { accountIds, verifyOnly, tryBoth, ...(skipAuthenticated ? { skipAuthenticated: true } : {}) } }),
   aiProviders: () => apiRequest<AiProviderOption[]>("/ai/providers"),
   /** "Gợi ý bằng AI": campaign ideas for the chosen platforms (one AI request, nothing stored; up to about a minute). */
-  suggestCampaigns: (input: { platformSlugs: string[]; hint?: string; aiProvider?: AiProviderId }) => apiRequest<{ suggestions: CampaignSuggestion[] }>("/ai/campaign-suggestions", {
+  suggestCampaigns: (input: { platformSlugs: string[]; hint?: string; aiProvider?: AiProviderId }) => apiRequest<{ suggestions: CampaignSuggestion[]; scored?: boolean }>("/ai/campaign-suggestions", {
     method: "POST", body: { platformSlugs: input.platformSlugs, ...(input.hint?.trim() ? { hint: input.hint.trim() } : {}), ...(input.aiProvider ? { aiProvider: input.aiProvider } : {}) },
   }),
   aiImageStatus: () => apiRequest<AiImageStatus>("/ai/image-status"),

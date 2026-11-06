@@ -173,12 +173,18 @@ describe("AutomationCampaignModal", () => {
     suggestCampaigns.mockResolvedValue({ suggestions: [{
       name: "Tối ưu NGINX trên VPS nhỏ", brief: "Hướng dẫn tối ưu NGINX trên VPS 2 GB: worker_processes, gzip, cache; gắn VPS NVMe của VPSTTT.",
       angle: "Hướng dẫn", whyEffective: "Giải quyết vấn đề thật của người tự quản trị.", platformFit: "dev.to: bài hướng dẫn; diễn đàn: hỏi kinh nghiệm.",
-    }] });
+      review: { score: 9, platformFit: 9, readerValue: 9, brandFit: 8, engagement: 8, weakness: "Cần lệnh cụ thể cho từng bước." }, recommended: true,
+    }], scored: true });
     render(<AutomationCampaignModal open accounts={accounts} aiProviders={aiProviders} onClose={vi.fn()} onSubmit={vi.fn()} />);
     fireEvent.change(screen.getByLabelText("Gợi ý chiến dịch bằng AI"), { target: { value: "proxy dân cư" } });
     fireEvent.click(screen.getByRole("button", { name: "Gợi ý" }));
     await waitFor(() => expect(suggestCampaigns).toHaveBeenCalledWith({ platformSlugs: ["devto", "assisted-forum"], hint: "proxy dân cư", aiProvider: "deepseek" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Dùng gợi ý này" }));
+    // The best-scored idea is marked, with its score per criterion and its main weakness.
+    expect(await screen.findByText("AI chấm 9/10")).toBeInTheDocument();
+    expect(screen.getByText("Phù hợp nhất")).toBeInTheDocument();
+    expect(screen.getByLabelText("Điểm từng tiêu chí của Tối ưu NGINX trên VPS nhỏ")).toHaveTextContent("Gắn sản phẩm tự nhiên8/10");
+    expect(screen.getByText(/Cần lệnh cụ thể cho từng bước/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Dùng gợi ý này" }));
     expect(screen.getByLabelText(/Tên chiến dịch/)).toHaveValue("Tối ưu NGINX trên VPS nhỏ");
     expect(screen.getByLabelText("Mô tả bài đăng")).toHaveValue("Hướng dẫn tối ưu NGINX trên VPS 2 GB: worker_processes, gzip, cache; gắn VPS NVMe của VPSTTT.");
     // Ideas were made for these two socials: changing the selection hides them until asked again.
