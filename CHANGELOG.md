@@ -3,6 +3,15 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.33.0 · 06/11/2026
+### Tính năng
+- Content đợi duyệt: viền thẻ bài theo kết quả AI để nhận ra ngay bài đạt / chưa đạt
+  - Bài chờ duyệt mà AI chấm đạt (và AI duyệt cuối đã duyệt, khi bật) có **viền xanh**.
+  - Bài AI chấm chưa đạt, hoặc AI duyệt cuối từ chối / lỗi, có **viền cam**.
+  - Bài AI còn đang xét (đang viết lại, đang duyệt cuối, chưa duyệt cuối) có viền xám.
+  - Bài đã duyệt giữ viền xanh đậm, bài đã từ chối giữ viền xám nhạt. Chấm màu ở hàng "Đi tới bài của từng kênh" cũng
+    đổi theo, kèm chú thích màu ngay trên hàng đó.
+
 ## 1.32.0 · 06/11/2026
 ### Tính năng
 - Viết lại bằng AI / Sửa theo khuyến nghị: Claude Opus sửa, chỉ sửa chỗ bị nhắc (cần backend 1.28.0)
