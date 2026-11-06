@@ -162,7 +162,7 @@ export function AutomationCampaignModal({
     open={open}
     onClose={safeClose}
     title="Tạo nội dung AI chạy ngầm"
-    description="Nhập mô tả và chọn tài khoản. AI viết bài ở chế độ nền; bạn duyệt một lần trong tab Content đợi duyệt là bài tự đăng lên social."
+    description="Chọn các social cần đăng trước, rồi nhờ AI gợi ý chiến dịch hợp với tất cả các social đó hoặc tự nhập mô tả. AI viết bài ở chế độ nền; bạn duyệt một lần trong tab Content đợi duyệt là bài tự đăng lên social."
     className="max-w-3xl"
   >
     <form className="space-y-6" onSubmit={submit}>
@@ -170,130 +170,6 @@ export function AutomationCampaignModal({
         <FlowStep icon={<Bot className="size-4" />} number="1" label="AI viết bài" />
         <FlowStep icon={<CheckCircle2 className="size-4" />} number="2" label={autoPublish ? "Bài đạt tự duyệt" : "Bạn duyệt một lần"} />
         <FlowStep icon={<Send className="size-4" />} number="3" label="Tự đăng lên social" />
-      </div>
-
-      <CampaignSuggestions
-        platformSlugs={selectedPlatformSlugs}
-        aiProvider={selectedAiProviderOption?.configured ? selectedAiProviderOption.id : undefined}
-        providerReady={selectedAiProviderOption?.configured === true}
-        onPick={(suggestion) => {
-          form.setValue("name", suggestion.name, { shouldDirty: true, shouldValidate: true });
-          form.setValue("brief", suggestion.brief, { shouldDirty: true, shouldValidate: true });
-        }}
-      />
-
-      <div>
-        <Label htmlFor="automation-brief">Mô tả bài đăng</Label>
-        <Textarea
-          id="automation-brief"
-          autoFocus
-          className="min-h-40"
-          placeholder="Mô tả sản phẩm, khách hàng mục tiêu, lợi ích nổi bật, ưu đãi, đường dẫn và giọng văn mong muốn. AI sẽ dùng thông tin này để viết bài phù hợp cho từng kênh."
-          {...form.register("brief")}
-        />
-        <div className="mt-1.5 flex items-start justify-between gap-3">
-          <FieldError>{form.formState.errors.brief?.message}</FieldError>
-          <span className="ml-auto shrink-0 text-[11px] text-muted">Càng cụ thể, bài viết càng đúng ý</span>
-        </div>
-      </div>
-
-      <div>
-        <Label htmlFor="automation-name">Tên chiến dịch (tuỳ chọn)</Label>
-        <Input
-          id="automation-name"
-          placeholder="Ví dụ: Ra mắt dịch vụ VPS tháng 10"
-          {...form.register("name")}
-        />
-        <FieldError>{form.formState.errors.name?.message}</FieldError>
-        <p className="mt-1.5 text-xs text-muted">Để trống để hệ thống tạo tên ngắn gọn từ mô tả.</p>
-      </div>
-
-      <div className="rounded-2xl border border-border bg-slate-50/70 p-4">
-        <div className="mb-3 flex items-start gap-3">
-          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-white text-indigo-600 shadow-sm"><ImagePlus className="size-4" /></span>
-          <div>
-            <p className="text-sm font-semibold text-slate-700">Ảnh cho bài đăng</p>
-            <p className="mt-1 text-xs leading-5 text-muted">Chỉ kênh gửi được ảnh mới có ảnh: Pixelfed, Bluesky, Mastodon, Tumblr, LinkedIn qua tiện ích Chrome; X, Discord, dev.to, Threads, Instagram qua API. Diễn đàn và các kênh khác chỉ đăng chữ.</p>
-          </div>
-        </div>
-        <div className="mb-4 flex items-start justify-between gap-4 rounded-xl border border-border bg-white p-3">
-          <div className="min-w-0">
-            <p id="automation-generate-images-label" className="text-sm font-semibold text-foreground">AI tạo ảnh cho kênh cần ảnh</p>
-            <p className="mt-0.5 text-xs leading-5 text-muted">
-              {imageGenerationPending ? "Đang kiểm tra cấu hình tạo ảnh…"
-                : !aiImagesAvailable ? `Máy chủ chưa bật tạo ảnh bằng ${aiImageProviderLabel(imageGeneration)} (cần key có quyền tạo ảnh). Bài vẫn được tạo, chỉ không có ảnh AI.`
-                  : chosenImage ? "Đã chọn ảnh của bạn: ảnh này dùng thay ảnh AI cho mọi kênh hỗ trợ ảnh."
-                    : `Mỗi kênh một ảnh riêng hợp khổ và phong cách của kênh, tạo bằng ${aiImageProviderLabel(imageGeneration)}; mỗi ảnh mất khoảng 30 giây đến 2 phút. Bạn xem, tạo lại hoặc bỏ ảnh khi duyệt.`}
-            </p>
-          </div>
-          <div className="shrink-0 pt-0.5"><Controller
-            control={form.control}
-            name="generateImages"
-            render={({ field }) => <Switch
-              checked={field.value !== false && aiImagesAvailable && !chosenImage}
-              disabled={!aiImagesAvailable || Boolean(chosenImage) || busy}
-              label="AI tạo ảnh cho kênh cần ảnh"
-              onChange={(checked) => { form.clearErrors("image"); field.onChange(checked); }}
-            />}
-          /></div>
-        </div>
-        <Label htmlFor="automation-image">Hoặc dùng ảnh của bạn (tuỳ chọn)</Label>
-        <p className="-mt-1 mb-2 text-xs leading-5 text-muted">JPEG, PNG hoặc WebP, tối đa 50 MiB; Pixelfed tối đa 20 MiB. Ảnh được tải lên một lần và dùng chung cho các kênh hỗ trợ ảnh.</p>
-        <Controller
-          control={form.control}
-          name="image"
-          render={({ field: { name, onBlur, onChange, ref } }) => <Input
-            id="automation-image"
-            name={name}
-            ref={ref}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="cursor-pointer py-2 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-indigo-700"
-            onBlur={onBlur}
-            onChange={(event) => onChange(event.target.files?.[0])}
-          />}
-        />
-        <FieldError>{form.formState.errors.image?.message}</FieldError>
-        <div className="mt-3">
-          <Label htmlFor="automation-image-alt">Mô tả ảnh / alt text (tuỳ chọn)</Label>
-          <Input
-            id="automation-image-alt"
-            placeholder="Ví dụ: Bảng điều khiển VPS hiển thị mức sử dụng CPU"
-            {...form.register("imageAltText")}
-          />
-          <FieldError>{form.formState.errors.imageAltText?.message}</FieldError>
-        </div>
-        <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-800">
-          {generateImages !== false && aiImagesAvailable && !chosenImage
-            ? "Bài cho kênh không gửi được ảnh được viết chỉ bằng chữ và không nhắc tới ảnh."
-            : "Ảnh được gửi tới các kênh hỗ trợ ảnh; các kênh còn lại đăng nội dung văn bản."}
-        </p>
-      </div>
-
-      <div>
-        <Label htmlFor="automation-ai-provider">Nhà cung cấp AI</Label>
-        <Select
-          id="automation-ai-provider"
-          disabled={aiProvidersPending || !aiProviders.some((provider) => provider.configured)}
-          {...form.register("aiProvider")}
-        >
-          {aiProviders.length ? aiProviders.map((provider) => <option
-            key={provider.id}
-            value={provider.id}
-            disabled={!provider.configured}
-          >
-            {provider.label} · {provider.model}{provider.configured ? "" : " (chưa cấu hình)"}
-          </option>) : <option value="openai">Đang tải cấu hình AI…</option>}
-        </Select>
-        <FieldError>{form.formState.errors.aiProvider?.message}</FieldError>
-        {aiProvidersError
-          ? <p className="mt-1.5 text-xs text-danger">Không thể tải cấu hình AI. Hãy đóng cửa sổ và thử lại.</p>
-          : <p className="mt-1.5 text-xs text-muted">
-            {selectedAiProviderOption?.configured
-              ? "Đã chọn sẵn AI của workspace. Bạn có thể giữ nguyên để tạo nội dung."
-              : "AI này chưa được cấu hình cho workspace."}
-          </p>}
-        {aiRoles && selectedAiProviderOption && <AiRolesLine writer={selectedAiProviderOption} roles={aiRoles} />}
       </div>
 
       <div>
@@ -398,6 +274,129 @@ export function AutomationCampaignModal({
             </div>
           </div>
         </div>}
+      </div>
+
+      <div>
+        <Label htmlFor="automation-ai-provider">Nhà cung cấp AI</Label>
+        <Select
+          id="automation-ai-provider"
+          disabled={aiProvidersPending || !aiProviders.some((provider) => provider.configured)}
+          {...form.register("aiProvider")}
+        >
+          {aiProviders.length ? aiProviders.map((provider) => <option
+            key={provider.id}
+            value={provider.id}
+            disabled={!provider.configured}
+          >
+            {provider.label} · {provider.model}{provider.configured ? "" : " (chưa cấu hình)"}
+          </option>) : <option value="openai">Đang tải cấu hình AI…</option>}
+        </Select>
+        <FieldError>{form.formState.errors.aiProvider?.message}</FieldError>
+        {aiProvidersError
+          ? <p className="mt-1.5 text-xs text-danger">Không thể tải cấu hình AI. Hãy đóng cửa sổ và thử lại.</p>
+          : <p className="mt-1.5 text-xs text-muted">
+            {selectedAiProviderOption?.configured
+              ? "Đã chọn sẵn AI của workspace. Bạn có thể giữ nguyên để tạo nội dung."
+              : "AI này chưa được cấu hình cho workspace."}
+          </p>}
+        {aiRoles && selectedAiProviderOption && <AiRolesLine writer={selectedAiProviderOption} roles={aiRoles} />}
+      </div>
+
+      <CampaignSuggestions
+        platformSlugs={selectedPlatformSlugs}
+        aiProvider={selectedAiProviderOption?.configured ? selectedAiProviderOption.id : undefined}
+        providerReady={selectedAiProviderOption?.configured === true}
+        onPick={(suggestion) => {
+          form.setValue("name", suggestion.name, { shouldDirty: true, shouldValidate: true });
+          form.setValue("brief", suggestion.brief, { shouldDirty: true, shouldValidate: true });
+        }}
+      />
+
+      <div>
+        <Label htmlFor="automation-brief">Mô tả bài đăng</Label>
+        <Textarea
+          id="automation-brief"
+          className="min-h-40"
+          placeholder="Mô tả sản phẩm, khách hàng mục tiêu, lợi ích nổi bật, ưu đãi, đường dẫn và giọng văn mong muốn. AI sẽ dùng thông tin này để viết bài phù hợp cho từng kênh."
+          {...form.register("brief")}
+        />
+        <div className="mt-1.5 flex items-start justify-between gap-3">
+          <FieldError>{form.formState.errors.brief?.message}</FieldError>
+          <span className="ml-auto shrink-0 text-[11px] text-muted">Càng cụ thể, bài viết càng đúng ý</span>
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="automation-name">Tên chiến dịch (tuỳ chọn)</Label>
+        <Input
+          id="automation-name"
+          placeholder="Ví dụ: Ra mắt dịch vụ VPS tháng 10"
+          {...form.register("name")}
+        />
+        <FieldError>{form.formState.errors.name?.message}</FieldError>
+        <p className="mt-1.5 text-xs text-muted">Để trống để hệ thống tạo tên ngắn gọn từ mô tả.</p>
+      </div>
+
+      <div className="rounded-2xl border border-border bg-slate-50/70 p-4">
+        <div className="mb-3 flex items-start gap-3">
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-white text-indigo-600 shadow-sm"><ImagePlus className="size-4" /></span>
+          <div>
+            <p className="text-sm font-semibold text-slate-700">Ảnh cho bài đăng</p>
+            <p className="mt-1 text-xs leading-5 text-muted">Chỉ kênh gửi được ảnh mới có ảnh: Pixelfed, Bluesky, Mastodon, Tumblr, LinkedIn qua tiện ích Chrome; X, Discord, dev.to, Threads, Instagram qua API. Diễn đàn và các kênh khác chỉ đăng chữ.</p>
+          </div>
+        </div>
+        <div className="mb-4 flex items-start justify-between gap-4 rounded-xl border border-border bg-white p-3">
+          <div className="min-w-0">
+            <p id="automation-generate-images-label" className="text-sm font-semibold text-foreground">AI tạo ảnh cho kênh cần ảnh</p>
+            <p className="mt-0.5 text-xs leading-5 text-muted">
+              {imageGenerationPending ? "Đang kiểm tra cấu hình tạo ảnh…"
+                : !aiImagesAvailable ? `Máy chủ chưa bật tạo ảnh bằng ${aiImageProviderLabel(imageGeneration)} (cần key có quyền tạo ảnh). Bài vẫn được tạo, chỉ không có ảnh AI.`
+                  : chosenImage ? "Đã chọn ảnh của bạn: ảnh này dùng thay ảnh AI cho mọi kênh hỗ trợ ảnh."
+                    : `Mỗi kênh một ảnh riêng hợp khổ và phong cách của kênh, tạo bằng ${aiImageProviderLabel(imageGeneration)}; mỗi ảnh mất khoảng 30 giây đến 2 phút. Bạn xem, tạo lại hoặc bỏ ảnh khi duyệt.`}
+            </p>
+          </div>
+          <div className="shrink-0 pt-0.5"><Controller
+            control={form.control}
+            name="generateImages"
+            render={({ field }) => <Switch
+              checked={field.value !== false && aiImagesAvailable && !chosenImage}
+              disabled={!aiImagesAvailable || Boolean(chosenImage) || busy}
+              label="AI tạo ảnh cho kênh cần ảnh"
+              onChange={(checked) => { form.clearErrors("image"); field.onChange(checked); }}
+            />}
+          /></div>
+        </div>
+        <Label htmlFor="automation-image">Hoặc dùng ảnh của bạn (tuỳ chọn)</Label>
+        <p className="-mt-1 mb-2 text-xs leading-5 text-muted">JPEG, PNG hoặc WebP, tối đa 50 MiB; Pixelfed tối đa 20 MiB. Ảnh được tải lên một lần và dùng chung cho các kênh hỗ trợ ảnh.</p>
+        <Controller
+          control={form.control}
+          name="image"
+          render={({ field: { name, onBlur, onChange, ref } }) => <Input
+            id="automation-image"
+            name={name}
+            ref={ref}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="cursor-pointer py-2 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-indigo-700"
+            onBlur={onBlur}
+            onChange={(event) => onChange(event.target.files?.[0])}
+          />}
+        />
+        <FieldError>{form.formState.errors.image?.message}</FieldError>
+        <div className="mt-3">
+          <Label htmlFor="automation-image-alt">Mô tả ảnh / alt text (tuỳ chọn)</Label>
+          <Input
+            id="automation-image-alt"
+            placeholder="Ví dụ: Bảng điều khiển VPS hiển thị mức sử dụng CPU"
+            {...form.register("imageAltText")}
+          />
+          <FieldError>{form.formState.errors.imageAltText?.message}</FieldError>
+        </div>
+        <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-800">
+          {generateImages !== false && aiImagesAvailable && !chosenImage
+            ? "Bài cho kênh không gửi được ảnh được viết chỉ bằng chữ và không nhắc tới ảnh."
+            : "Ảnh được gửi tới các kênh hỗ trợ ảnh; các kênh còn lại đăng nội dung văn bản."}
+        </p>
       </div>
 
       <div className="flex items-start justify-between gap-4 rounded-2xl border border-border bg-slate-50/70 p-4">

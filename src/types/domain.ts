@@ -58,7 +58,9 @@ export interface ContentVariant { id: string; contentId: string; platform: strin
   /** True when `aiApproval` was given for the current text; false once the post changed after it. */
   aiApprovalCurrent?: boolean; }
 export interface MediaAsset { id: string; contentId?: string | null; variantId?: string | null; type: "IMAGE" | "VIDEO" | "DOCUMENT"; storageKey: string; publicUrl?: string | null; mimeType: string; sizeBytes: number; altText?: string | null; generated?: boolean; createdAt: string; }
-export interface Campaign { id: string; name: string; content?: Pick<Content, "id" | "title">; status: Status; reviewMode?: "AUTOMATION" | "EXISTING_CAMPAIGN" | "CONTENT"; automationState?: Status | null; automationErrorCode?: string | null; automationVariantIds?: string[]; automationAccountIds?: string[]; targetsCount?: number; publishedCount?: number; failedCount?: number; needsActionCount?: number; activeCount?: number; scheduledCount?: number; scheduledAt?: string | null; createdAt: string; }
+/** Why the last AI run failed (backend 1.23.2): cause, the platform being written, the AI provider. */
+export interface AutomationErrorDetail { code: string; message: string; platform?: string; platformName?: string; provider?: string; at?: string }
+export interface Campaign { id: string; name: string; content?: Pick<Content, "id" | "title">; status: Status; reviewMode?: "AUTOMATION" | "EXISTING_CAMPAIGN" | "CONTENT"; automationState?: Status | null; automationErrorCode?: string | null; automationErrorDetail?: AutomationErrorDetail | null; automationVariantIds?: string[]; automationAccountIds?: string[]; targetsCount?: number; publishedCount?: number; failedCount?: number; needsActionCount?: number; activeCount?: number; scheduledCount?: number; scheduledAt?: string | null; createdAt: string; }
 export interface PublishedPost {
   id: string;
   publishJobId: string;

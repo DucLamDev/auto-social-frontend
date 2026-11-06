@@ -14,5 +14,5 @@ export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSel
 });
 export function FieldError({ children }: { children?: React.ReactNode }) { return children ? <p role="alert" className="mt-1.5 text-xs font-medium text-danger">{children}</p> : null; }
 export function Switch({ checked, onChange, disabled, label }: { checked: boolean; onChange?: (checked: boolean) => void; disabled?: boolean; label?: string }) {
-  return <button type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled} onClick={() => onChange?.(!checked)} className={cn("relative h-6 w-11 rounded-full transition", checked ? "bg-primary" : "bg-slate-300", disabled && "opacity-50")}><span className={cn("absolute top-1 size-4 rounded-full bg-white shadow-sm transition-all", checked ? "left-6" : "left-1")} /></button>;
+  return <button type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled} onClick={() => onChange?.(!checked)} className={cn("relative h-6 w-11 rounded-full transition", checked ? "bg-primary" : "bg-slate-300", disabled && "opacity-50")}><span className={cn("absolute top-1 size-4 rounded-full bg-[#fff] shadow-sm transition-all", checked ? "left-6" : "left-1")} /></button>;
 }

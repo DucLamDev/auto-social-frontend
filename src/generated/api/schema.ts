@@ -2174,6 +2174,18 @@ export interface components {
             reviewMode?: "AUTOMATION" | "EXISTING_CAMPAIGN" | "CONTENT";
             automationState?: string | null;
             automationErrorCode?: string | null;
+            /**
+             * @description Why the last AI run failed: { code, message, platform, platformName, provider, at }.
+             * @example {
+             *       "code": "PLATFORM_RATE_LIMITED",
+             *       "message": "VPSTTT AI rate limit was reached. Try again later",
+             *       "platform": "product-hunt",
+             *       "platformName": "Product Hunt",
+             *       "provider": "vpsttt",
+             *       "at": "2026-11-06T04:39:56.000Z"
+             *     }
+             */
+            automationErrorDetail?: Record<string, never> | null;
             automationVariantIds?: string[];
             automationAccountIds?: string[];
             /** Format: uuid */
