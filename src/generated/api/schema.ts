@@ -668,7 +668,7 @@ export interface paths {
         get: operations["Campaigns_get"];
         put?: never;
         post?: never;
-        delete?: never;
+        delete: operations["Campaigns_remove"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2336,6 +2336,11 @@ export interface components {
             publishMode: "NOW" | "SCHEDULED";
             /** @description Future ISO-8601 timestamp with an explicit UTC offset. Required for SCHEDULED. */
             scheduledAt?: string;
+        };
+        DeletedCampaignContractDto: {
+            deleted: boolean;
+            /** @description True when the brief content made for this AI run was deleted with it (library content is kept). */
+            contentRemoved: boolean;
         };
         PublishJobContractDto: {
             /**
@@ -5272,6 +5277,54 @@ export interface operations {
                         /** @example true */
                         success: boolean;
                         data: components["schemas"]["CampaignContractDto"];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    Campaigns_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["DeletedCampaignContractDto"];
                         meta: components["schemas"]["ApiMetaContractDto"];
                     };
                 };
