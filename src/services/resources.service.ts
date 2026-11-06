@@ -27,6 +27,8 @@ export type ImportOneAccountInput = {
 };
 export type ApiAccountImportStatus = "CONNECTED" | "CHECK_FAILED" | "OAUTH_REQUIRED" | "INVALID_ROW" | "NOT_SUPPORTED" | "ACCOUNT_BUSY" | "DUPLICATE_ROW";
 export type ApiAccountImportResult = { total: number; connected: number; needsAttention: number; rows: Array<{ row: number; platform: string; slug?: string; name: string; status: ApiAccountImportStatus; message: string; accountId?: string }> };
+/** One AI campaign idea: name and brief fill the campaign form; angle, whyEffective and bestFor explain it. */
+export type CampaignSuggestion = { name: string; brief: string; angle: string; whyEffective: string; bestFor: string[] };
 export type ExtensionLoginCheckRow = { id: string; name: string; platform: string; configured: boolean; autoLogin?: boolean; issues: string[]; deviceId?: string;
   posting?: { status: string; implemented: boolean; engine?: string; message: string; url?: string };
   attempts?: Array<{ method: string; available: boolean; check: { status: string; message?: string | null; finishedAt?: string | null } | null }>;
@@ -234,6 +236,10 @@ export const resourcesService = {
   /** `skipAuthenticated`: bulk runs leave out accounts whose latest login check succeeded. */
   queueExtensionLoginChecks: (accountIds?: string[], verifyOnly = false, tryBoth = false, skipAuthenticated = false) => apiRequest<{ batchId: string; queued: number; skipped?: number }>("/extension/login-checks", { method: "POST", body: { accountIds, verifyOnly, tryBoth, ...(skipAuthenticated ? { skipAuthenticated: true } : {}) } }),
   aiProviders: () => apiRequest<AiProviderOption[]>("/ai/providers"),
+  /** "Gợi ý bằng AI": campaign ideas for the chosen platforms (one AI request, nothing stored; up to about a minute). */
+  suggestCampaigns: (input: { platformSlugs: string[]; hint?: string; aiProvider?: AiProviderId }) => apiRequest<{ suggestions: CampaignSuggestion[] }>("/ai/campaign-suggestions", {
+    method: "POST", body: { platformSlugs: input.platformSlugs, ...(input.hint?.trim() ? { hint: input.hint.trim() } : {}), ...(input.aiProvider ? { aiProvider: input.aiProvider } : {}) },
+  }),
   aiImageStatus: () => apiRequest<AiImageStatus>("/ai/image-status"),
   /** Starts a new AI image for a draft variant; the variant's image status follows it. */
   regenerateVariantImage: (variantId: string, prompt?: string) => apiRequest<{ status: "generating" }>(`/content-variants/${variantId}/image`, { method: "POST", body: prompt?.trim() ? { prompt: prompt.trim() } : {} }),
