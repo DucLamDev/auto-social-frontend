@@ -11,6 +11,7 @@ import { FieldError, Input, Label, Select, Switch, Textarea } from "@/components
 import { Modal } from "@/components/ui/modal";
 import { automationCampaignSchema, type AutomationCampaignInput } from "@/schemas/campaign";
 import { aiImageProviderLabel, type AiImageStatus, type AiProviderOption, type PlatformAccount } from "@/types/domain";
+import { CampaignSuggestions } from "./campaign-suggestions";
 import { canAddAutomationAccount, countAutomationPlatforms, defaultAutomationAccountIds, getAutomationAccountBlocker, isAutomationAccountEligible, MAX_AUTOMATION_PLATFORMS } from "./campaign-utils";
 
 type AutomationCampaignModalProps = {
@@ -89,6 +90,11 @@ export function AutomationCampaignModal({
     [eligibleAccounts, channel],
   );
   const selectedPlatformCount = countAutomationPlatforms(eligibleAccounts, selectedAccountIds);
+  // Suggestions are planned for the platforms of the accounts ticked below.
+  const selectedPlatformSlugs = [...new Set(eligibleAccounts
+    .filter((account) => (selectedAccountIds ?? []).includes(account.id))
+    .map((account) => account.platform?.slug)
+    .filter((slug): slug is string => Boolean(slug)))];
   const initializedAccounts = useRef<string | null>(null);
 
   useEffect(() => {
@@ -162,6 +168,16 @@ export function AutomationCampaignModal({
         <FlowStep icon={<CheckCircle2 className="size-4" />} number="2" label={autoPublish ? "Bài đạt tự duyệt" : "Bạn duyệt một lần"} />
         <FlowStep icon={<Send className="size-4" />} number="3" label="Tự đăng lên social" />
       </div>
+
+      <CampaignSuggestions
+        platformSlugs={selectedPlatformSlugs}
+        aiProvider={selectedAiProviderOption?.configured ? selectedAiProviderOption.id : undefined}
+        providerReady={selectedAiProviderOption?.configured === true}
+        onPick={(suggestion) => {
+          form.setValue("name", suggestion.name, { shouldDirty: true, shouldValidate: true });
+          form.setValue("brief", suggestion.brief, { shouldDirty: true, shouldValidate: true });
+        }}
+      />
 
       <div>
         <Label htmlFor="automation-brief">Mô tả bài đăng</Label>

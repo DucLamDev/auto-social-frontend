@@ -3,6 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 import type { PlatformAccount } from "@/types/domain";
 import { AutomationCampaignModal } from "./automation-campaign-modal";
 
+const suggestCampaigns = vi.hoisted(() => vi.fn());
+vi.mock("@/services/resources.service", () => ({ resourcesService: { suggestCampaigns } }));
+
 const aiProviders = [
   { id: "openai" as const, label: "OpenAI", model: "gpt-5-mini", configured: false, isDefault: false },
   { id: "deepseek" as const, label: "DeepSeek", model: "deepseek-flash", configured: true, isDefault: true },
@@ -164,6 +167,20 @@ describe("AutomationCampaignModal", () => {
     expect(screen.getByRole("checkbox", { name: checked })).toBeChecked();
     // The other tab's accounts stay selectable.
     expect(screen.getByRole("checkbox", { name: unchecked })).not.toBeChecked();
+  });
+
+  it("suggests campaigns for the chosen platforms and fills the name and description with the one picked", async () => {
+    suggestCampaigns.mockResolvedValue({ suggestions: [{
+      name: "Tối ưu NGINX trên VPS nhỏ", brief: "Hướng dẫn tối ưu NGINX trên VPS 2 GB: worker_processes, gzip, cache; gắn VPS NVMe của VPSTTT.",
+      angle: "Hướng dẫn", whyEffective: "Giải quyết vấn đề thật của người tự quản trị.", bestFor: ["dev.to"],
+    }] });
+    render(<AutomationCampaignModal open accounts={accounts} aiProviders={aiProviders} onClose={vi.fn()} onSubmit={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Gợi ý chiến dịch bằng AI"), { target: { value: "proxy dân cư" } });
+    fireEvent.click(screen.getByRole("button", { name: "Gợi ý" }));
+    await waitFor(() => expect(suggestCampaigns).toHaveBeenCalledWith({ platformSlugs: ["devto", "assisted-forum"], hint: "proxy dân cư", aiProvider: "deepseek" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Dùng gợi ý này" }));
+    expect(screen.getByLabelText(/Tên chiến dịch/)).toHaveValue("Tối ưu NGINX trên VPS nhỏ");
+    expect(screen.getByLabelText("Mô tả bài đăng")).toHaveValue("Hướng dẫn tối ưu NGINX trên VPS 2 GB: worker_processes, gzip, cache; gắn VPS NVMe của VPSTTT.");
   });
 
   it("uses the named publish button as the single submission action", async () => {
