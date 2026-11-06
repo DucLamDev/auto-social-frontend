@@ -4,11 +4,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AiContentView } from "./ai-content-view";
 
 const mocks = vi.hoisted(() => ({
-  role: "ADMIN", review: vi.fn(), reviewExisting: vi.fn(), update: vi.fn(), preview: vi.fn(), reviewVariant: vi.fn(), rewrite: vi.fn(), extra: [] as Array<Record<string, unknown>>, revision: null as null | { status: string; instruction?: string; error?: string }, review_: { recommended: true as boolean, reason: "" }, warning: vi.fn(), error: vi.fn(), variantStatus: "GENERATED", image: null as null | { type: string; status: string }, state: "WAITING_REVIEW", ids: ["variant-1"], mode: "AUTOMATION", multipleVersions: false, secondAccount: false,
+  failure: undefined as Record<string, string> | undefined, role: "ADMIN", review: vi.fn(), reviewExisting: vi.fn(), update: vi.fn(), preview: vi.fn(), reviewVariant: vi.fn(), rewrite: vi.fn(), extra: [] as Array<Record<string, unknown>>, revision: null as null | { status: string; instruction?: string; error?: string }, review_: { recommended: true as boolean, reason: "" }, warning: vi.fn(), error: vi.fn(), variantStatus: "GENERATED", image: null as null | { type: string; status: string }, state: "WAITING_REVIEW", ids: ["variant-1"], mode: "AUTOMATION", multipleVersions: false, secondAccount: false,
 }));
 vi.mock("@/hooks/use-auth", () => ({ useCurrentUser: () => ({ data: { role: mocks.role } }) }));
 vi.mock("@/hooks/use-resources", () => ({
-  useAiCampaigns: () => ({ data: { items: [{ id: "campaign-1", name: "Launch", reviewMode: mocks.mode, status: "DRAFT", content: { id: "content-1" }, automationState: mocks.state, automationVariantIds: mocks.ids, automationAccountIds: mocks.secondAccount ? ["account-1", "account-2"] : ["account-1"], createdAt: "2026-11-02T00:00:00Z" }] } }),
+  useAiCampaigns: () => ({ data: { items: [{ id: "campaign-1", name: "Launch", reviewMode: mocks.mode, status: "DRAFT", content: { id: "content-1" }, automationState: mocks.state, automationErrorCode: mocks.failure?.code ?? null, automationErrorDetail: mocks.failure ?? null, automationVariantIds: mocks.ids, automationAccountIds: mocks.secondAccount ? ["account-1", "account-2"] : ["account-1"], createdAt: "2026-11-02T00:00:00Z" }] } }),
   useAccounts: () => ({ data: { items: [{ id: "account-1", name: "DEV account", enabled: true, status: "CONNECTED", platform: { slug: "devto", name: "DEV", mode: "OFFICIAL_API" } },
     ...(mocks.secondAccount ? [{ id: "account-2", name: "Tumblr vpsttt", enabled: true, status: "CONNECTED", platform: { slug: "tumblr", name: "Tumblr", mode: "OFFICIAL_API" } }] : [])] } }),
   useVariants: () => ({ data: { items: [{ id: "variant-1", platform: "DEV", platformSlug: "devto", title: "Original title", body: "Original body", status: mocks.variantStatus, image: mocks.image, aiRevision: mocks.revision, recommended: mocks.review_.recommended, reason: mocks.review_.reason }, ...(mocks.multipleVersions ? [{ id: "variant-2", platform: "DEV", platformSlug: "devto", title: "Older version", body: "Older body", status: "APPROVED" }] : []), ...mocks.extra] } }),
@@ -31,6 +31,7 @@ describe("AI content waiting for review", () => {
     mocks.multipleVersions = false;
     mocks.secondAccount = false;
     mocks.ids = ["variant-1"];
+    mocks.failure = undefined;
     mocks.review.mockReset().mockResolvedValue({});
     mocks.reviewExisting.mockReset().mockResolvedValue({});
     mocks.update.mockReset().mockResolvedValue({});
@@ -183,6 +184,20 @@ describe("AI content waiting for review", () => {
     const progress = screen.getByLabelText("Tiến độ tạo nội dung theo kênh");
     expect(within(progress).getByText("Tumblr").closest("li")).toHaveTextContent("Chưa tạo được");
     expect(within(progress).getByText("DEV").closest("li")).toHaveTextContent("Đã tạo");
+  });
+
+  it("says why a run failed and on which platform, and that the others were not started", () => {
+    mocks.state = "FAILED";
+    mocks.secondAccount = true;
+    mocks.ids = [];
+    mocks.failure = { code: "PLATFORM_RATE_LIMITED", message: "VPSTTT AI rate limit was reached. Try again later", platform: "devto", platformName: "DEV", provider: "vpsttt" };
+    render(<AiContentView />);
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Dừng ở kênh DEV. AI báo đã đạt hạn mức lượt gọi");
+    expect(alert).toHaveTextContent("Chi tiết: VPSTTT AI rate limit was reached. Try again later · mã PLATFORM_RATE_LIMITED · AI vpsttt");
+    const progress = screen.getByLabelText("Tiến độ tạo nội dung theo kênh");
+    expect(within(progress).getByText("DEV").closest("li")).toHaveTextContent("Lỗi ở kênh này");
+    expect(within(progress).getByText("Tumblr").closest("li")).toHaveTextContent("Chưa chạy (dừng sau lỗi)");
   });
 
   it("keeps the approval buttons in a bar that stays visible and previews each post as its platform shows it", async () => {

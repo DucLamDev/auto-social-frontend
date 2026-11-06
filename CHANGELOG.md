@@ -10,6 +10,11 @@ danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số k�
     mô tả bài đăng và tên chiến dịch.
   - Mỗi gợi ý dùng được cho tất cả nền tảng đã chọn và ghi rõ cách dùng cho từng nền tảng.
   - Đổi danh sách tài khoản sau khi đã có gợi ý thì gợi ý cũ được ẩn, kèm lời nhắc bấm Gợi ý lại.
+- Chiến dịch AI lỗi hiện rõ nguyên nhân ở Content đợi duyệt
+  - Khung lỗi ghi kênh đang viết khi dừng, nguyên nhân dễ hiểu theo mã lỗi (ví dụ đạt hạn mức lượt gọi AI, key bị từ
+    chối, AI quá tải) kèm việc nên làm, và dòng **Chi tiết** (thông điệp, mã lỗi, nhà cung cấp AI) để gửi cho quản trị.
+  - Bảng tiến độ đánh dấu riêng kênh **Lỗi ở kênh này** và các kênh **Chưa chạy (dừng sau lỗi)**, thay vì ghi "Chưa tạo
+    được" cho mọi kênh còn lại. Lượt chạy cũ (trước bản này) vẫn hiện như trước.
 
 ## 1.27.0 · 06/11/2026
 ### Tính năng
