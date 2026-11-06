@@ -303,12 +303,12 @@ describe("AI content waiting for review", () => {
   it("restores a rejected campaign and opens its unchanged content for review", async () => {
     mocks.state = "REJECTED";
     const { rerender } = render(<AiContentView />);
-    fireEvent.click(screen.getByRole("tab", { name: "Đã từ chối" }));
+    fireEvent.click(screen.getByRole("tab", { name: /^Đã từ chối/ }));
     mocks.review.mockImplementation(async () => { mocks.state = "WAITING_REVIEW"; });
     fireEvent.click(screen.getByRole("button", { name: "Khôi phục để duyệt" }));
     await waitFor(() => expect(mocks.review).toHaveBeenCalledWith("campaign-1", "restore"));
     rerender(<AiContentView />);
-    expect(screen.getByRole("tab", { name: "Chờ duyệt" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: /^Chờ duyệt/ })).toHaveAttribute("aria-selected", "true");
     openPost();
     expect(screen.getByLabelText("Nội dung · DEV")).toHaveValue("Original body");
     expect(screen.getByRole("button", { name: "Duyệt & đăng bài DEV" })).toBeEnabled();
@@ -332,10 +332,10 @@ describe("AI content waiting for review", () => {
     mocks.state = "REJECTED";
     mocks.review.mockRejectedValue(new Error("Không thể khôi phục"));
     render(<AiContentView />);
-    fireEvent.click(screen.getByRole("tab", { name: "Đã từ chối" }));
+    fireEvent.click(screen.getByRole("tab", { name: /^Đã từ chối/ }));
     fireEvent.click(screen.getByRole("button", { name: "Khôi phục để duyệt" }));
     await waitFor(() => expect(mocks.review).toHaveBeenCalled());
-    expect(screen.getByRole("tab", { name: "Đã từ chối" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: /^Đã từ chối/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("button", { name: "Khôi phục để duyệt" })).toBeEnabled();
   });
 

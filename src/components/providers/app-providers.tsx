@@ -2,6 +2,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type PropsWithChildren } from "react";
 import { Toaster } from "sonner";
+import { ThemeSync, useTheme } from "./theme-provider";
 
 export function AppProviders({ children }: PropsWithChildren) {
   const [queryClient] = useState(() => new QueryClient({ defaultOptions: {
@@ -10,5 +11,6 @@ export function AppProviders({ children }: PropsWithChildren) {
       return !(status >= 400 && status < 500) && count < 2;
     } }, mutations: { retry: false },
   } }));
-  return <QueryClientProvider client={queryClient}>{children}<Toaster richColors closeButton position="top-right" /></QueryClientProvider>;
+  const { theme } = useTheme();
+  return <QueryClientProvider client={queryClient}><ThemeSync />{children}<Toaster richColors closeButton position="top-right" theme={theme} /></QueryClientProvider>;
 }

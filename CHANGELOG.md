@@ -3,6 +3,24 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.28.0 · 06/11/2026
+### Tính năng
+- Giao diện sáng / tối, sidebar nền sáng và thẻ tiến độ mới ở trang Content đợi duyệt
+  - **Chế độ sáng / tối cho toàn hệ thống**:
+    - nút mặt trăng / mặt trời trên thanh trên cùng để chuyển; lựa chọn được nhớ trên trình duyệt đó;
+    - khi chưa chọn, giao diện theo cài đặt sáng / tối của máy;
+    - trang mở thẳng đúng chế độ, không bị nháy trắng;
+    - mọi trang tự đổi màu, chữ đủ tương phản trên nền tối;
+    - khung mã lệnh, ô logo nền tảng và phần giới thiệu ở trang đăng nhập vẫn giữ nền tối như cũ.
+  - **Sidebar thiết kế lại**:
+    - nền sáng thay cho nền xanh đen, có viền ngăn với nội dung;
+    - mục đang mở có nền tím nhạt, ô biểu tượng màu tím và vạch đánh dấu bên trái;
+    - nhóm menu có nhãn nhỏ, thu gọn thì các nhóm cách nhau bằng vạch kẻ.
+  - **Trang Content đợi duyệt**: hàng nút lọc đơn giản được thay bằng thẻ **Tiến độ duyệt**:
+    - phần trăm lượt đã duyệt;
+    - thanh màu chia theo trạng thái (đang tạo, chờ duyệt, đã duyệt, có lỗi, đã từ chối);
+    - mỗi trạng thái là một ô có biểu tượng và số lượt; bấm ô để lọc danh sách như trước.
+
 ## 1.27.0 · 06/11/2026
 ### Tính năng
 - Gợi ý chiến dịch bằng AI trong hộp Tạo nội dung hàng loạt (cần backend 1.23.0)

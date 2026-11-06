@@ -22,6 +22,7 @@ import { ReviewAdvice } from "./review-advice";
 import { isRewriting, VariantRewritePanel } from "./variant-rewrite-panel";
 import { VariantImagePanel } from "./variant-image-panel";
 import { useSlow, VariantPreviewCard } from "./variant-preview-card";
+import { ContentStatusBar, contentStatusOf, type ContentStatusFilter } from "./content-status-bar";
 
 const isGenerating = (campaign: Campaign) => campaign.automationState === "QUEUED" || campaign.automationState === "PROCESSING";
 const without = <T,>(record: Record<string, T>, key: string) => Object.fromEntries(Object.entries(record).filter(([id]) => id !== key));
@@ -347,17 +348,16 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
 export function AiContentView() {
   const query = useAiCampaigns();
   const accounts = useAccounts({ limit: 100 });
-  const [filter, setFilter] = useState("ALL");
+  const [filter, setFilter] = useState<ContentStatusFilter>("ALL");
   const [expanded, setExpanded] = useState<string | null>(null);
   const retry = useResourceMutation((id: string) => resourcesService.reviewAiCampaign(id, "retry-generation"), ["campaigns"]);
   const resume = useResourceMutation((id: string) => resourcesService.reviewAiCampaign(id, "approve"), ["campaigns", "publish-jobs"]);
   const restore = useResourceMutation((id: string) => resourcesService.reviewAiCampaign(id, "restore"), ["campaigns", "contents", "variants"]);
   const all = (query.data?.items ?? []).filter((campaign) => campaign.automationState);
-  const items = all.filter((campaign) => filter === "ALL" || (filter === "PROCESSING" ? ["QUEUED", "PROCESSING"].includes(campaign.automationState!) : campaign.automationState === filter));
+  const items = all.filter((campaign) => filter === "ALL" || contentStatusOf(campaign) === filter);
   return <div className="animate-enter">
     <PageHeader eyebrow="AI Workspace" title="Content đợi duyệt" description="Tự đồng bộ mỗi 2 giây với AI đang tạo và đã tạo xong. Review, edit nội dung, hẹn lịch hoặc duyệt đăng ngay tại đây." action={<Link href="/campaigns?automate=1" className={buttonVariants()}><Sparkles className="size-4" />Tạo nội dung AI</Link>} />
-    <p className="mb-3 text-sm text-muted">{all.length} lượt nội dung · {new Set(all.flatMap((item) => item.automationVariantIds ?? [])).size} biến thể · gồm dữ liệu trước đây và Content Studio</p>
-    <div role="tablist" aria-label="Trạng thái nội dung AI" className="mb-5 flex flex-wrap gap-2">{[["ALL", "Tất cả"], ["PROCESSING", "Đang tạo"], ["WAITING_REVIEW", "Chờ duyệt"], ["APPROVED", "Đã duyệt"], ["FAILED", "Có lỗi"], ["REJECTED", "Đã từ chối"]].map(([value, label]) => <button key={value} role="tab" aria-selected={filter === value} className={buttonVariants({ variant: filter === value ? "primary" : "secondary", size: "sm" })} onClick={() => setFilter(value!)}>{label}</button>)}</div>
+    <ContentStatusBar campaigns={all} variantCount={new Set(all.flatMap((item) => item.automationVariantIds ?? [])).size} value={filter} onChange={setFilter} />
     {query.isPending ? <TableSkeleton /> : query.isError ? <ErrorState error={query.error} onRetry={() => void query.refetch()} /> : !items.length ? <EmptyState title="Chưa có nội dung trong mục này" description="Các lượt tạo AI sẽ xuất hiện ở đây và cập nhật tiến độ tự động." /> : <div className="space-y-4">{items.map((campaign) => {
       const state = campaign.automationState!;
       const selectedAccounts = (campaign.automationAccountIds ?? []).map((id) => accounts.data?.items.find((account) => account.id === id)?.name ?? id);
