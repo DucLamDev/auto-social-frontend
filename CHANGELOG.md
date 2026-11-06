@@ -3,6 +3,14 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.33.1 · 06/11/2026
+### Sửa lỗi
+- Trang Publishing báo "Tiện ích cần cập nhật" khi tiện ích Chrome là bản cũ và bỏ qua bài (cần backend 1.28.2)
+  - Trước đây bài của nền tảng mà tiện ích cũ chưa có luồng đăng (Hugging Face, Linux Foundation Forum…) chỉ hiện "Chờ
+    tiện ích Chrome" mãi dù Chrome đang mở. Giờ bài hiện nhãn cam **Tiện ích cần cập nhật**, ghi rõ Chrome nào và hướng
+    dẫn cập nhật rồi bấm Tải lại ở `chrome://extensions`.
+  - Chỉ hiện khi ghi chú của máy chủ còn mới (15 phút). Chrome đã nhận bài thì hiện "Tiện ích đang đăng" như cũ.
+
 ## 1.33.0 · 06/11/2026
 ### Tính năng
 - Content đợi duyệt: viền thẻ bài theo kết quả AI để nhận ra ngay bài đạt / chưa đạt

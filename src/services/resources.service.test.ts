@@ -575,6 +575,29 @@ describe("resourcesService contract adapters", () => {
     expect(response.items[2]?.error).toBeNull();
   });
 
+  it("flags a waiting job that the polling Chrome's extension is too old to post, while the server's note is recent", async () => {
+    const job = (id: string, extensionUnsupported: Record<string, unknown>, lockedAt: string | null = null) => ({
+      id, status: "NEEDS_ACTION", attemptCount: 1, maxAttempts: 3, lastErrorCode: null, lastErrorMessage: null, lockedAt,
+      platformAccount: { name: "HF", platform: { slug: "hugging-face", name: "Hugging Face" } },
+      target: { campaign: { id: "c", name: "C" }, contentVariant: { id: "v", title: "T" } },
+      attempts: [{ id: "a", attemptNumber: 1, status: "SUCCEEDED", startedAt: "2026-11-06T00:00:00.000Z", responseMetadata: { extensionQueued: true, extensionUnsupported } }],
+    });
+    const recent = new Date(Date.now() - 2 * 60_000).toISOString();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(apiResponse([
+      job("recent", { deviceId: "d", deviceName: "Chrome VPS", engine: "huggingface", at: recent }),
+      job("stale", { deviceId: "d", deviceName: "Chrome VPS", engine: "huggingface", at: new Date(Date.now() - 20 * 60_000).toISOString() }),
+      job("claimed", { deviceId: "d", deviceName: "Chrome VPS", engine: "huggingface", at: recent }, recent),
+    ])));
+
+    const response = await resourcesService.publishJobs();
+
+    expect(response.items[0]?.needsAction).toEqual({ kind: "EXTENSION_PENDING", outdatedExtension: { deviceName: "Chrome VPS", engine: "huggingface" } });
+    // An old note (the extension was updated, or that Chrome stopped polling) no longer counts.
+    expect(response.items[1]?.needsAction).toEqual({ kind: "EXTENSION_PENDING" });
+    // Once a Chrome takes the post, it is being posted.
+    expect(response.items[2]?.needsAction).toEqual({ kind: "EXTENSION_PENDING", claimedAt: recent });
+  });
+
   it("distinguishes an already-submitted moderation job from manual publishing", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(apiResponse([{
       id: "job-1",

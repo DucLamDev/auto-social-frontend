@@ -79,6 +79,8 @@ export type PublishNeedsAction = {
   kind: "MODERATION" | "RECONCILIATION" | "BROWSER_LOGIN" | "BROWSER_REVIEW" | "POLICY_BLOCKED" | "EXTENSION_PENDING" | "EXTENSION_ACTION";
   /** EXTENSION_PENDING: when a Chrome extension picked the job up (it is being posted); absent while still waiting. */
   claimedAt?: string;
+  /** EXTENSION_PENDING, still waiting: the polling Chrome's extension is too old for this destination (backend 1.28.2). */
+  outdatedExtension?: { deviceName: string; engine: string };
   externalPostId?: string;
   url?: string;
   canRetryAfterNotFound?: boolean;
