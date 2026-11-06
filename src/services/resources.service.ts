@@ -27,8 +27,8 @@ export type ImportOneAccountInput = {
 };
 export type ApiAccountImportStatus = "CONNECTED" | "CHECK_FAILED" | "OAUTH_REQUIRED" | "INVALID_ROW" | "NOT_SUPPORTED" | "ACCOUNT_BUSY" | "DUPLICATE_ROW";
 export type ApiAccountImportResult = { total: number; connected: number; needsAttention: number; rows: Array<{ row: number; platform: string; slug?: string; name: string; status: ApiAccountImportStatus; message: string; accountId?: string }> };
-/** One AI campaign idea: name and brief fill the campaign form; angle, whyEffective and bestFor explain it. */
-export type CampaignSuggestion = { name: string; brief: string; angle: string; whyEffective: string; bestFor: string[] };
+/** One AI campaign idea for all chosen platforms: name and brief fill the campaign form; angle, whyEffective and platformFit explain it. */
+export type CampaignSuggestion = { name: string; brief: string; angle: string; whyEffective: string; platformFit: string };
 export type ExtensionLoginCheckRow = { id: string; name: string; platform: string; configured: boolean; autoLogin?: boolean; issues: string[]; deviceId?: string;
   posting?: { status: string; implemented: boolean; engine?: string; message: string; url?: string };
   attempts?: Array<{ method: string; available: boolean; check: { status: string; message?: string | null; finishedAt?: string | null } | null }>;

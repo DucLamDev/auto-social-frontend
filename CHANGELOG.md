@@ -3,6 +3,14 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.27.1 · 06/11/2026
+### Sửa lỗi
+- Hộp Tạo nội dung hàng loạt: chọn social trước, rồi mới gợi ý chiến dịch cho đúng các social đó (cần backend 1.23.2)
+  - Phần **Đăng tới tài khoản** và **Nhà cung cấp AI** nằm đầu hộp; ô **Gợi ý chiến dịch bằng AI** ở ngay sau, rồi tới
+    mô tả bài đăng và tên chiến dịch.
+  - Mỗi gợi ý dùng được cho tất cả nền tảng đã chọn và ghi rõ cách dùng cho từng nền tảng.
+  - Đổi danh sách tài khoản sau khi đã có gợi ý thì gợi ý cũ được ẩn, kèm lời nhắc bấm Gợi ý lại.
+
 ## 1.27.0 · 06/11/2026
 ### Tính năng
 - Gợi ý chiến dịch bằng AI trong hộp Tạo nội dung hàng loạt (cần backend 1.23.0)

@@ -21,15 +21,19 @@ export function CampaignSuggestions({ platformSlugs, aiProvider, providerReady, 
   const [hint, setHint] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [suggestions, setSuggestions] = useState<CampaignSuggestion[] | null>(null);
+  const [result, setResult] = useState<{ forPlatforms: string; suggestions: CampaignSuggestion[] } | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
+  const platformsKey = [...platformSlugs].sort().join(",");
+  // Ideas are made for one set of socials: after the selection changes they are hidden until asked again.
+  const suggestions = result && result.forPlatforms === platformsKey ? result.suggestions : null;
+  const stale = Boolean(result) && !suggestions;
   const blocked = !platformSlugs.length ? "Chọn ít nhất một tài khoản bên dưới để AI gợi ý theo nền tảng." : !providerReady ? "Chọn một nhà cung cấp AI đã cấu hình." : "";
 
   const suggest = async () => {
     setLoading(true); setError(""); setPicked(null);
     try {
-      const result = await resourcesService.suggestCampaigns({ platformSlugs, hint, aiProvider });
-      setSuggestions(result.suggestions);
+      const answer = await resourcesService.suggestCampaigns({ platformSlugs, hint, aiProvider });
+      setResult({ forPlatforms: platformsKey, suggestions: answer.suggestions });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "AI chưa gợi ý được. Thử lại sau.");
     } finally { setLoading(false); }
@@ -46,7 +50,9 @@ export function CampaignSuggestions({ platformSlugs, aiProvider, providerReady, 
       </Button>
     </div>
     <p className="mt-1.5 text-[11px] leading-4 text-muted">
-      {blocked || (loading ? "AI đang đọc thông tin công ty, các nền tảng đã chọn và kết quả các chiến dịch trước (thường 20–60 giây)…" : "Gợi ý hợp với công ty và các nền tảng đã chọn, dựa trên điểm AI và số bài đã đăng của các chiến dịch trước.")}
+      {blocked || (loading ? `AI đang đọc thông tin công ty, ${platformSlugs.length} nền tảng đã chọn và kết quả các chiến dịch trước (thường 20–60 giây)…`
+        : stale ? `Danh sách social đã đổi. Bấm Gợi ý để có chiến dịch hợp với cả ${platformSlugs.length} nền tảng đang chọn.`
+          : `Mỗi gợi ý dùng được cho cả ${platformSlugs.length} nền tảng đã chọn ở trên, hợp với công ty và dựa trên kết quả các chiến dịch trước.`)}
     </p>
     {error && <p role="alert" className="mt-2 text-sm text-danger">{error}</p>}
     {suggestions && !suggestions.length && !loading && <p className="mt-2 text-sm text-muted">Chưa có gợi ý phù hợp. Thử thêm hướng muốn nhắm rồi bấm lại.</p>}
@@ -56,7 +62,7 @@ export function CampaignSuggestions({ platformSlugs, aiProvider, providerReady, 
         {suggestion.angle && <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-indigo-700">{suggestion.angle}</p>}
         <p className="mt-2 line-clamp-5 text-xs leading-5 text-slate-600">{suggestion.brief}</p>
         {suggestion.whyEffective && <p className="mt-2 text-[11px] leading-4 text-emerald-700"><span className="font-semibold">Vì sao hiệu quả: </span>{suggestion.whyEffective}</p>}
-        {suggestion.bestFor.length > 0 && <p className="mt-1 text-[11px] text-muted">Hợp nhất với: {suggestion.bestFor.join(", ")}</p>}
+        {suggestion.platformFit && <p className="mt-1 text-[11px] leading-4 text-slate-600"><span className="font-semibold">Dùng cho từng nền tảng: </span>{suggestion.platformFit}</p>}
         <Button type="button" size="sm" variant={picked === suggestion.name ? "primary" : "secondary"} className="mt-3 self-start" onClick={() => { onPick(suggestion); setPicked(suggestion.name); }}>
           {picked === suggestion.name ? "Đang dùng gợi ý này" : "Dùng gợi ý này"}
         </Button>

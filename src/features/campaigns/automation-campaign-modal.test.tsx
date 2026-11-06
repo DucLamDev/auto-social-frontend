@@ -172,7 +172,7 @@ describe("AutomationCampaignModal", () => {
   it("suggests campaigns for the chosen platforms and fills the name and description with the one picked", async () => {
     suggestCampaigns.mockResolvedValue({ suggestions: [{
       name: "Tối ưu NGINX trên VPS nhỏ", brief: "Hướng dẫn tối ưu NGINX trên VPS 2 GB: worker_processes, gzip, cache; gắn VPS NVMe của VPSTTT.",
-      angle: "Hướng dẫn", whyEffective: "Giải quyết vấn đề thật của người tự quản trị.", bestFor: ["dev.to"],
+      angle: "Hướng dẫn", whyEffective: "Giải quyết vấn đề thật của người tự quản trị.", platformFit: "dev.to: bài hướng dẫn; diễn đàn: hỏi kinh nghiệm.",
     }] });
     render(<AutomationCampaignModal open accounts={accounts} aiProviders={aiProviders} onClose={vi.fn()} onSubmit={vi.fn()} />);
     fireEvent.change(screen.getByLabelText("Gợi ý chiến dịch bằng AI"), { target: { value: "proxy dân cư" } });
@@ -181,6 +181,10 @@ describe("AutomationCampaignModal", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Dùng gợi ý này" }));
     expect(screen.getByLabelText(/Tên chiến dịch/)).toHaveValue("Tối ưu NGINX trên VPS nhỏ");
     expect(screen.getByLabelText("Mô tả bài đăng")).toHaveValue("Hướng dẫn tối ưu NGINX trên VPS 2 GB: worker_processes, gzip, cache; gắn VPS NVMe của VPSTTT.");
+    // Ideas were made for these two socials: changing the selection hides them until asked again.
+    fireEvent.click(screen.getByRole("checkbox", { name: /Browser-assisted destination/ }));
+    expect(screen.queryByRole("button", { name: /Dùng gợi ý này|Đang dùng gợi ý này/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/Danh sách social đã đổi/)).toBeInTheDocument();
   });
 
   it("uses the named publish button as the single submission action", async () => {
