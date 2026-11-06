@@ -18,7 +18,7 @@ import { Modal } from "@/components/ui/modal";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/ui/states";
 import { Table, TableWrap, Td, Th } from "@/components/ui/table";
 import { StatusFilter, Toolbar } from "@/components/ui/toolbar";
-import { useAccounts, useAiImageStatus, useAiProviders, useCampaigns, useContents, usePlatforms, useResourceMutation, useVariants } from "@/hooks/use-resources";
+import { useAccounts, useAiImageStatus, useAiProviders, useAiRoles, useCampaigns, useContents, usePlatforms, useResourceMutation, useVariants } from "@/hooks/use-resources";
 import { formatDate } from "@/lib/utils";
 import { campaignSchema, type AutomationCampaignInput, type CampaignInput } from "@/schemas/campaign";
 import { getAiGenerationErrorMessage } from "@/services/api/errors";
@@ -48,6 +48,7 @@ export function CampaignsView({ initialAutomationOpen = false, initialChannel }:
   const platforms = usePlatforms({ limit: 100 });
   const aiProviders = useAiProviders();
   const aiImageStatus = useAiImageStatus();
+  const aiRoles = useAiRoles();
   const create = useResourceMutation((input: Parameters<typeof resourcesService.createCampaign>[0]) => resourcesService.createCampaign(input), ["campaigns", "publish-jobs"]);
   const automate = useResourceMutation(
     ({ input, idempotencyKey }: { input: Parameters<typeof resourcesService.automateCampaign>[0]; idempotencyKey: string }) => resourcesService.automateCampaign(input, idempotencyKey),
@@ -225,6 +226,7 @@ export function CampaignsView({ initialAutomationOpen = false, initialChannel }:
       aiProviders={aiProviders.data ?? []}
       aiProvidersPending={aiProviders.isPending}
       aiProvidersError={aiProviders.error}
+      aiRoles={aiRoles.data}
       imageGeneration={aiImageStatus.data}
       imageGenerationPending={aiImageStatus.isPending}
       submitError={automationError}

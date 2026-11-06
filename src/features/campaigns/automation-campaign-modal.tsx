@@ -10,9 +10,9 @@ import { Button } from "@/components/ui/button";
 import { FieldError, Input, Label, Select, Switch, Textarea } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
 import { automationCampaignSchema, type AutomationCampaignInput } from "@/schemas/campaign";
-import { aiImageProviderLabel, type AiImageStatus, type AiProviderOption, type PlatformAccount } from "@/types/domain";
+import { aiImageProviderLabel, type AiImageStatus, type AiProviderOption, type AiRoles, type PlatformAccount } from "@/types/domain";
 import { CampaignSuggestions } from "./campaign-suggestions";
-import { canAddAutomationAccount, countAutomationPlatforms, defaultAutomationAccountIds, getAutomationAccountBlocker, isAutomationAccountEligible, MAX_AUTOMATION_PLATFORMS } from "./campaign-utils";
+import { canAddAutomationAccount, countAutomationPlatforms, defaultAutomationAccountIds, getAutomationAccountBlocker, isAutomationAccountEligible, MAX_AUTOMATION_PLATFORMS, sameAiModel, writerLabel } from "./campaign-utils";
 
 type AutomationCampaignModalProps = {
   open: boolean;
@@ -24,6 +24,8 @@ type AutomationCampaignModalProps = {
   aiProviders: AiProviderOption[];
   aiProvidersPending?: boolean;
   aiProvidersError?: unknown;
+  /** Reviewer and final approver configured on the server; null/undefined (older backends) hides the three-role line. */
+  aiRoles?: AiRoles | null;
   /** Whether VPSTTT AI image generation is configured on the backend. */
   imageGeneration?: AiImageStatus;
   imageGenerationPending?: boolean;
@@ -55,6 +57,7 @@ export function AutomationCampaignModal({
   aiProviders,
   aiProvidersPending = false,
   aiProvidersError,
+  aiRoles,
   imageGeneration,
   imageGenerationPending = false,
   submitError,
@@ -296,6 +299,7 @@ export function AutomationCampaignModal({
               ? "Đã chọn sẵn AI của workspace. Bạn có thể giữ nguyên để tạo nội dung."
               : "AI này chưa được cấu hình cho workspace."}
           </p>}
+        {aiRoles && selectedAiProviderOption && <AiRolesLine writer={selectedAiProviderOption} roles={aiRoles} />}
       </div>
 
       <CampaignSuggestions
@@ -462,4 +466,34 @@ function FlowStep({ icon, number, label }: { icon: ReactNode; number: string; la
     <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-indigo-600 text-white">{icon}</span>
     <span><span className="mr-1 text-indigo-500">{number}.</span>{label}</span>
   </div>;
+}
+
+/**
+ * The three AI roles of a run: the chosen provider writes, the server's reviewer scores and the
+ * final approver gives the last yes. Warns when the writer is the same model as a judge (it would
+ * grade its own work) or when a judge is not configured.
+ */
+function AiRolesLine({ writer, roles }: { writer: AiProviderOption; roles: AiRoles }) {
+  const steps = [
+    { role: "Viết", label: writerLabel(writer) },
+    { role: "Chấm", label: roles.reviewer.label },
+    ...(roles.approvalEnabled ? [{ role: "Duyệt cuối", label: roles.approver.label }] : []),
+  ];
+  const same = [
+    sameAiModel(writer, roles.reviewer) ? "AI chấm" : null,
+    roles.approvalEnabled && sameAiModel(writer, roles.approver) ? "AI duyệt cuối" : null,
+  ].filter((role): role is string => Boolean(role));
+  // The server falls back to the writer for an unconfigured reviewer; an unconfigured approver fails every approval.
+  const unconfigured = [
+    roles.reviewer.configured ? null : `AI chấm (${roles.reviewer.label}) chưa được cấu hình trên máy chủ: bài sẽ do chính AI viết tự chấm.`,
+    roles.approvalEnabled && !roles.approver.configured ? `AI duyệt cuối (${roles.approver.label}) chưa được cấu hình trên máy chủ: bài sẽ không qua được bước duyệt cuối.` : null,
+  ].filter((problem): problem is string => Boolean(problem));
+  return <section aria-label="Ba vai AI" className="mt-3 rounded-xl border border-border bg-slate-50/70 px-3 py-2 text-xs text-slate-700">
+    <p className="leading-6">{steps.map((step, index) => <span key={step.role}>
+      {index > 0 && <span aria-hidden className="text-slate-400"> → </span>}
+      <span className="whitespace-nowrap"><span className="font-semibold text-slate-500">{step.role}:</span> <span className="font-semibold text-slate-900">{step.label}</span></span>
+    </span>)}</p>
+    {same.length > 0 && <p className="mt-1.5 flex items-start gap-1.5 text-amber-800"><AlertTriangle aria-hidden className="mt-0.5 size-3.5 shrink-0" />AI viết trùng {same.join(" và ")} nên kết quả kém khách quan. Chọn AI viết khác để bài được chấm và duyệt độc lập.</p>}
+    {unconfigured.length > 0 && <p className="mt-1.5 flex items-start gap-1.5 text-amber-800"><AlertTriangle aria-hidden className="mt-0.5 size-3.5 shrink-0" /><span>{unconfigured.join(" ")} Nhờ quản trị cấu hình trước khi tạo bài.</span></p>}
+  </section>;
 }

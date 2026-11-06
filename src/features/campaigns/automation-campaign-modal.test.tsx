@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { PlatformAccount } from "@/types/domain";
+import type { AiRoles, PlatformAccount } from "@/types/domain";
 import { AutomationCampaignModal } from "./automation-campaign-modal";
 
 const suggestCampaigns = vi.hoisted(() => vi.fn());
@@ -336,6 +336,53 @@ describe("AutomationCampaignModal", () => {
   it("shows no count when the server does not send one (older backend)", () => {
     render(<AutomationCampaignModal open accounts={[accounts[0]!]} aiProviders={aiProviders} onClose={vi.fn()} onSubmit={vi.fn()} />);
     expect(screen.queryByLabelText(/Đã đăng \d+ bài/)).not.toBeInTheDocument();
+  });
+  describe("three AI roles", () => {
+    const roles: AiRoles = {
+      reviewer: { provider: "vpsttt", model: "claude:sonnet", label: "Claude Sonnet", configured: true },
+      approver: { provider: "vpsttt", model: "claude:opus", label: "Claude Opus", configured: true },
+      approvalEnabled: true,
+    };
+    const writers = [
+      { id: "vpsttt" as const, label: "VPSTTT AI", model: "gpt:gpt-5", configured: true, isDefault: true },
+      { id: "openai" as const, label: "OpenAI", model: "gpt-5-mini", configured: true, isDefault: false },
+      { id: "deepseek" as const, label: "DeepSeek", model: "deepseek-flash", configured: false, isDefault: false },
+    ];
+
+    it("shows who writes, who scores and who gives the final yes", () => {
+      render(<AutomationCampaignModal open accounts={accounts} aiProviders={writers} aiRoles={roles} onClose={vi.fn()} onSubmit={vi.fn()} />);
+      const line = screen.getByRole("region", { name: "Ba vai AI" });
+      expect(line).toHaveTextContent("Viết: GPT (VPSTTT AI) → Chấm: Claude Sonnet → Duyệt cuối: Claude Opus");
+      expect(line).not.toHaveTextContent("kém khách quan");
+      fireEvent.change(screen.getByLabelText("Nhà cung cấp AI"), { target: { value: "openai" } });
+      expect(line).toHaveTextContent("Viết: OpenAI · gpt-5-mini → Chấm: Claude Sonnet");
+    });
+
+    it("warns when the writer is the same model as a judge, or a judge is not configured", () => {
+      const sameWriter = [{ ...writers[0]!, model: "claude:opus" }, writers[1]!];
+      const { unmount } = render(<AutomationCampaignModal open accounts={accounts} aiProviders={sameWriter} aiRoles={roles} onClose={vi.fn()} onSubmit={vi.fn()} />);
+      const line = screen.getByRole("region", { name: "Ba vai AI" });
+      expect(line).toHaveTextContent("Viết: Claude Opus");
+      expect(line).toHaveTextContent("AI viết trùng AI duyệt cuối nên kết quả kém khách quan.");
+      fireEvent.change(screen.getByLabelText("Nhà cung cấp AI"), { target: { value: "openai" } });
+      expect(line).not.toHaveTextContent("kém khách quan");
+      unmount();
+      render(<AutomationCampaignModal open accounts={accounts} aiProviders={[{ ...writers[0]!, model: "claude:sonnet" }]} onClose={vi.fn()} onSubmit={vi.fn()}
+        aiRoles={{ ...roles, approver: { ...roles.approver, configured: false } }} />);
+      const warned = screen.getByRole("region", { name: "Ba vai AI" });
+      expect(warned).toHaveTextContent("AI viết trùng AI chấm nên kết quả kém khách quan.");
+      expect(warned).toHaveTextContent("AI duyệt cuối (Claude Opus) chưa được cấu hình trên máy chủ: bài sẽ không qua được bước duyệt cuối.");
+    });
+
+    it("leaves out the final approver when it is off, and the whole line on older backends", () => {
+      const { unmount } = render(<AutomationCampaignModal open accounts={accounts} aiProviders={writers} aiRoles={{ ...roles, approvalEnabled: false }} onClose={vi.fn()} onSubmit={vi.fn()} />);
+      const line = screen.getByRole("region", { name: "Ba vai AI" });
+      expect(within(line).getByText("Claude Sonnet")).toBeInTheDocument();
+      expect(line).not.toHaveTextContent("Duyệt cuối");
+      unmount();
+      render(<AutomationCampaignModal open accounts={accounts} aiProviders={writers} aiRoles={null} onClose={vi.fn()} onSubmit={vi.fn()} />);
+      expect(screen.queryByRole("region", { name: "Ba vai AI" })).not.toBeInTheDocument();
+    });
   });
 });
 

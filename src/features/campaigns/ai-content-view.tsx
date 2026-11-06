@@ -13,11 +13,12 @@ import { Card } from "@/components/ui/card";
 import { Input, Label, Textarea } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/ui/states";
-import { useAccounts, useAiCampaigns, useMedia, useResourceMutation, useVariants } from "@/hooks/use-resources";
+import { useAccounts, useAiCampaigns, useAiRoles, useMedia, useResourceMutation, useVariants } from "@/hooks/use-resources";
 import { cn, formatDate } from "@/lib/utils";
 import { resourcesService } from "@/services/resources.service";
 import type { Campaign, ContentVariant, PlatformAccount } from "@/types/domain";
-import { aiScore, imagePending, isAutomationAccountEligible, normalizeMinScore, readApproveMinScore, reviewOutcomeWarning, saveApproveMinScore } from "./campaign-utils";
+import { ApprovalChip, ApprovalNotice, canRequestApproval, RequestApprovalButton } from "./ai-approval";
+import { aiScore, approvalGate, imagePending, isAutomationAccountEligible, normalizeMinScore, readApproveMinScore, reviewOutcomeWarning, saveApproveMinScore } from "./campaign-utils";
 import { ReviewAdvice } from "./review-advice";
 import { isRewriting, VariantRewritePanel } from "./variant-rewrite-panel";
 import { VariantImagePanel } from "./variant-image-panel";
@@ -110,8 +111,13 @@ function GenerationProgress({ campaign, accounts }: { campaign: Campaign; accoun
 }
 
 function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: PlatformAccount[] }) {
+  // Live: polls every 2 seconds, so a final AI verdict still being read shows up by itself.
   const variants = useVariants(campaign.content?.id ?? "", true);
   const media = useMedia({ contentId: campaign.content?.id, limit: 100 });
+  const roles = useAiRoles();
+  // Older backends (no AI roles, 404) and a switched-off approver leave the decision to people alone.
+  const approvalEnabled = roles.data?.approvalEnabled === true;
+  const gateOf = (variant: ContentVariant) => approvalGate(variant, approvalEnabled);
   const [edits, setEdits] = useState<Record<string, { title: string; body: string }>>({});
   // Editing is opened post by post, from that post's own "Sửa bài" button.
   const [editingIds, setEditingIds] = useState<Record<string, boolean>>({});
@@ -186,8 +192,12 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
   // …and while the AI rewrites a post, approving it would send the old text.
   const readyToApprove = (variant: ContentVariant) => waiting(variant) && !imagePending(variant) && !isRewriting(variant);
   const readyCount = items.filter(readyToApprove).length;
-  // "Duyệt & đăng bài từ N điểm": ready posts the AI editor scored at least N (unscored ones are left out).
-  const scoredReady = items.filter((variant) => readyToApprove(variant) && (aiScore(variant.reason) ?? 0) >= minScore);
+  // With the final AI approver on, only a post it approved as it reads now (no unsaved edit) can go out.
+  const approvable = (variant: ContentVariant) => readyToApprove(variant) && gateOf(variant).ok && !(approvalEnabled && edits[variant.id]);
+  const approvableCount = items.filter(approvable).length;
+  const awaitingApproval = approvalEnabled ? items.filter((variant) => readyToApprove(variant) && !gateOf(variant).ok).length : 0;
+  // "Duyệt & đăng bài từ N điểm": approvable posts the AI editor scored at least N (unscored ones are left out).
+  const scoredReady = items.filter((variant) => approvable(variant) && (aiScore(variant.reason) ?? 0) >= minScore);
   const generating = isGenerating(campaign);
   const editable = campaign.reviewMode !== "EXISTING_CAMPAIGN" && (campaign.automationState === "WAITING_REVIEW" || generating || (standalone && campaign.automationState === "APPROVED"));
   const eligibleAccounts = accounts.filter((account) => isAutomationAccountEligible(account) && chosenVariants.some((variant) => variant.platformSlug === account.platform?.slug));
@@ -198,7 +208,7 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
   };
   const emptyEdit = Object.values(edits).some((edit) => !edit.body.trim());
   const ready = perPost
-    ? readyCount > 0 && !busy && !emptyEdit
+    ? approvableCount > 0 && !busy && !emptyEdit
     : !generating && items.length > 0 && items.length === campaign.automationVariantIds?.length && !dirty && !busy && (!standalone || (accountIds.length > 0 && accountIds.every((id) => eligibleAccounts.some((account) => account.id === id))));
   // Accounts that went offline since the AI run are left out of an approval; say which ones.
   const warnSkipped = (outcome: Parameters<typeof reviewOutcomeWarning>[0]) => {
@@ -237,6 +247,14 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
       warnSkipped(outcome);
     } catch (error) { toast.error(error instanceof Error ? error.message : "Không thể xử lý nội dung"); }
   };
+  /** Saves one post's edit; with the final AI approver on, the server then has it approve the new text. */
+  const saveEdit = (variant: ContentVariant) => {
+    const edit = edits[variant.id];
+    if (!edit) return;
+    void saveOne.mutateAsync({ id: variant.id, input: edit })
+      .then(() => { closeEdit(variant.id); toast.success(approvalEnabled ? `Đã lưu bài ${variant.platform}. AI duyệt cuối đang đọc lại bài.` : `Đã lưu bài ${variant.platform}`); })
+      .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không thể lưu"));
+  };
   const scheduleVariant = scheduleTarget && scheduleTarget !== "all" ? items.find((variant) => variant.id === scheduleTarget) : undefined;
   const loadingSlowly = useSlow(variants.isPending);
   if (variants.isPending) return loadingSlowly ? <TableSkeleton /> : <div aria-busy="true" className="min-h-24" />;
@@ -270,12 +288,21 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
       const isEditing = canEdit && Boolean(editingIds[variant.id]);
       const edit = edits[variant.id];
       const approving = decide.isPending && decide.variables?.variantId === variant.id;
-      const hint = isRewriting(variant) ? "AI đang viết lại bài này; duyệt được khi bài mới xong."
-        : imagePending(variant) ? "Đang tạo ảnh cho bài này; duyệt được ngay khi ảnh xong."
-          : edit ? "Duyệt sẽ lưu luôn phần bạn đã sửa." : null;
+      const saving = saveOne.isPending && saveOne.variables?.id === variant.id;
+      const gate = gateOf(variant);
+      // An unsaved edit is not what the approver read: it has to be saved (and approved again) first.
+      const awaitingSave = approvalEnabled && Boolean(edit);
+      const draftEditable = editable && (perPost ? waiting(variant) : ["GENERATED", "APPROVED"].includes(variant.status));
+      const retryApproval = approvalEnabled && draftEditable && canRequestApproval(gate) && !edit && !isRewriting(variant)
+        ? <PermissionGate allow={["ADMIN", "EDITOR"]}><RequestApprovalButton variant={variant} disabled={busy} /></PermissionGate> : null;
+      const [hint, hintTone] = isRewriting(variant) ? ["AI đang viết lại bài này; duyệt được khi bài mới xong.", "text-indigo-700"]
+        : imagePending(variant) ? ["Đang tạo ảnh cho bài này; duyệt được ngay khi ảnh xong.", "text-indigo-700"]
+          : awaitingSave ? ["Bài đã sửa: lưu để AI duyệt cuối đọc lại, duyệt được khi có kết quả mới.", "text-amber-700"]
+            : !gate.ok ? [gate.message, gate.state === "running" ? "text-indigo-700" : gate.state === "rejected" ? "text-red-700" : "text-amber-700"]
+              : edit ? ["Duyệt sẽ lưu luôn phần bạn đã sửa.", "text-muted"] : [null, ""];
       const editTools = canEdit ? <PermissionGate allow={["ADMIN", "EDITOR"]}>{isEditing
-        ? <><Button size="sm" variant="secondary" disabled={busy || !edit || !edit.body.trim()} loading={saveOne.isPending && saveOne.variables?.id === variant.id}
-            onClick={() => edit && void saveOne.mutateAsync({ id: variant.id, input: edit }).then(() => { closeEdit(variant.id); toast.success(`Đã lưu bài ${variant.platform}`); }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Không thể lưu"))}><Save className="size-4" />Lưu bài này</Button>
+        ? <><Button size="sm" variant="secondary" disabled={busy || !edit || !edit.body.trim()} loading={saving}
+            onClick={() => saveEdit(variant)}><Save className="size-4" />Lưu bài này</Button>
           <Button size="sm" variant="ghost" disabled={busy} onClick={() => closeEdit(variant.id)}>Huỷ sửa</Button></>
         : <Button size="sm" variant="secondary" aria-label={`Sửa bài ${variant.platform}`} disabled={busy} onClick={() => { setEditingIds((current) => ({ ...current, [variant.id]: true })); setViews((current) => ({ ...current, [variant.id]: "content" })); }}><Pencil className="size-4" />Sửa bài</Button>}</PermissionGate> : null;
       return <article key={variant.id} id={`post-${variant.id}`} aria-labelledby={`post-title-${variant.id}`}
@@ -288,7 +315,8 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
             <p className="truncate text-xs text-muted">Bài {index + 1}/{items.length}{postAccounts.length ? ` · đăng bằng ${postAccounts.join(", ")}` : ""}</p>
             {folded && <p className="mt-0.5 truncate text-xs text-slate-600">{variant.title || variant.body.split("\n").find((line) => line.trim())?.trim()}</p>}
           </div>
-          {score !== null && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", variant.recommended === false ? "bg-amber-100 text-amber-800" : "bg-emerald-50 text-emerald-700")}>AI chấm {score}/10</span>}
+          {score !== null && <span title={roles.data ? `Chấm bởi ${roles.data.reviewer.label}` : undefined} className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", variant.recommended === false ? "bg-amber-100 text-amber-800" : "bg-emerald-50 text-emerald-700")}>AI chấm {score}/10</span>}
+          <ApprovalChip variant={variant} approvalEnabled={approvalEnabled} />
           <Badge value={perPost && waiting(variant) ? "WAITING_REVIEW" : variant.status} />
           {!folded && <div role="tablist" aria-label={`Cách xem bài ${variant.platform}`} className="inline-flex rounded-lg border border-border bg-white p-0.5">
             {([["content", "Nội dung", FileText], ["preview", "Xem trước", Eye]] as const).map(([value, label, Icon]) => <button key={value} type="button" role="tab" aria-selected={view === value}
@@ -300,10 +328,11 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
         </header>
         {!folded && <div id={`post-body-${variant.id}`} className="space-y-3 p-4">
           {standalone && editable && ["GENERATED", "APPROVED"].includes(variant.status) && <label className="flex items-center gap-2 text-sm text-primary"><input type="radio" name={`variant-${campaign.id}-${variant.platformSlug}`} checked={chosenVariants.some((chosen) => chosen.id === variant.id)} disabled={busy} onChange={() => setSelectedVariants((current) => ({ ...current, [variant.platformSlug]: variant.id }))} />Dùng biến thể này khi đăng · {variant.title || variant.platform}</label>}
-          {variant.recommended === false && <ReviewAdvice key={variant.reason ?? ""} variant={variant} unsaved={Boolean(edit)}
-            editable={editable && (perPost ? waiting(variant) : ["GENERATED", "APPROVED"].includes(variant.status))} />}
-          <VariantRewritePanel variant={variant} unsaved={Boolean(edit)} actions={editTools}
-            editable={editable && (perPost ? waiting(variant) : ["GENERATED", "APPROVED"].includes(variant.status))} />
+          {/* Per-post review: "Cho AI duyệt lại" sits in the decision footer, which stays visible when folded. */}
+          {variant.status === "GENERATED" && <ApprovalNotice variant={variant} approvalEnabled={approvalEnabled} action={perPost ? undefined : retryApproval} />}
+          {!perPost && retryApproval && (gate.state === "missing" || gate.state === "stale") && <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600"><span>{gate.message}</span>{retryApproval}</div>}
+          {variant.recommended === false && <ReviewAdvice key={variant.reason ?? ""} variant={variant} unsaved={Boolean(edit)} editable={draftEditable} />}
+          <VariantRewritePanel variant={variant} unsaved={Boolean(edit)} actions={editTools} editable={draftEditable} />
           {view === "preview" ? <>
             <VariantPreviewCard variant={variant} edit={edit} account={accountFor(variant)} />
             {/* The preview shows the picture; the image buttons stay usable under it. */}
@@ -320,11 +349,14 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
         {perPost && editable && waiting(variant) && <PermissionGate allow={["ADMIN", "EDITOR"]}><footer role="group" aria-label={`Duyệt bài ${variant.platform}`} className="flex flex-wrap items-center gap-2 border-t border-border bg-amber-50/40 px-4 py-3">
           <div className="mr-auto flex min-w-0 basis-full items-center gap-2 sm:basis-auto">
             <PlatformMark slug={variant.platformSlug} name={variant.platform} size="xs" />
-            <div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-800">Bài {variant.platform}</p>{hint && <p className={cn("text-xs", edit && !isRewriting(variant) && !imagePending(variant) ? "text-muted" : "text-indigo-700")}>{hint}</p>}</div>
+            <div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-800">Bài {variant.platform}</p>{hint && <p className={cn("text-xs", hintTone)}>{hint}</p>}</div>
           </div>
           <Button variant="ghost" aria-label={`Từ chối bài ${variant.platform}`} disabled={busy} loading={approving && decide.variables?.action === "reject"} onClick={() => void actOn(variant, "reject")}><X className="size-4" />Từ chối</Button>
-          <Button variant="secondary" aria-label={`Hẹn lịch bài ${variant.platform}`} disabled={busy || !readyToApprove(variant) || edit?.body.trim() === ""} onClick={() => setScheduleTarget(variant.id)}><CalendarClock className="size-4" />Hẹn lịch</Button>
-          <Button aria-label={`Duyệt & đăng bài ${variant.platform}`} disabled={busy || !readyToApprove(variant) || edit?.body.trim() === ""} loading={approving && decide.variables?.action === "approve"} onClick={() => void actOn(variant, "approve")}><Check className="size-4" />Duyệt & đăng</Button>
+          {retryApproval}
+          <Button variant="secondary" aria-label={`Hẹn lịch bài ${variant.platform}`} disabled={busy || !approvable(variant) || edit?.body.trim() === ""} onClick={() => setScheduleTarget(variant.id)}><CalendarClock className="size-4" />Hẹn lịch</Button>
+          {awaitingSave
+            ? <Button aria-label={`Lưu bài ${variant.platform} để AI duyệt lại`} disabled={busy || !edit?.body.trim()} loading={saving} onClick={() => saveEdit(variant)}><Save className="size-4" />Lưu để AI duyệt lại</Button>
+            : <Button aria-label={`Duyệt & đăng bài ${variant.platform}`} disabled={busy || !approvable(variant) || edit?.body.trim() === ""} loading={approving && decide.variables?.action === "approve"} onClick={() => void actOn(variant, "approve")}><Check className="size-4" />Duyệt & đăng</Button>}
         </footer></PermissionGate>}
         {perPost && variant.status === "APPROVED" && <footer className="border-t border-emerald-100 bg-emerald-50/50 px-4 py-2.5 text-xs text-emerald-800">Đã duyệt: bài vào hàng đợi đăng. Theo dõi ở <Link href="/publishing" className="font-semibold underline">Publishing</Link>.</footer>}
         {perPost && variant.status === "REJECTED" && <footer className="flex flex-wrap items-center gap-2 border-t border-border bg-slate-50 px-4 py-3">
@@ -338,7 +370,7 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
       {/* Long reviews (13 platforms) pushed these buttons far below the fold: keep them in view while scrolling. */}
       <div role="region" aria-label="Duyệt nội dung" className="sticky bottom-0 z-20 -mx-5 -mb-5 flex flex-wrap items-center gap-2 border-t border-indigo-100 bg-indigo-50/95 px-3 py-2 sm:px-5 sm:py-3 shadow-[0_-6px_16px_-12px_rgba(15,23,42,0.35)] backdrop-blur">
       {/* This bar acts on every post of the run; each post's own decision is at the end of its card. */}
-      <div className="mr-auto min-w-0"><p className="text-xs font-bold text-indigo-900">Cả lượt · {items.length} bài</p><p className="hidden text-xs text-slate-600 sm:block">{perPost ? `${pendingCount} chờ duyệt${readyCount < pendingCount ? ` (${pendingCount - readyCount} đang tạo ảnh)` : ""} · ${items.filter((variant) => variant.status === "APPROVED").length} đã duyệt · ${items.filter((variant) => variant.status === "REJECTED").length} từ chối · ` : ""}{items.length} kênh{items.some((variant) => variant.recommended === false) ? ` · ${items.filter((variant) => variant.recommended === false).length} kênh AI đề nghị kiểm tra` : ""}</p></div>
+      <div className="mr-auto min-w-0"><p className="text-xs font-bold text-indigo-900">Cả lượt · {items.length} bài</p><p className="hidden text-xs text-slate-600 sm:block">{perPost ? `${pendingCount} chờ duyệt${readyCount < pendingCount ? ` (${pendingCount - readyCount} đang tạo ảnh)` : ""}${awaitingApproval ? ` · ${awaitingApproval} chờ AI duyệt cuối` : ""} · ${items.filter((variant) => variant.status === "APPROVED").length} đã duyệt · ${items.filter((variant) => variant.status === "REJECTED").length} từ chối · ` : ""}{items.length} kênh{items.some((variant) => variant.recommended === false) ? ` · ${items.filter((variant) => variant.recommended === false).length} kênh AI đề nghị kiểm tra` : ""}</p></div>
       <Button size="sm" variant="secondary" className={perPost ? "hidden sm:inline-flex" : undefined} disabled={!ready} onClick={() => setScheduleOpen(true)}><CalendarClock className="size-4" />{perPost ? "Hẹn lịch bài còn chờ" : "Hẹn lịch đăng"}</Button>
       {perPost && <div role="group" aria-label="Duyệt theo điểm AI" className="flex items-center gap-1.5">
         <label htmlFor={`min-score-${campaign.id}`} className="text-xs font-semibold text-slate-600">Từ</label>
@@ -350,10 +382,10 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
           }} />
         <Button size="sm" variant="secondary" disabled={busy || !scoredReady.length || emptyEdit} loading={scoredRunning} onClick={() => void approveScored()}><Star className="size-4" />Duyệt & đăng bài từ {minScore} điểm ({scoredReady.length})</Button>
       </div>}
-      <Button size="sm" disabled={!ready} loading={review.isPending} onClick={() => void act("approve")}><Check className="size-4" />{perPost ? `Duyệt & đăng bài đã xong (${readyCount})` : "Duyệt đăng ngay"}</Button>
+      <Button size="sm" disabled={!ready} loading={review.isPending} onClick={() => void act("approve")}><Check className="size-4" />{perPost ? `Duyệt & đăng bài đã xong (${approvableCount})` : "Duyệt đăng ngay"}</Button>
       <Button size="sm" variant="ghost" className={perPost ? "hidden sm:inline-flex" : undefined} disabled={busy || (perPost ? !pendingCount : generating)} onClick={() => void act("reject")}><X className="size-4" />{perPost ? "Từ chối bài còn chờ" : "Từ chối"}</Button>
       {dirty && !perPost && <p className="text-xs text-amber-700">Lưu hoặc huỷ phần đang sửa ở từng bài trước khi duyệt.</p>}
-      {dirty && perPost && <p className="text-xs text-muted">Duyệt sẽ lưu luôn phần bạn đã sửa.</p>}
+      {dirty && perPost && <p className="text-xs text-muted">{approvalEnabled ? "Duyệt cả lượt sẽ lưu phần đang sửa; bài đã sửa chờ AI duyệt cuối đọc lại rồi mới đăng." : "Duyệt sẽ lưu luôn phần bạn đã sửa."}</p>}
       {generating && <p className="text-xs text-indigo-700">AI đang viết các kênh còn lại. Kênh nào xong (kèm ảnh) là duyệt và đăng được ngay.</p>}
     </div></PermissionGate>}
     <Modal open={scheduleOpen && editable} onClose={() => { if (!busy) setScheduleOpen(false); }} title="Hẹn lịch đăng" description={scheduleVariant ? `Duyệt bài ${scheduleVariant.platform} và đăng vào thời gian bạn chọn; các bài khác vẫn chờ duyệt.` : perPost ? "Duyệt các bài còn chờ và đăng vào thời gian bạn chọn." : "Duyệt toàn bộ nội dung của lượt này và đăng vào thời gian bạn chọn."}>

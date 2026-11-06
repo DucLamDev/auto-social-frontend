@@ -23,7 +23,40 @@ export interface Content { id: string; title: string; description?: string | nul
 export interface VariantImagePlan { type: "none" | "image" | "video" | "document"; prompt?: string | null; altText?: string; size?: string; status?: "pending" | "generating" | "generated" | "failed" | "removed"; error?: string | null; }
 /** The last "Viết lại bằng AI" request on a draft (runs in the background on the server). */
 export interface VariantAiRevision { status: "generating" | "done" | "failed"; instruction?: string; /** Review points chosen with "Sửa theo khuyến nghị". */ notes?: string[]; startedAt?: string; finishedAt?: string | null; error?: string | null; }
-export interface ContentVariant { id: string; contentId: string; platform: string; platformSlug: string; title?: string | null; body: string; summary?: string | null; hashtags?: string[]; cta?: string | null; status: Status; recommended?: boolean; reason?: string | null; updatedAt?: string; image?: VariantImagePlan | null; aiRevision?: VariantAiRevision | null; }
+export type AiApprovalStatus = "running" | "approved" | "rejected" | "failed";
+export type AiBrandRisk = "none" | "low" | "medium" | "high";
+/** The final AI approver's verdict on one draft; a post needs "approved" (for its current text) before anyone can approve it. */
+export interface AiApproval {
+  status: AiApprovalStatus;
+  /** `provider:model` of the approver, e.g. `vpsttt:claude:opus`. */
+  approver: string;
+  /** Human label of the approver, e.g. "Claude Opus". */
+  approverLabel: string;
+  score?: number;
+  risk?: AiBrandRisk;
+  /** True when the approver found clumsy seeding (an ad dressed up as a user's opinion). */
+  seeding?: boolean;
+  reasons?: string[];
+  startedAt: string;
+  finishedAt?: string | null;
+  error?: string | null;
+}
+/** A "running" final approval started longer ago than this was lost (server restart) and may be started again, as on the server. */
+export const AI_APPROVAL_LOST_AFTER_MS = 10 * 60 * 1000;
+/** True while the final approver is really reading the post (not a run lost to a restart). */
+export function aiApprovalRunning(approval?: Pick<AiApproval, "status" | "startedAt"> | null, now = Date.now()): boolean {
+  if (approval?.status !== "running") return false;
+  const startedAt = Date.parse(approval.startedAt);
+  return Number.isFinite(startedAt) && now - startedAt < AI_APPROVAL_LOST_AFTER_MS;
+}
+/** One AI role configured on the server (reviewer or final approver). */
+export interface AiRole { provider: AiProviderId; model: string; label: string; configured: boolean; }
+/** Who scores and who gives the final yes; `approvalEnabled` false (or older backends) means no final approval gate. */
+export interface AiRoles { reviewer: AiRole; approver: AiRole; approvalEnabled: boolean; }
+export interface ContentVariant { id: string; contentId: string; platform: string; platformSlug: string; title?: string | null; body: string; summary?: string | null; hashtags?: string[]; cta?: string | null; status: Status; recommended?: boolean; reason?: string | null; updatedAt?: string; image?: VariantImagePlan | null; aiRevision?: VariantAiRevision | null;
+  aiApproval?: AiApproval | null;
+  /** True when `aiApproval` was given for the current text; false once the post changed after it. */
+  aiApprovalCurrent?: boolean; }
 export interface MediaAsset { id: string; contentId?: string | null; variantId?: string | null; type: "IMAGE" | "VIDEO" | "DOCUMENT"; storageKey: string; publicUrl?: string | null; mimeType: string; sizeBytes: number; altText?: string | null; generated?: boolean; createdAt: string; }
 /** Why the last AI run failed (backend 1.23.2): cause, the platform being written, the AI provider. */
 export interface AutomationErrorDetail { code: string; message: string; platform?: string; platformName?: string; provider?: string; at?: string }

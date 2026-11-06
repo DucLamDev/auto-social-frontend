@@ -352,6 +352,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** AI chấm điểm và AI duyệt cuối đang cấu hình trên máy chủ (không có key). */
+        get: operations["Ai_roles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/campaign-suggestions": {
         parameters: {
             query?: never;
@@ -523,6 +540,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["ContentVariants_rewrite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content-variants/{id}/ai-approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ContentVariants_requestAiApproval"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1863,6 +1896,12 @@ export interface components {
             aiRevision?: {
                 [key: string]: unknown;
             } | null;
+            /** @description Final AI approver verdict: status running | approved | rejected | failed, approver (provider:model), approverLabel, textHash (the text it read), score, risk, seeding, reasons, startedAt, finishedAt, error. Null when the variant was never sent to the approver. */
+            aiApproval?: {
+                [key: string]: unknown;
+            } | null;
+            /** @description True when the stored aiApproval was given on the current title, body and hashtags; false after an edit or when there is none. */
+            aiApprovalCurrent?: boolean;
             /** @enum {string} */
             status: "DRAFT" | "GENERATED" | "APPROVED" | "REJECTED";
             version: number;
@@ -1896,6 +1935,30 @@ export interface components {
             model: string;
             configured: boolean;
             isDefault: boolean;
+        };
+        AiRoleContractDto: {
+            /**
+             * @example vpsttt
+             * @enum {string}
+             */
+            provider: "openai" | "deepseek" | "gemini" | "vpsttt";
+            /**
+             * @description Model used for this role (the provider default when not set).
+             * @example claude:opus
+             */
+            model: string;
+            /** @example Claude Opus */
+            label: string;
+            /** @description False when the provider has no key: the reviewer then falls back to the writer, approvals fail. */
+            configured: boolean;
+        };
+        AiRolesContractDto: {
+            /** @description Scores every draft and checks seeding and risk for the company (AI_REVIEWER). */
+            reviewer: components["schemas"]["AiRoleContractDto"];
+            /** @description Final gate on the finished draft (AI_APPROVER). */
+            approver: components["schemas"]["AiRoleContractDto"];
+            /** @description AI_APPROVAL_ENABLED: whether drafts go through the final approver. */
+            approvalEnabled: boolean;
         };
         CampaignSuggestionsDto: {
             /**
@@ -2172,6 +2235,14 @@ export interface components {
             /** @description Vietnamese explanation shown to the reviewer. */
             message: string;
         };
+        UnapprovedVariantContractDto: {
+            /** Format: uuid */
+            id: string;
+            /** @description Platform display name. */
+            platform: string;
+            /** @description Vietnamese reason from the final AI approver gate shown to the reviewer. */
+            message: string;
+        };
         AutomatedCampaignContractDto: {
             campaign: components["schemas"]["CampaignContractDto"];
             content: components["schemas"]["ContentContractDto"];
@@ -2185,6 +2256,8 @@ export interface components {
             waitingVariantIds?: string[];
             /** @description Review decisions only: drafts left waiting because they exceed their destination character limit. */
             overLimitVariants?: components["schemas"]["OverLimitVariantContractDto"][];
+            /** @description Review decisions only: drafts left waiting because the final AI approver has not approved their current text. */
+            unapprovedVariants?: components["schemas"]["UnapprovedVariantContractDto"][];
         };
         ReviewExistingContentDto: {
             /**
@@ -4035,6 +4108,52 @@ export interface operations {
             };
         };
     };
+    Ai_roles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["AiRolesContractDto"];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
     Ai_suggestCampaigns: {
         parameters: {
             query?: never;
@@ -4619,6 +4738,47 @@ export interface operations {
                 "application/json": components["schemas"]["RewriteVariantDto"];
             };
         };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ContentVariants_requestAiApproval: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             202: {
                 headers: {
