@@ -3,6 +3,19 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.28.1 · 06/11/2026
+### Sửa lỗi
+- Hộp Tạo nội dung hàng loạt: chọn social trước, rồi mới gợi ý chiến dịch cho đúng các social đó (cần backend 1.23.2)
+  - Phần **Đăng tới tài khoản** và **Nhà cung cấp AI** nằm đầu hộp; ô **Gợi ý chiến dịch bằng AI** ở ngay sau, rồi tới
+    mô tả bài đăng và tên chiến dịch.
+  - Mỗi gợi ý dùng được cho tất cả nền tảng đã chọn và ghi rõ cách dùng cho từng nền tảng.
+  - Đổi danh sách tài khoản sau khi đã có gợi ý thì gợi ý cũ được ẩn, kèm lời nhắc bấm Gợi ý lại.
+- Chiến dịch AI lỗi hiện rõ nguyên nhân ở Content đợi duyệt
+  - Khung lỗi ghi kênh đang viết khi dừng, nguyên nhân dễ hiểu theo mã lỗi (ví dụ đạt hạn mức lượt gọi AI, key bị từ
+    chối, AI quá tải) kèm việc nên làm, và dòng **Chi tiết** (thông điệp, mã lỗi, nhà cung cấp AI) để gửi cho quản trị.
+  - Bảng tiến độ đánh dấu riêng kênh **Lỗi ở kênh này** và các kênh **Chưa chạy (dừng sau lỗi)**, thay vì ghi "Chưa tạo
+    được" cho mọi kênh còn lại. Lượt chạy cũ (trước bản này) vẫn hiện như trước.
+
 ## 1.28.0 · 06/11/2026
 ### Tính năng
 - Giao diện sáng / tối, sidebar nền sáng và thẻ tiến độ mới ở trang Content đợi duyệt

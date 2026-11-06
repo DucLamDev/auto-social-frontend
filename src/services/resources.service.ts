@@ -1,6 +1,6 @@
 import { apiList, apiRequest } from "@/services/api/client";
 import type { ListResult } from "@/services/api/types";
-import type { AiImageStatus, AiProviderId, AiProviderOption, AuditLog, Campaign, Capability, ConnectorMode, Content, ContentSource, ContentVariant, MediaAsset, Platform, PlatformAccount, PlatformAvailability, PlatformGroup, PromptTemplate, PublishJob, SourceArticle, Status, SystemSettings, VariantAiRevision, VariantImagePlan } from "@/types/domain";
+import type { AiImageStatus, AiProviderId, AutomationErrorDetail, AiProviderOption, AuditLog, Campaign, Capability, ConnectorMode, Content, ContentSource, ContentVariant, MediaAsset, Platform, PlatformAccount, PlatformAvailability, PlatformGroup, PromptTemplate, PublishJob, SourceArticle, Status, SystemSettings, VariantAiRevision, VariantImagePlan } from "@/types/domain";
 import type { components } from "@/generated/api/schema";
 import type { PublishedPost } from "@/types/domain";
 
@@ -27,8 +27,8 @@ export type ImportOneAccountInput = {
 };
 export type ApiAccountImportStatus = "CONNECTED" | "CHECK_FAILED" | "OAUTH_REQUIRED" | "INVALID_ROW" | "NOT_SUPPORTED" | "ACCOUNT_BUSY" | "DUPLICATE_ROW";
 export type ApiAccountImportResult = { total: number; connected: number; needsAttention: number; rows: Array<{ row: number; platform: string; slug?: string; name: string; status: ApiAccountImportStatus; message: string; accountId?: string }> };
-/** One AI campaign idea: name and brief fill the campaign form; angle, whyEffective and bestFor explain it. */
-export type CampaignSuggestion = { name: string; brief: string; angle: string; whyEffective: string; bestFor: string[] };
+/** One AI campaign idea for all chosen platforms: name and brief fill the campaign form; angle, whyEffective and platformFit explain it. */
+export type CampaignSuggestion = { name: string; brief: string; angle: string; whyEffective: string; platformFit: string };
 export type ExtensionLoginCheckRow = { id: string; name: string; platform: string; configured: boolean; autoLogin?: boolean; issues: string[]; deviceId?: string;
   posting?: { status: string; implemented: boolean; engine?: string; message: string; url?: string };
   attempts?: Array<{ method: string; available: boolean; check: { status: string; message?: string | null; finishedAt?: string | null } | null }>;
@@ -66,7 +66,7 @@ type RawSource = Contract["ContentSourceContractDto"];
 type RawSourceArticle = Omit<Contract["SourceArticleContractDto"], "content"> & { content?: SourceArticle["content"] };
 type RawVariant = Contract["ContentVariantContractDto"];
 type RawContent = Contract["ContentContractDto"] & { variants?: RawVariant[] };
-type RawCampaign = { id: string; name: string; status: Status; reviewMode?: "AUTOMATION" | "EXISTING_CAMPAIGN" | "CONTENT"; automationState?: Status | null; automationErrorCode?: string | null; automationVariantIds?: string[]; automationAccountIds?: string[]; scheduledAt?: string | null; createdAt: string; content?: { id: string; title: string }; _count?: { targets?: number }; targets?: Array<{ publishJobs?: RawJob[] }>; progress?: { total?: number; published?: number; failed?: number; needsAction?: number; active?: number; scheduled?: number; cancelled?: number } };
+type RawCampaign = { id: string; name: string; status: Status; reviewMode?: "AUTOMATION" | "EXISTING_CAMPAIGN" | "CONTENT"; automationState?: Status | null; automationErrorCode?: string | null; automationErrorDetail?: AutomationErrorDetail | null; automationVariantIds?: string[]; automationAccountIds?: string[]; scheduledAt?: string | null; createdAt: string; content?: { id: string; title: string }; _count?: { targets?: number }; targets?: Array<{ publishJobs?: RawJob[] }>; progress?: { total?: number; published?: number; failed?: number; needsAction?: number; active?: number; scheduled?: number; cancelled?: number } };
 type RawAttempt = Contract["PublishAttemptLogContractDto"] & { responseMetadata?: unknown };
 type RawPublishedPost = {
   id: string; publishJobId: string; url: string | null; publishedAt: string;
@@ -148,7 +148,7 @@ const mapMedia = (item: RawMedia): MediaAsset => {
     generated: metadata.generated === true,
   };
 };
-const mapCampaign = (item: RawCampaign): Campaign => { const jobs = item.targets?.flatMap((target) => target.publishJobs ?? []) ?? []; return { id: item.id, name: item.name, content: item.content, status: item.status, reviewMode: item.reviewMode, automationState: item.automationState, automationErrorCode: item.automationErrorCode, automationVariantIds: item.automationVariantIds, automationAccountIds: item.automationAccountIds, targetsCount: item.progress?.total ?? item._count?.targets ?? item.targets?.length ?? 0, publishedCount: item.progress?.published ?? jobs.filter((job) => job.status === "PUBLISHED").length, failedCount: item.progress?.failed ?? jobs.filter((job) => ["FAILED", "POSSIBLE_DUPLICATE"].includes(job.status)).length, needsActionCount: item.progress?.needsAction ?? jobs.filter((job) => job.status === "NEEDS_ACTION").length, activeCount: item.progress?.active ?? jobs.filter((job) => ["QUEUED", "PUBLISHING", "PROCESSING", "RETRY"].includes(job.status)).length, scheduledCount: item.progress?.scheduled ?? jobs.filter((job) => job.status === "SCHEDULED").length, scheduledAt: item.scheduledAt, createdAt: item.createdAt }; };
+const mapCampaign = (item: RawCampaign): Campaign => { const jobs = item.targets?.flatMap((target) => target.publishJobs ?? []) ?? []; return { id: item.id, name: item.name, content: item.content, status: item.status, reviewMode: item.reviewMode, automationState: item.automationState, automationErrorCode: item.automationErrorCode, automationErrorDetail: item.automationErrorDetail ?? null, automationVariantIds: item.automationVariantIds, automationAccountIds: item.automationAccountIds, targetsCount: item.progress?.total ?? item._count?.targets ?? item.targets?.length ?? 0, publishedCount: item.progress?.published ?? jobs.filter((job) => job.status === "PUBLISHED").length, failedCount: item.progress?.failed ?? jobs.filter((job) => ["FAILED", "POSSIBLE_DUPLICATE"].includes(job.status)).length, needsActionCount: item.progress?.needsAction ?? jobs.filter((job) => job.status === "NEEDS_ACTION").length, activeCount: item.progress?.active ?? jobs.filter((job) => ["QUEUED", "PUBLISHING", "PROCESSING", "RETRY"].includes(job.status)).length, scheduledCount: item.progress?.scheduled ?? jobs.filter((job) => job.status === "SCHEDULED").length, scheduledAt: item.scheduledAt, createdAt: item.createdAt }; };
 const mapJob = (item: RawJob): PublishJob => {
   const latest = item.attempts?.[0];
   const metadata = latest?.responseMetadata

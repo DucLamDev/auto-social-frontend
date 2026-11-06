@@ -41,6 +41,29 @@ function jumpToPost(id: string) {
   document.getElementById(`post-${id}`)?.scrollIntoView?.({ behavior: reduce ? "auto" : "smooth", block: "start" });
 }
 
+/** What each failure code means for the operator, and what to do. */
+const FAILURE_CAUSES: Record<string, string> = {
+  PLATFORM_RATE_LIMITED: "AI báo đã đạt hạn mức lượt gọi (quá nhiều lượt mỗi phút hoặc hết lượt của key). Đợi vài phút rồi bấm Thử lại; chỉ các kênh chưa tạo được mới được viết lại.",
+  PLATFORM_AUTH_FAILED: "Nhà cung cấp AI từ chối key (sai key, key hết hạn hoặc IP máy chủ chưa được phép). Kiểm tra key trong cấu hình máy chủ.",
+  PLATFORM_PERMISSION_DENIED: "Key AI chưa có quyền dùng model này. Nhờ quản trị cấp quyền hoặc chọn nhà cung cấp AI khác.",
+  INFRASTRUCTURE_UNAVAILABLE: "Nhà cung cấp AI đang quá tải, mất kết nối hoặc trả lời quá lâu. Thử lại sau ít phút hoặc chọn nhà cung cấp AI khác.",
+  PLATFORM_API_ERROR: "AI trả kết quả không dùng được (sai định dạng hoặc bị từ chối). Thử lại hoặc chọn nhà cung cấp AI khác.",
+  RESOURCE_NOT_FOUND: "Thiếu nền tảng hoặc prompt (nền tảng bị tắt hoặc chưa có prompt đang dùng).",
+  CONFLICT: "Nội dung đang được tạo ở lượt khác hoặc vừa thay đổi. Đợi lượt kia xong rồi thử lại.",
+  VALIDATION_FAILED: "Yêu cầu tạo bài không hợp lệ (tài khoản hoặc cấu hình đã đổi).",
+  INTERNAL_ERROR: "Lỗi trong máy chủ. Gửi chi tiết bên dưới cho người quản trị để xem log.",
+};
+
+/** The failure line of a run: cause, the platform being written, technical detail. Older runs only have a code. */
+export function failureSummary(campaign: Pick<Campaign, "automationErrorCode" | "automationErrorDetail">) {
+  const detail = campaign.automationErrorDetail;
+  const code = detail?.code ?? campaign.automationErrorCode ?? "";
+  const cause = FAILURE_CAUSES[code] ?? "Kiểm tra cấu hình AI và tài khoản rồi thử lại.";
+  const where = detail?.platformName ? `Dừng ở kênh ${detail.platformName}. ` : "";
+  const technical = [detail?.message, code && `mã ${code}`, detail?.provider && `AI ${detail.provider}`].filter(Boolean).join(" · ");
+  return { cause, where, technical };
+}
+
 /** One row per platform of the selected accounts: which ones the AI has already written. */
 export function generationProgress(campaign: Campaign, accounts: PlatformAccount[], variants: ContentVariant[]) {
   const saved = new Set(campaign.automationVariantIds ?? []);
@@ -63,8 +86,10 @@ function GenerationProgress({ campaign, accounts }: { campaign: Campaign; accoun
   const variants = useVariants(campaign.content?.id ?? "", isGenerating(campaign));
   const { rows, done, total } = generationProgress(campaign, accounts, variants.data?.items ?? []);
   if (!total) return null;
+  // After a failure the run stops: only the platform being written failed, the others were not started.
+  const failedSlug = state === "FAILED" ? campaign.automationErrorDetail?.platform : undefined;
   const pending = state === "QUEUED" ? { label: "Chờ tới lượt", icon: Clock3, tone: "text-slate-500" }
-    : state === "FAILED" ? { label: "Chưa tạo được", icon: CircleAlert, tone: "text-red-700" }
+    : state === "FAILED" ? failedSlug ? { label: "Chưa chạy (dừng sau lỗi)", icon: Clock3, tone: "text-slate-500" } : { label: "Chưa tạo được", icon: CircleAlert, tone: "text-red-700" }
       : { label: "AI đang viết…", icon: LoaderCircle, tone: "text-indigo-700" };
   return <div className="mt-3 rounded-xl border border-border bg-slate-50/60 p-3" aria-label="Tiến độ tạo nội dung theo kênh">
     <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold">
@@ -73,11 +98,12 @@ function GenerationProgress({ campaign, accounts }: { campaign: Campaign; accoun
     </div>
     <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-label="Số kênh đã tạo" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done}><div className="h-full rounded-full bg-emerald-500 transition-[width] duration-500" style={{ width: `${Math.round((done / total) * 100)}%` }} /></div>
     <ul className="mt-3 grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3">{rows.map((row) => {
-      const Icon = row.done ? Check : pending.icon;
+      const failedHere = !row.done && row.slug === failedSlug;
+      const Icon = row.done ? Check : failedHere ? CircleAlert : pending.icon;
       return <li key={row.slug} className="flex min-w-0 items-center gap-2 rounded-lg bg-white px-2 py-1.5 text-xs">
         <PlatformMark slug={row.slug} name={row.name} size="sm" />
         <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{row.name}</span><span className="block truncate text-[11px] text-muted">{row.accounts.join(", ")}</span></span>
-        <span className={cn("inline-flex shrink-0 items-center gap-1 font-semibold", row.done ? "text-emerald-700" : pending.tone)}><Icon aria-hidden className={cn("size-3.5", !row.done && state === "PROCESSING" && "animate-spin motion-reduce:animate-none")} />{row.done ? "Đã tạo" : pending.label}</span>
+        <span className={cn("inline-flex shrink-0 items-center gap-1 font-semibold", row.done ? "text-emerald-700" : failedHere ? "text-red-700" : pending.tone)}><Icon aria-hidden className={cn("size-3.5", !row.done && state === "PROCESSING" && "animate-spin motion-reduce:animate-none")} />{row.done ? "Đã tạo" : failedHere ? "Lỗi ở kênh này" : pending.label}</span>
       </li>;
     })}</ul>
   </div>;
@@ -366,7 +392,13 @@ export function AiContentView() {
           <div className="min-w-0 flex-1 basis-full sm:basis-80"><h2 className="font-bold">{campaign.name}</h2><p className="mt-1 text-xs text-muted">{formatDate(campaign.createdAt)} · {selectedAccounts.length} tài khoản · {campaign.automationVariantIds?.length ?? 0} nội dung</p><p className="mt-2 break-words text-xs text-muted">{selectedAccounts.join(", ")}</p>
             {state === "QUEUED" && <p className="mt-3 text-sm text-indigo-700">Đã nhận yêu cầu, đang chờ AI xử lý.</p>}
             {state === "PROCESSING" && <p className="mt-3 text-sm text-indigo-700">AI đang tạo nội dung. Kênh nào xong sẽ hiện ngay để bạn xem trước.</p>}
-            {state === "FAILED" && <p role="alert" className="mt-3 text-sm text-red-700">Chưa tạo được nội dung. Kiểm tra cấu hình AI và tài khoản rồi thử lại. ({campaign.automationErrorCode})</p>}
+            {state === "FAILED" && (() => {
+              const failure = failureSummary(campaign);
+              return <div role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                <p><span className="font-semibold">Chưa tạo được nội dung.</span> {failure.where}{failure.cause}</p>
+                {failure.technical && <p className="mt-1 break-words font-mono text-[11px] text-red-700">Chi tiết: {failure.technical}</p>}
+              </div>;
+            })()}
             {state === "DRAFT" && <p className="mt-3 text-sm text-muted">Lượt cũ chưa có biến thể. Mở Content Studio để tạo nội dung.</p>}
             {state === "WAITING_REVIEW" && campaign.reviewMode !== "EXISTING_CAMPAIGN" && <p className="mt-3 text-sm text-amber-700">Chưa đăng lên social. {campaign.scheduledAt && new Date(campaign.scheduledAt) > new Date() ? `Lịch đăng sau khi duyệt: ${formatDate(campaign.scheduledAt)}.` : "Bài sẽ vào hàng đợi đăng ngay sau khi bạn duyệt."}</p>}
             {campaign.reviewMode === "EXISTING_CAMPAIGN" && !!campaign.automationVariantIds?.length && <p className="mt-3 text-sm text-muted">Nội dung từ chiến dịch trước đây · trạng thái đăng: <Badge value={campaign.status} /></p>}
