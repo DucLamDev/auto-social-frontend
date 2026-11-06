@@ -380,6 +380,22 @@ describe("AutomationCampaignModal", () => {
       expect(warned).toHaveTextContent("AI duyệt cuối (Claude Opus) chưa được cấu hình trên máy chủ: bài sẽ không qua được bước duyệt cuối.");
     });
 
+    it("shows one \"Chấm & duyệt cuối\" step when Claude Opus both scores and approves", () => {
+      const opus = { ...roles, reviewer: { ...roles.approver } };
+      const { unmount } = render(<AutomationCampaignModal open accounts={accounts} aiProviders={writers} aiRoles={opus} onClose={vi.fn()} onSubmit={vi.fn()} />);
+      const line = screen.getByRole("region", { name: "Ba vai AI" });
+      expect(line).toHaveTextContent("Viết: GPT (VPSTTT AI) → Chấm & duyệt cuối: Claude Opus");
+      expect(line).not.toHaveTextContent("Chấm: ");
+      expect(line).not.toHaveTextContent("kém khách quan");
+      unmount();
+      render(<AutomationCampaignModal open accounts={accounts} aiProviders={[{ ...writers[0]!, model: "claude:opus" }]} onClose={vi.fn()} onSubmit={vi.fn()}
+        aiRoles={{ ...opus, reviewer: { ...opus.reviewer, configured: false }, approver: { ...opus.approver, configured: false } }} />);
+      const warned = screen.getByRole("region", { name: "Ba vai AI" });
+      expect(warned).toHaveTextContent("AI viết trùng AI chấm & duyệt cuối nên kết quả kém khách quan.");
+      expect(warned).toHaveTextContent("AI chấm & duyệt cuối (Claude Opus) chưa được cấu hình trên máy chủ: bài sẽ không qua được bước duyệt cuối.");
+      expect(warned).not.toHaveTextContent("tự chấm");
+    });
+
     it("leaves out the final approver when it is off, and the whole line on older backends", () => {
       const { unmount } = render(<AutomationCampaignModal open accounts={accounts} aiProviders={writers} aiRoles={{ ...roles, approvalEnabled: false }} onClose={vi.fn()} onSubmit={vi.fn()} />);
       const line = screen.getByRole("region", { name: "Ba vai AI" });

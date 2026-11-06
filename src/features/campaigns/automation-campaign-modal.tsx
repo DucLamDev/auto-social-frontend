@@ -469,31 +469,41 @@ function FlowStep({ icon, number, label }: { icon: ReactNode; number: string; la
 }
 
 /**
- * The three AI roles of a run: the chosen provider writes, the server's reviewer scores and the
- * final approver gives the last yes. Warns when the writer is the same model as a judge (it would
- * grade its own work) or when a judge is not configured.
+ * The AI roles of a run: the chosen provider writes, the server's reviewer scores and the final
+ * approver gives the last yes. When reviewer and approver are one model (Claude Opus by default) its
+ * last review is the final verdict, shown as one step. Warns when the writer is the same model as a
+ * judge (it would grade its own work) or when a judge is not configured.
  */
 function AiRolesLine({ writer, roles }: { writer: AiProviderOption; roles: AiRoles }) {
+  const model = (value: string) => value.trim().toLowerCase();
+  const oneJudge = roles.approvalEnabled && roles.reviewer.provider === roles.approver.provider && model(roles.reviewer.model) === model(roles.approver.model);
   const steps = [
     { role: "Viết", label: writerLabel(writer) },
-    { role: "Chấm", label: roles.reviewer.label },
-    ...(roles.approvalEnabled ? [{ role: "Duyệt cuối", label: roles.approver.label }] : []),
+    ...(oneJudge
+      ? [{ role: "Chấm & duyệt cuối", label: roles.approver.label }]
+      : [{ role: "Chấm", label: roles.reviewer.label }, ...(roles.approvalEnabled ? [{ role: "Duyệt cuối", label: roles.approver.label }] : [])]),
   ];
-  const same = [
-    sameAiModel(writer, roles.reviewer) ? "AI chấm" : null,
-    roles.approvalEnabled && sameAiModel(writer, roles.approver) ? "AI duyệt cuối" : null,
-  ].filter((role): role is string => Boolean(role));
+  const same = oneJudge
+    ? [sameAiModel(writer, roles.approver) ? "AI chấm & duyệt cuối" : null]
+    : [
+        sameAiModel(writer, roles.reviewer) ? "AI chấm" : null,
+        roles.approvalEnabled && sameAiModel(writer, roles.approver) ? "AI duyệt cuối" : null,
+      ];
+  const sameRoles = same.filter((role): role is string => Boolean(role));
   // The server falls back to the writer for an unconfigured reviewer; an unconfigured approver fails every approval.
-  const unconfigured = [
-    roles.reviewer.configured ? null : `AI chấm (${roles.reviewer.label}) chưa được cấu hình trên máy chủ: bài sẽ do chính AI viết tự chấm.`,
-    roles.approvalEnabled && !roles.approver.configured ? `AI duyệt cuối (${roles.approver.label}) chưa được cấu hình trên máy chủ: bài sẽ không qua được bước duyệt cuối.` : null,
-  ].filter((problem): problem is string => Boolean(problem));
+  const unconfigured = oneJudge
+    ? [roles.approver.configured ? null : `AI chấm & duyệt cuối (${roles.approver.label}) chưa được cấu hình trên máy chủ: bài sẽ không qua được bước duyệt cuối.`]
+    : [
+        roles.reviewer.configured ? null : `AI chấm (${roles.reviewer.label}) chưa được cấu hình trên máy chủ: bài sẽ do chính AI viết tự chấm.`,
+        roles.approvalEnabled && !roles.approver.configured ? `AI duyệt cuối (${roles.approver.label}) chưa được cấu hình trên máy chủ: bài sẽ không qua được bước duyệt cuối.` : null,
+      ];
+  const problems = unconfigured.filter((problem): problem is string => Boolean(problem));
   return <section aria-label="Ba vai AI" className="mt-3 rounded-xl border border-border bg-slate-50/70 px-3 py-2 text-xs text-slate-700">
     <p className="leading-6">{steps.map((step, index) => <span key={step.role}>
       {index > 0 && <span aria-hidden className="text-slate-400"> → </span>}
       <span className="whitespace-nowrap"><span className="font-semibold text-slate-500">{step.role}:</span> <span className="font-semibold text-slate-900">{step.label}</span></span>
     </span>)}</p>
-    {same.length > 0 && <p className="mt-1.5 flex items-start gap-1.5 text-amber-800"><AlertTriangle aria-hidden className="mt-0.5 size-3.5 shrink-0" />AI viết trùng {same.join(" và ")} nên kết quả kém khách quan. Chọn AI viết khác để bài được chấm và duyệt độc lập.</p>}
-    {unconfigured.length > 0 && <p className="mt-1.5 flex items-start gap-1.5 text-amber-800"><AlertTriangle aria-hidden className="mt-0.5 size-3.5 shrink-0" /><span>{unconfigured.join(" ")} Nhờ quản trị cấu hình trước khi tạo bài.</span></p>}
+    {sameRoles.length > 0 && <p className="mt-1.5 flex items-start gap-1.5 text-amber-800"><AlertTriangle aria-hidden className="mt-0.5 size-3.5 shrink-0" />AI viết trùng {sameRoles.join(" và ")} nên kết quả kém khách quan. Chọn AI viết khác để bài được chấm và duyệt độc lập.</p>}
+    {problems.length > 0 && <p className="mt-1.5 flex items-start gap-1.5 text-amber-800"><AlertTriangle aria-hidden className="mt-0.5 size-3.5 shrink-0" /><span>{problems.join(" ")} Nhờ quản trị cấu hình trước khi tạo bài.</span></p>}
   </section>;
 }

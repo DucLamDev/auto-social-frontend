@@ -3,6 +3,14 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.31.1 · 06/11/2026
+### Sửa lỗi
+- Hộp tạo bài hiện "Chấm & duyệt cuối: Claude Opus" khi một AI làm cả hai vai (cần backend 1.27.0)
+  - Backend 1.27.0 để Claude Opus vừa chấm vừa duyệt cuối. Dòng vai AI giờ gộp hai bước thành một: "Viết: GPT (VPSTTT
+    AI) → Chấm & duyệt cuối: Claude Opus", thay vì hiện Opus hai lần.
+  - Cảnh báo trùng AI viết và cảnh báo chưa cấu hình cũng nói theo vai gộp. Máy chủ tách hai vai thì vẫn hiện ba bước như
+    cũ.
+
 ## 1.31.0 · 06/11/2026
 ### Tính năng
 - Gợi ý chiến dịch có điểm AI để chọn gợi ý phù hợp nhất (cần backend 1.26.0)
