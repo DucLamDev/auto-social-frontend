@@ -3,6 +3,14 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.31.0 · 06/11/2026
+### Tính năng
+- Gợi ý chiến dịch có điểm AI để chọn gợi ý phù hợp nhất (cần backend 1.26.0)
+  - Mỗi thẻ gợi ý có nhãn **AI chấm X/10** (xanh từ 8, vàng 6–7, đỏ dưới 6), điểm từng tiêu chí (hợp mọi nền tảng, giá
+    trị cho người đọc, gắn sản phẩm tự nhiên, khả năng tương tác) và **Điểm yếu** chính.
+  - Gợi ý điểm cao nhất nằm đầu, có viền xanh và nhãn **Phù hợp nhất**. Lần nào AI chưa chấm được thì ghi rõ và giữ thứ
+    tự AI đưa ra.
+
 ## 1.30.0 · 06/11/2026
 ### Tính năng
 - Content đợi duyệt: nút Xoá cho từng lượt và lỗi chi tiết khi rê chuột vào từng kênh
