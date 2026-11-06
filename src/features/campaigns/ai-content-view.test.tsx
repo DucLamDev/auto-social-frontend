@@ -635,7 +635,36 @@ describe("AI content waiting for review", () => {
       expect(box).toHaveTextContent("Có dấu hiệu seeding");
       expect(box).toHaveTextContent("Rủi ro cho công ty: cao");
       expect(box).toHaveTextContent("Sửa theo khuyến nghị");
-      expect(within(screen.getByRole("region", { name: "Khuyến nghị của AI · DEV" })).getByRole("button", { name: "Sửa theo 1 khuyến nghị đã chọn" })).toBeEnabled();
+      // The approver's full reasons are the points to fix.
+      const advice = screen.getByRole("region", { name: "Khuyến nghị của AI · DEV" });
+      expect(advice).toHaveTextContent("Bình luận giả làm khách hàng");
+      expect(within(advice).getByRole("button", { name: "Sửa theo 2 khuyến nghị đã chọn" })).toBeEnabled();
+    });
+
+    it("says Claude Opus edits only the ticked points and keeps the rest, and names it while it works", () => {
+      mocks.roles = { ...roles, reviser: { ...roles.approver } };
+      mocks.review_ = { recommended: false, reason: "Cần xem lại (AI chấm 6/10): Lời mở đầu hơi chung chung" };
+      const { unmount } = render(<AiContentView />);
+      openReview();
+      openPost();
+      expect(screen.getByRole("region", { name: "Khuyến nghị của AI · DEV" })).toHaveTextContent("Claude Opus chỉ sửa đúng các chỗ còn tick, giữ nguyên phần đã ổn, rồi chấm lại, thường 1–3 phút. Bản sửa điểm thấp hơn thì giữ bản hiện tại.");
+      expect(screen.getByText("Claude Opus sửa đúng chỗ bị nhắc để đạt điểm cao hơn, giữ phần đã ổn.")).toBeInTheDocument();
+      unmount();
+      mocks.revision = { status: "generating", notes: ["Lời mở đầu hơi chung chung"], writerLabel: "Claude Opus" } as typeof mocks.revision;
+      render(<AiContentView />);
+      openReview();
+      openPost();
+      expect(screen.getByRole("status")).toHaveTextContent("Claude Opus đang viết lại bài này theo 1 khuyến nghị đã chọn");
+    });
+
+    it("shows why a lower-scoring edit was not saved", () => {
+      mocks.roles = { ...roles, reviser: { ...roles.approver } };
+      mocks.review_ = { recommended: false, reason: "Cần xem lại (AI chấm 6/10): Lời mở đầu hơi chung chung" };
+      mocks.revision = { status: "failed", error: "Bản AI sửa chỉ được 4/10, thấp hơn bản hiện tại (6/10), nên giữ nguyên bản hiện tại." };
+      render(<AiContentView />);
+      openReview();
+      openPost();
+      expect(screen.getByRole("alert")).toHaveTextContent("Bản AI sửa chỉ được 4/10, thấp hơn bản hiện tại (6/10), nên giữ nguyên bản hiện tại.");
     });
 
     it("waits for the verdict while the approver reads, on a live list that shows it by itself", () => {

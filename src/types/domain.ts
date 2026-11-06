@@ -22,7 +22,8 @@ export interface Content { id: string; title: string; description?: string | nul
 /** AI image plan of one variant: what to draw and how far the generation got. */
 export interface VariantImagePlan { type: "none" | "image" | "video" | "document"; prompt?: string | null; altText?: string; size?: string; status?: "pending" | "generating" | "generated" | "failed" | "removed"; error?: string | null; }
 /** The last "Viết lại bằng AI" request on a draft (runs in the background on the server). */
-export interface VariantAiRevision { status: "generating" | "done" | "failed"; instruction?: string; /** Review points chosen with "Sửa theo khuyến nghị". */ notes?: string[]; startedAt?: string; finishedAt?: string | null; error?: string | null; }
+export interface VariantAiRevision { status: "generating" | "done" | "failed"; instruction?: string; /** Review points chosen with "Sửa theo khuyến nghị". */ notes?: string[];
+  /** The AI that edits ("Claude Opus"); absent on older backends. */ writerLabel?: string; startedAt?: string; finishedAt?: string | null; error?: string | null; }
 export type AiApprovalStatus = "running" | "approved" | "rejected" | "failed";
 export type AiBrandRisk = "none" | "low" | "medium" | "high";
 /** The final AI approver's verdict on one draft; a post needs "approved" (for its current text) before anyone can approve it. */
@@ -51,8 +52,11 @@ export function aiApprovalRunning(approval?: Pick<AiApproval, "status" | "starte
 }
 /** One AI role configured on the server (reviewer or final approver). */
 export interface AiRole { provider: AiProviderId; model: string; label: string; configured: boolean; }
-/** Who scores and who gives the final yes; `approvalEnabled` false (or older backends) means no final approval gate. */
-export interface AiRoles { reviewer: AiRole; approver: AiRole; approvalEnabled: boolean; }
+/**
+ * Who scores and who gives the final yes; `approvalEnabled` false (or older backends) means no final approval gate.
+ * `reviser` (backend 1.28.0) edits drafts for "Viết lại bằng AI" / "Sửa theo khuyến nghị".
+ */
+export interface AiRoles { reviewer: AiRole; approver: AiRole; reviser?: AiRole; approvalEnabled: boolean; }
 export interface ContentVariant { id: string; contentId: string; platform: string; platformSlug: string; title?: string | null; body: string; summary?: string | null; hashtags?: string[]; cta?: string | null; status: Status; recommended?: boolean; reason?: string | null; updatedAt?: string; image?: VariantImagePlan | null; aiRevision?: VariantAiRevision | null;
   aiApproval?: AiApproval | null;
   /** True when `aiApproval` was given for the current text; false once the post changed after it. */
