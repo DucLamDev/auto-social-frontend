@@ -3,6 +3,24 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.29.0 · 06/11/2026
+### Tính năng
+- Hiện 3 vai AI và kết quả AI duyệt cuối; bài chưa được duyệt cuối không duyệt / đăng được
+  Cần backend 1.24.0.
+  - **Hộp tạo nội dung AI:**
+    - dòng "Viết: … → Chấm: … → Duyệt cuối: …" (ví dụ GPT → Claude Sonnet → Claude Opus);
+    - cảnh báo khi AI viết trùng model với AI chấm / AI duyệt, hoặc một vai chưa cấu hình.
+  - **Trang Content đợi duyệt:**
+    - mỗi bài có nhãn duyệt cuối: Đạt / Từ chối / Đang duyệt… / Lỗi / Chưa duyệt cuối;
+    - bài bị từ chối hoặc lỗi có khung đỏ liệt kê lý do, dấu hiệu seeding, mức rủi ro cho công ty, và nút
+      **Cho AI duyệt lại**;
+    - nút **Duyệt & đăng** / **Hẹn lịch** khoá cho tới khi AI duyệt cuối đạt đúng nội dung hiện tại;
+    - đang sửa dở thì nút chính thành **Lưu để AI duyệt lại**;
+    - "Duyệt & đăng bài đã xong" và "từ N điểm" chỉ tính bài đã qua duyệt cuối;
+    - sau khi duyệt hàng loạt, bài bị giữ vì chưa qua duyệt cuối được báo riêng.
+  - **Studio:** nút Duyệt theo cùng luật, có nhãn trạng thái và nút duyệt lại.
+  - Tự cập nhật trong lúc AI duyệt cuối đang đọc bài. Backend cũ (không có `/ai/roles`) thì không khoá nút.
+
 ## 1.28.1 · 06/11/2026
 ### Sửa lỗi
 - Hộp Tạo nội dung hàng loạt: chọn social trước, rồi mới gợi ý chiến dịch cho đúng các social đó (cần backend 1.23.2)
