@@ -18,11 +18,29 @@ const groups = [
 export function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose }: { collapsed: boolean; mobileOpen: boolean; onCollapse: () => void; onMobileClose: () => void }) {
   const pathname = usePathname();
   return <>
-    {mobileOpen && <button aria-label="Đóng menu" onClick={onMobileClose} className="fixed inset-0 z-30 bg-slate-950/45 backdrop-blur-sm lg:hidden" />}
-    <aside className={cn("fixed inset-y-0 left-0 z-40 flex flex-col bg-sidebar text-white transition-all duration-300", collapsed ? "w-[76px]" : "w-[252px]", mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0")}>
-      <div className={cn("flex h-[72px] items-center border-b border-white/[.07]", collapsed ? "justify-center" : "px-5")}><Link href="/dashboard" className="flex items-center gap-3" onClick={onMobileClose}><AppLogo className="size-9 shadow-lg shadow-indigo-950/50" label={collapsed ? env.appName : undefined} />{!collapsed && <div><p className="max-w-40 truncate text-sm font-bold tracking-wide">{env.appName}</p><p className="mt-0.5 text-[10px] text-slate-500">CONTENT OPERATIONS</p></div>}</Link><button onClick={onMobileClose} className="ml-auto text-slate-400 lg:hidden"><X className="size-5" /></button></div>
-      <nav className="flex-1 overflow-y-auto px-3 py-5">{groups.map((group) => <div className="mb-5" key={group.label}>{!collapsed && <p className="mb-2 px-3 text-[9px] font-bold tracking-[.16em] text-slate-600">{group.label}</p>}<div className="space-y-1">{group.items.map((item) => { const active = [item.href, ...("also" in item ? item.also : [])].some((href) => pathname === href || pathname.startsWith(`${href}/`)); const Icon = item.icon; return <Link title={collapsed ? item.label : undefined} aria-current={active ? "page" : undefined} onClick={onMobileClose} href={item.href as Route} key={item.href} className={cn("group flex h-10 items-center gap-3 rounded-xl px-3 text-[13px] font-medium transition", active ? "bg-white/[.1] text-white shadow-inner" : "text-slate-400 hover:bg-white/[.055] hover:text-slate-100", collapsed && "justify-center px-0")}><Icon className={cn("size-[18px] shrink-0", active ? "text-indigo-400" : "text-slate-500 group-hover:text-slate-300")} />{!collapsed && <span>{item.label}</span>}{active && !collapsed && <span className="ml-auto size-1.5 rounded-full bg-indigo-400" />}</Link>; })}</div></div>)}</nav>
-      <div className="border-t border-white/[.07] p-3"><button onClick={onCollapse} className={cn("hidden h-10 w-full items-center rounded-xl text-xs font-medium text-slate-500 transition hover:bg-white/[.055] hover:text-white lg:flex", collapsed ? "justify-center" : "gap-3 px-3")}><ChevronLeft className={cn("size-4 transition", collapsed && "rotate-180")} />{!collapsed && "Thu gọn menu"}</button></div>
+    {mobileOpen && <button aria-label="Đóng menu" onClick={onMobileClose} className="fixed inset-0 z-30 bg-[#020617]/45 backdrop-blur-sm lg:hidden" />}
+    <aside className={cn("fixed inset-y-0 left-0 z-40 flex flex-col border-r border-border bg-white transition-all duration-300", collapsed ? "w-[76px]" : "w-[252px]", mobileOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full lg:translate-x-0")}>
+      <div className={cn("flex h-[72px] shrink-0 items-center border-b border-border", collapsed ? "justify-center" : "px-5")}>
+        <Link href="/dashboard" className="flex min-w-0 items-center gap-3 rounded-xl" onClick={onMobileClose}>
+          <AppLogo className="size-9 shadow-sm ring-1 ring-border" label={collapsed ? env.appName : undefined} />
+          {!collapsed && <div className="min-w-0"><p className="max-w-40 truncate text-sm font-bold text-foreground">{env.appName}</p><p className="mt-0.5 text-[10px] font-semibold tracking-[.14em] text-slate-400">CONTENT OPERATIONS</p></div>}
+        </Link>
+        <button type="button" aria-label="Đóng menu" onClick={onMobileClose} className="ml-auto grid size-10 place-items-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-foreground lg:hidden"><X className="size-5" /></button>
+      </div>
+      <nav aria-label="Menu chính" className="flex-1 overflow-y-auto px-3 py-4">{groups.map((group, index) => <div className="mb-4 last:mb-0" key={group.label}>
+        {collapsed ? index > 0 && <div className="mx-auto mb-3 h-px w-8 bg-border" aria-hidden /> : <p className="mb-1.5 px-3 text-[10px] font-semibold tracking-[.14em] text-slate-400">{group.label}</p>}
+        <div className="space-y-0.5">{group.items.map((item) => {
+          const active = [item.href, ...("also" in item ? item.also : [])].some((href) => pathname === href || pathname.startsWith(`${href}/`));
+          const Icon = item.icon;
+          return <Link title={collapsed ? item.label : undefined} aria-current={active ? "page" : undefined} onClick={onMobileClose} href={item.href as Route} key={item.href}
+            className={cn("group relative flex h-11 items-center gap-3 rounded-xl px-2 text-[13px] font-medium transition-colors", active ? "bg-primary-soft font-semibold text-primary" : "text-slate-600 hover:bg-slate-100 hover:text-foreground", collapsed && "justify-center px-0")}>
+            {active && <span aria-hidden className="absolute -left-3 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-primary" />}
+            <span className={cn("grid size-8 shrink-0 place-items-center rounded-lg transition-colors", active ? "bg-primary text-white shadow-sm shadow-primary/30" : "text-slate-400 group-hover:bg-white group-hover:text-slate-600 group-hover:shadow-sm")}><Icon className="size-[17px]" /></span>
+            {!collapsed && <span className="truncate">{item.label}</span>}
+          </Link>;
+        })}</div>
+      </div>)}</nav>
+      <div className="border-t border-border p-3"><button type="button" onClick={onCollapse} aria-label={collapsed ? "Mở rộng menu" : "Thu gọn menu"} className={cn("hidden h-10 w-full items-center rounded-xl text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-foreground lg:flex", collapsed ? "justify-center" : "gap-3 px-3")}><ChevronLeft className={cn("size-4 transition", collapsed && "rotate-180")} />{!collapsed && "Thu gọn menu"}</button></div>
     </aside>
   </>;
 }
