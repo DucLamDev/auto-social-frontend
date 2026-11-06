@@ -419,6 +419,21 @@ describe("AI content waiting for review", () => {
     expect(within(images).getByRole("button", { name: "Tải ảnh lên" })).toBeEnabled();
   });
 
+  it("outlines a post the AI passed in green and one it did not pass in orange", () => {
+    mocks.ids = ["variant-1", "variant-3"];
+    mocks.extra = [{ id: "variant-3", platform: "Tumblr", platformSlug: "tumblr", title: "T", body: "Tumblr body", status: "GENERATED", recommended: false, reason: "Cần xem lại (AI chấm 5/10): Mở bài chung chung" }];
+    render(<AiContentView />);
+    fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    const dev = screen.getByRole("article", { name: "DEV" });
+    const tumblr = screen.getByRole("article", { name: "Tumblr" });
+    expect(dev).toHaveAttribute("data-verdict", "passed");
+    expect(dev).toHaveClass("border-emerald-300", "border-l-emerald-500");
+    expect(within(dev).getByText("Kết quả: chờ duyệt · AI đạt")).toBeInTheDocument();
+    expect(tumblr).toHaveAttribute("data-verdict", "failed");
+    expect(tumblr).toHaveClass("border-orange-300", "border-l-orange-500");
+    expect(screen.getByText("Viền cam: chưa đạt")).toBeInTheDocument();
+  });
+
   it("keeps each post's buttons on its own card, named after its platform, and edits one post at a time", () => {
     mocks.ids = ["variant-1", "variant-3"];
     mocks.extra = [{ id: "variant-3", platform: "Tumblr", platformSlug: "tumblr", title: "T", body: "Tumblr body", status: "GENERATED" }];

@@ -30,12 +30,19 @@ const isGenerating = (campaign: Campaign) => campaign.automationState === "QUEUE
 const without = <T,>(record: Record<string, T>, key: string) => Object.fromEntries(Object.entries(record).filter(([id]) => id !== key));
 
 /** Where a post stands in a per-post review: drives its colour edge and its dot in the jump list. */
-type PostState = "waiting" | "approved" | "rejected" | "other";
+/**
+ * A post waiting for review is outlined by the AI's verdict: green when it passed (AI score and,
+ * when on, the final AI approval), orange when it did not (low score, refused or failed approval),
+ * slate while the AI is still deciding (rewriting or approving). Decided posts keep their own look.
+ */
+type PostState = "passed" | "failed" | "checking" | "approved" | "rejected" | "other";
 const postTone: Record<PostState, { edge: string; dot: string; label: string }> = {
-  waiting: { edge: "border-l-amber-400", dot: "bg-amber-400", label: "chờ duyệt" },
-  approved: { edge: "border-l-emerald-500", dot: "bg-emerald-500", label: "đã duyệt" },
-  rejected: { edge: "border-l-slate-300", dot: "bg-slate-300", label: "đã từ chối" },
-  other: { edge: "border-l-indigo-300", dot: "bg-indigo-300", label: "" },
+  passed: { edge: "border-emerald-300 border-l-emerald-500", dot: "bg-emerald-500", label: "chờ duyệt · AI đạt" },
+  failed: { edge: "border-orange-300 border-l-orange-500", dot: "bg-orange-500", label: "chờ duyệt · AI chưa đạt" },
+  checking: { edge: "border-border border-l-slate-400", dot: "bg-slate-400", label: "chờ duyệt · AI đang xét" },
+  approved: { edge: "border-emerald-300 border-l-emerald-600", dot: "bg-emerald-600", label: "đã duyệt" },
+  rejected: { edge: "border-border border-l-slate-300", dot: "bg-slate-300", label: "đã từ chối" },
+  other: { edge: "border-border border-l-indigo-300", dot: "bg-indigo-300", label: "" },
 };
 
 function jumpToPost(id: string) {
@@ -213,7 +220,13 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
     );
   }, ["campaigns", "contents", "variants", "publish-jobs"]);
   const waiting = (variant: ContentVariant) => variant.status === "GENERATED";
-  const postStateOf = (variant: ContentVariant): PostState => !perPost ? "other" : waiting(variant) ? "waiting" : variant.status === "APPROVED" ? "approved" : variant.status === "REJECTED" ? "rejected" : "other";
+  const verdictOf = (variant: ContentVariant): PostState => {
+    if (isRewriting(variant)) return "checking";
+    const gate = gateOf(variant);
+    if (variant.recommended === false || gate.state === "rejected" || gate.state === "failed") return "failed";
+    return gate.ok ? "passed" : "checking";
+  };
+  const postStateOf = (variant: ContentVariant): PostState => !perPost ? "other" : waiting(variant) ? verdictOf(variant) : variant.status === "APPROVED" ? "approved" : variant.status === "REJECTED" ? "rejected" : "other";
   const pendingCount = items.filter(waiting).length;
   // A platform can be approved (and goes out) as soon as its post and image are
   // done, while the AI is still writing the others.
@@ -292,7 +305,14 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
     {media.data?.items.map((asset) => <p key={asset.id} className="text-sm">{asset.publicUrl ? <a href={asset.publicUrl} target="_blank" rel="noreferrer" className="font-semibold text-primary underline">Xem tệp đính kèm{asset.altText ? `: ${asset.altText}` : ""}</a> : `Tệp đính kèm: ${asset.mimeType}`}</p>)}
     {items.length > 1 && <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0 space-y-1">
         <p className="text-xs font-semibold text-slate-600">{items.length} bài · bấm tên kênh để mở và đi tới bài đó</p>
+        {perPost && <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
+          <span className="inline-flex items-center gap-1"><span aria-hidden className="h-3 w-1.5 rounded-sm bg-emerald-500" />Viền xanh: AI đạt</span>
+          <span className="inline-flex items-center gap-1"><span aria-hidden className="h-3 w-1.5 rounded-sm bg-orange-500" />Viền cam: chưa đạt</span>
+          <span className="inline-flex items-center gap-1"><span aria-hidden className="h-3 w-1.5 rounded-sm bg-slate-400" />AI đang xét</span>
+        </p>}
+        </div>
         <div className="flex gap-1">
           <Button size="sm" variant="ghost" onClick={() => setOpenPosts(Object.fromEntries(items.map((variant) => [variant.id, true])))}><ChevronDown className="size-4" />Mở hết</Button>
           <Button size="sm" variant="ghost" onClick={() => setOpenPosts({})}><ChevronUp className="size-4" />Thu gọn hết</Button>
@@ -334,12 +354,14 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
           <Button size="sm" variant="ghost" disabled={busy} onClick={() => closeEdit(variant.id)}>Huỷ sửa</Button></>
         : <Button size="sm" variant="secondary" aria-label={`Sửa bài ${variant.platform}`} disabled={busy} onClick={() => { setEditingIds((current) => ({ ...current, [variant.id]: true })); setViews((current) => ({ ...current, [variant.id]: "content" })); }}><Pencil className="size-4" />Sửa bài</Button>}</PermissionGate> : null;
       return <article key={variant.id} id={`post-${variant.id}`} aria-labelledby={`post-title-${variant.id}`}
+        data-verdict={state}
         className={cn("scroll-mt-24 overflow-hidden rounded-2xl border border-l-4 border-border bg-white shadow-sm", postTone[state].edge)}>
         {/* Who this post is for, at a glance: logo, platform, account, AI score and status. */}
         <header className="flex flex-wrap items-center gap-3 border-b border-border bg-slate-50/80 px-4 py-3">
           <PlatformMark slug={variant.platformSlug} name={variant.platform} />
           <div className="min-w-0 flex-1 basis-40">
             <h3 id={`post-title-${variant.id}`} className="truncate font-bold">{variant.platform}</h3>
+            {postTone[state].label && <span className="sr-only">Kết quả: {postTone[state].label}</span>}
             <p className="truncate text-xs text-muted">Bài {index + 1}/{items.length}{postAccounts.length ? ` · đăng bằng ${postAccounts.join(", ")}` : ""}</p>
             {folded && <p className="mt-0.5 truncate text-xs text-slate-600">{variant.title || variant.body.split("\n").find((line) => line.trim())?.trim()}</p>}
           </div>
