@@ -3,6 +3,17 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.32.0 · 06/11/2026
+### Tính năng
+- Viết lại bằng AI / Sửa theo khuyến nghị: Claude Opus sửa, chỉ sửa chỗ bị nhắc (cần backend 1.28.0)
+  - Lời nhắc ở các nút ghi rõ ai sửa bài (lấy `reviser` từ `/ai/roles`, ví dụ "Claude Opus"). AI chỉ sửa đúng các chỗ
+    còn tick, giữ nguyên phần đã ổn. Bản sửa điểm thấp hơn thì giữ bản hiện tại.
+  - Trạng thái "đang viết lại" / "đã viết lại" ghi tên AI đã sửa. Lần sửa không được lưu vì điểm thấp hơn thì hiện lý
+    do.
+  - **Khuyến nghị đầy đủ, không bị cắt.** Bài bị AI duyệt cuối từ chối thì danh sách "AI đề nghị kiểm tra" lấy đủ lý do từ
+    kết quả duyệt và tách riêng phần nhận xét chấm điểm. Trước đây ghi chú bị cắt giữa câu nên có khuyến nghị cụt như
+    "Câu discl" hoặc hai ý dính vào nhau.
+
 ## 1.31.1 · 06/11/2026
 ### Sửa lỗi
 - Hộp tạo bài hiện "Chấm & duyệt cuối: Claude Opus" khi một AI làm cả hai vai (cần backend 1.27.0)

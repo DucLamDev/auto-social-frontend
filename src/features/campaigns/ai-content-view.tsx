@@ -359,8 +359,8 @@ function ReviewContent({ campaign, accounts }: { campaign: Campaign; accounts: P
           {/* Per-post review: "Cho AI duyệt lại" sits in the decision footer, which stays visible when folded. */}
           {variant.status === "GENERATED" && <ApprovalNotice variant={variant} approvalEnabled={approvalEnabled} action={perPost ? undefined : retryApproval} />}
           {!perPost && retryApproval && (gate.state === "missing" || gate.state === "stale") && <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600"><span>{gate.message}</span>{retryApproval}</div>}
-          {variant.recommended === false && <ReviewAdvice key={variant.reason ?? ""} variant={variant} unsaved={Boolean(edit)} editable={draftEditable} />}
-          <VariantRewritePanel variant={variant} unsaved={Boolean(edit)} actions={editTools} editable={draftEditable} />
+          {variant.recommended === false && <ReviewAdvice key={variant.reason ?? ""} variant={variant} unsaved={Boolean(edit)} editable={draftEditable} reviser={roles.data?.reviser?.label} />}
+          <VariantRewritePanel variant={variant} unsaved={Boolean(edit)} actions={editTools} editable={draftEditable} reviser={roles.data?.reviser?.label} />
           {view === "preview" ? <>
             <VariantPreviewCard variant={variant} edit={edit} account={accountFor(variant)} />
             {/* The preview shows the picture; the image buttons stay usable under it. */}

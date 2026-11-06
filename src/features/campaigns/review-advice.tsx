@@ -16,12 +16,20 @@ const FALLBACK = "Nội dung cần được chỉnh sửa trước khi đăng.";
 
 /**
  * The AI editor's recommendations for one post, one per line. While the post
- * is still a draft, each can be ticked and "Sửa theo khuyến nghị" has the AI
- * rewrite the post fixing only the ticked ones, then score it again. Remount
- * it (key) when the review changes so a new review starts with every point ticked.
+ * is still a draft, each can be ticked and "Sửa theo khuyến nghị" has the
+ * reviser (Claude Opus by default) edit only the ticked points, keeping the
+ * rest of the post, then score it again. Remount it (key) when the review
+ * changes so a new review starts with every point ticked.
  */
-export function ReviewAdvice({ variant, editable, unsaved }: { variant: ContentVariant; editable: boolean; unsaved: boolean }) {
-  const parsed = reviewPoints(variant.reason);
+export function ReviewAdvice({ variant, editable, unsaved, reviser }: {
+  variant: ContentVariant; editable: boolean; unsaved: boolean;
+  /** Who edits ("Claude Opus"); unknown on older backends. */
+  reviser?: string;
+}) {
+  // The final approver's full reasons for the current text; the stored note may shorten them.
+  const refusal = variant.aiApproval?.status === "rejected" && variant.aiApprovalCurrent !== false ? variant.aiApproval.reasons : undefined;
+  const parsed = reviewPoints(variant.reason, refusal);
+  const who = reviser ?? "AI";
   const points = parsed.length ? parsed : [FALLBACK];
   const [skipped, setSkipped] = useState<Set<number>>(() => new Set());
   const [open, setOpen] = useState(false);
@@ -37,7 +45,7 @@ export function ReviewAdvice({ variant, editable, unsaved }: { variant: ContentV
   const start = async () => {
     try {
       await fix.mutateAsync(chosen);
-      toast.success(`AI đang sửa bài ${variant.platform} theo ${chosen.length} khuyến nghị. Bài mới sẽ tự hiện và được chấm lại.`);
+      toast.success(`${who} đang sửa bài ${variant.platform} theo ${chosen.length} khuyến nghị. Bài mới sẽ tự hiện và được chấm lại.`);
     } catch (error) { toast.error(error instanceof Error ? error.message : "Không thể sửa bài theo khuyến nghị"); }
   };
   const text = (point: string) => <span className={cn("min-w-0 break-words", long && !open && "line-clamp-2")}>{point}</span>;
@@ -55,7 +63,7 @@ export function ReviewAdvice({ variant, editable, unsaved }: { variant: ContentV
         <Button size="sm" variant="secondary" disabled={!chosen.length || unsaved} loading={fix.isPending} onClick={() => void start()}><WandSparkles className="size-4" />Sửa theo {chosen.length} khuyến nghị đã chọn</Button>
         <span className="text-xs text-amber-800">{unsaved ? "Lưu hoặc huỷ phần đang sửa của bài này trước."
           : !chosen.length ? "Tick ít nhất một khuyến nghị."
-            : "Bỏ tick mục bạn không muốn sửa. AI viết lại bài theo các mục còn tick rồi chấm lại, thường 1–3 phút."}</span>
+            : `Bỏ tick mục bạn không muốn sửa. ${who} chỉ sửa đúng các chỗ còn tick, giữ nguyên phần đã ổn, rồi chấm lại, thường 1–3 phút. Bản sửa điểm thấp hơn thì giữ bản hiện tại.`}</span>
       </div>
     </PermissionGate> : list(false)}
     {long && <button type="button" aria-expanded={open} className="mt-2 inline-flex min-h-8 items-center text-xs font-semibold text-amber-800 underline" onClick={() => setOpen(!open)}>{open ? "Thu gọn ghi chú" : "Xem đủ ghi chú"}</button>}
