@@ -18,7 +18,8 @@ export type MaintenanceRun = components["schemas"]["MaintenanceRunContractDto"];
 export type ExtensionDevice = { id: string; name: string; lastSeenAt?: string | null; createdAt: string };
 export type GeminiKeysSettings = { revision: string; source: "environment" | "saved"; maxKeys: number; slots: Array<{ slot: number; configured: boolean; active: boolean; retryAt: string | null }> };
 export type GeminiKeysUpdate = { revision: string; changes: Array<{ slot: number; apiKey?: string; clear?: boolean }> };
-export type AccountImportResult = { imported: number; skipped?: number; queued: number; batchId: string | null; rows: Array<{ id?: string; row: string; name: string; setup?: string; issue?: string }> };
+export type AccountDeleteResult = { deleted: string[]; blocked: Array<{ id: string; name: string; reason: string }>; notFound: string[] };
+export type AccountImportResult ={ imported: number; skipped?: number; queued: number; batchId: string | null; rows: Array<{ id?: string; row: string; name: string; setup?: string; issue?: string }> };
 /** One social added by hand to the extension flow: the same fields as one row of the accounts file. */
 export type ImportOneAccountInput = {
   deviceId: string; platform: string; provider: "password" | "google"; loginUsername: string;
@@ -258,6 +259,8 @@ export const resourcesService = {
   async revokeBrowserSession(id: string) { return mapAccount(await apiRequest<RawAccount>(`/platform-accounts/${id}/browser-session`, { method: "DELETE" })); },
   async updateAccount(id: string, input: Pick<PlatformAccount, "enabled">) { return mapAccount(await apiRequest<RawAccount>(`/platform-accounts/${id}`, { method: "PATCH", body: input })); },
   testAccount: (id: string) => apiRequest<AccountConnectionTestResult>(`/platform-accounts/${id}/test`, { method: "POST" }),
+  /** Deletes accounts with their login data and posting history (backend 1.22.0+); busy ones come back in `blocked`. */
+  deleteAccounts: (ids: string[]) => apiRequest<AccountDeleteResult>("/platform-accounts/bulk-delete", { method: "POST", body: { ids } }),
   oauthProviders: () => apiRequest<Array<{ provider: string; platform?: string; status: string; callback?: string }>>("/oauth/providers"),
   async oauthStart(provider: string) { return apiRequest<{ authorizationUrl: string }>(`/oauth/${provider}/start`); },
   accountHealth: () => apiRequest<AccountHealth>("/account-health"),
