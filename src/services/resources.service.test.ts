@@ -47,6 +47,44 @@ describe("resourcesService contract adapters", () => {
     expect(listed.items[1]?.aiRevision).toBeNull();
   });
 
+  it("reads the reviewer and final approver, and treats a backend without AI roles as no approval gate", async () => {
+    const roles = {
+      reviewer: { provider: "vpsttt", model: "claude:sonnet", label: "Claude Sonnet", configured: true },
+      approver: { provider: "vpsttt", model: "claude:opus", label: "Claude Opus", configured: false },
+      approvalEnabled: true,
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(apiResponse(roles))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: false, error: { code: "NOT_FOUND", message: "Cannot GET /api/v1/ai/roles" } }), { status: 404, headers: { "content-type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: false, error: { code: "INTERNAL", message: "Lỗi máy chủ" } }), { status: 500, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(resourcesService.aiRoles()).resolves.toEqual(roles);
+    expect(new URL(String(fetchMock.mock.calls[0]?.[0])).pathname).toBe("/api/v1/ai/roles");
+    await expect(resourcesService.aiRoles()).resolves.toBeNull();
+    await expect(resourcesService.aiRoles()).rejects.toThrow("Lỗi máy chủ");
+  });
+
+  it("asks for the final AI approval again and maps the verdict on each variant", async () => {
+    const base = { contentId: "content-1", platformId: "p-1", title: null, body: "Bài", hashtags: [], recommended: true, status: "GENERATED", version: 1, createdAt: "2026-11-06T00:00:00.000Z", updatedAt: "2026-11-06T00:00:00.000Z" };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(apiResponse({ status: "running" }))
+      .mockResolvedValueOnce(apiResponse([
+        { ...base, id: "rejected", aiApprovalCurrent: true, aiApproval: { status: "rejected", approver: "vpsttt:claude:opus", approverLabel: "Claude Opus", textHash: "abc", score: 4, risk: "high", seeding: true, reasons: ["Seeding vụng", 3, ""], startedAt: "2026-11-06T00:00:00.000Z", finishedAt: "2026-11-06T00:01:00.000Z" } },
+        { ...base, id: "weird", aiApproval: { status: "maybe" }, aiApprovalCurrent: "yes" },
+        { ...base, id: "none" },
+      ]));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(resourcesService.requestVariantApproval("variant-1")).resolves.toEqual({ status: "running" });
+    expect(new URL(String(fetchMock.mock.calls[0]?.[0])).pathname).toBe("/api/v1/content-variants/variant-1/ai-approval");
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: "POST" });
+    const listed = await resourcesService.variants("content-1");
+    expect(listed.items[0]?.aiApproval).toEqual({ status: "rejected", approver: "vpsttt:claude:opus", approverLabel: "Claude Opus", score: 4, risk: "high", seeding: true, reasons: ["Seeding vụng"], startedAt: "2026-11-06T00:00:00.000Z", finishedAt: "2026-11-06T00:01:00.000Z", error: null });
+    expect(listed.items[0]?.aiApprovalCurrent).toBe(true);
+    expect(listed.items[1]?.aiApproval).toBeNull();
+    expect(listed.items[1]).not.toHaveProperty("aiApprovalCurrent");
+    expect(listed.items[2]?.aiApproval).toBeNull();
+  });
+
   it("forwards the moderation filter and keeps destination links separate from published URLs", async () => {
     const fetchMock = vi.fn().mockResolvedValue(apiResponse([
       { id: "pending", status: "NEEDS_ACTION", reviewUrl: "https://forum.example/my/activity/pending", reviewUrlKind: "pending_queue", lastErrorCode: "EXTENSION_MODERATION_PENDING", attemptCount: 1, maxAttempts: 3 },

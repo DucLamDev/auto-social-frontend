@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AiProviderOption } from "@/types/domain";
@@ -12,8 +12,12 @@ const mocks = vi.hoisted(() => ({
   useAiProviders: vi.fn(),
   variants: [] as Array<Record<string, unknown>>,
   preview: vi.fn(),
+  roles: null as null | Record<string, unknown>,
+  requestApproval: vi.fn(),
+  approve: vi.fn(),
+  callThrough: false,
 }));
-vi.mock("@/services/resources.service", () => ({ resourcesService: { previewVariant: mocks.preview } }));
+vi.mock("@/services/resources.service", () => ({ resourcesService: { previewVariant: mocks.preview, requestVariantApproval: mocks.requestApproval, approveVariant: mocks.approve } }));
 
 vi.mock("@/hooks/use-auth", () => ({
   useCurrentUser: () => ({ data: { role: "ADMIN" } }),
@@ -22,6 +26,7 @@ vi.mock("@/hooks/use-auth", () => ({
 vi.mock("@/hooks/use-resources", () => ({
   useAccounts: () => ({ data: { items: [] }, isPending: false, isError: false }),
   useAiProviders: mocks.useAiProviders,
+  useAiRoles: () => ({ data: mocks.roles }),
   useContent: () => ({
     data: {
       id: "content-1",
@@ -37,7 +42,8 @@ vi.mock("@/hooks/use-resources", () => ({
   }),
   useMedia: () => ({ data: { items: [] }, isPending: false, isError: false }),
   usePlatforms: () => ({ data: { items: [] }, isPending: false, isError: false }),
-  useResourceMutation: () => ({ isPending: false, mutateAsync: mocks.mutateAsync }),
+  // callThrough: run the mutation itself, to see which service it calls.
+  useResourceMutation: (fn: (...args: unknown[]) => unknown) => ({ isPending: false, mutateAsync: (...args: unknown[]) => mocks.callThrough ? fn(...args) : mocks.mutateAsync(...args) }),
   useVariants: () => ({
     data: { items: mocks.variants },
     isPending: false,
@@ -158,5 +164,62 @@ describe("StudioView platform preview", () => {
     expect(mocks.preview).toHaveBeenLastCalledWith("variant-1", { title: "", body: "Edited body #VPS" });
     fireEvent.click(screen.getByRole("tab", { name: "Sửa" }));
     expect(screen.getByLabelText("Nội dung biến thể")).toHaveValue("Edited body #VPS");
+  });
+});
+
+describe("StudioView final AI approval", () => {
+  const roles = {
+    reviewer: { provider: "vpsttt", model: "claude:sonnet", label: "Claude Sonnet", configured: true },
+    approver: { provider: "vpsttt", model: "claude:opus", label: "Claude Opus", configured: true },
+    approvalEnabled: true,
+  };
+  const variant = (aiApproval: Record<string, unknown> | null, aiApprovalCurrent?: boolean) => ({ id: "variant-1", contentId: "content-1", platform: "Mastodon", platformSlug: "mastodon", title: null, body: "Saved body", status: "GENERATED", updatedAt: "2026-11-06T00:00:00Z", aiApproval, aiApprovalCurrent });
+  const verdict = (status: string, extra: Record<string, unknown> = {}) => ({ status, approver: "vpsttt:claude:opus", approverLabel: "Claude Opus", startedAt: new Date().toISOString(), ...extra });
+
+  beforeEach(() => {
+    mocks.useAiProviders.mockReset().mockReturnValue(providerQuery());
+    mocks.mutateAsync.mockReset().mockResolvedValue({});
+    mocks.requestApproval.mockReset().mockResolvedValue({ status: "running" });
+    mocks.roles = roles;
+    mocks.callThrough = false;
+  });
+
+  it("keeps \"Duyệt\" off for a post the approver refused, and shows why", () => {
+    mocks.variants = [variant(verdict("rejected", { reasons: ["Seeding vụng"], seeding: true }), true)];
+    render(<StudioView contentId="content-1" />);
+    expect(screen.getByText("Opus: Từ chối")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Duyệt" })).toBeDisabled();
+    expect(screen.getByText("Claude Opus từ chối bài này. Sửa bài hoặc viết lại bằng AI; bài mới được duyệt lại tự động.")).toBeInTheDocument();
+    const box = screen.getByRole("region", { name: "AI duyệt cuối · Mastodon" });
+    expect(box).toHaveTextContent("Seeding vụng");
+    expect(box).toHaveTextContent("Có dấu hiệu seeding");
+    expect(box).toHaveTextContent("Sửa bài rồi bấm “Lưu”");
+    expect(screen.queryByRole("button", { name: /Cho AI duyệt lại/ })).not.toBeInTheDocument();
+  });
+
+  it("asks the approver again for a failed post and approves only a post it passed", async () => {
+    mocks.variants = [variant(verdict("failed"), true)];
+    mocks.callThrough = true;
+    const { rerender } = render(<StudioView contentId="content-1" />);
+    expect(screen.getByText("Opus lỗi")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Duyệt" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Cho AI duyệt lại bài Mastodon" }));
+    await waitFor(() => expect(mocks.requestApproval).toHaveBeenCalledWith("variant-1"));
+    mocks.variants = [variant(verdict("approved"), true)];
+    rerender(<StudioView contentId="content-1" />);
+    expect(screen.getByText("Opus: Đạt")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Duyệt" })).toBeEnabled();
+    // An unsaved edit is not what the approver read.
+    fireEvent.change(screen.getByLabelText("Nội dung biến thể"), { target: { value: "Edited body" } });
+    expect(screen.getByRole("button", { name: "Duyệt" })).toBeDisabled();
+    expect(screen.getByText("Lưu bài để AI duyệt cuối đọc lại; duyệt được khi có kết quả mới.")).toBeInTheDocument();
+  });
+
+  it("does not gate approval on backends without AI roles", () => {
+    mocks.roles = null;
+    mocks.variants = [variant(verdict("rejected"), true)];
+    render(<StudioView contentId="content-1" />);
+    expect(screen.getByRole("button", { name: "Duyệt" })).toBeEnabled();
+    expect(screen.queryByText(/Opus/)).not.toBeInTheDocument();
   });
 });

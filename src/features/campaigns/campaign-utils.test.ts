@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ContentVariant, PlatformAccount } from "@/types/domain";
-import { canAddAutomationAccount, countAutomationPlatforms, defaultAutomationAccountIds, deriveAutomationCampaignName, getApprovedVariantForAccount, getAutomationAccountBlocker, getEligibleAccounts, includeImageAltText, isAutomationAccountEligible, isCampaignReadyContent, MAX_AUTOMATION_PLATFORMS, normalizeAutomationAccountIds, reviewOutcomeWarning, aiScore, normalizeMinScore, reviewPoints } from "./campaign-utils";
+import type { AiApproval, ContentVariant, PlatformAccount } from "@/types/domain";
+import { canAddAutomationAccount, countAutomationPlatforms, defaultAutomationAccountIds, deriveAutomationCampaignName, getApprovedVariantForAccount, getAutomationAccountBlocker, getEligibleAccounts, includeImageAltText, isAutomationAccountEligible, isCampaignReadyContent, MAX_AUTOMATION_PLATFORMS, normalizeAutomationAccountIds, reviewOutcomeWarning, aiScore, normalizeMinScore, reviewPoints, approvalGate, sameAiModel, shortAiLabel, writerLabel } from "./campaign-utils";
 
 const account: PlatformAccount = { id: "a1", platformId: "p1", platform: { id: "p1", name: "LinkedIn", slug: "linkedin" }, name: "Company", enabled: true, status: "CONNECTED" };
 const variants: ContentVariant[] = [
@@ -102,6 +102,70 @@ describe("review outcome warning", () => {
       waitingVariantIds: ["variant-x", "gone"],
     }, platformOf)).toBe("Không đăng lên 2 tài khoản chưa sẵn sàng: Main · DEV (tài khoản đang tắt); DEV · team (chưa bật \"Tự bấm Đăng\"). Bài X, một nền tảng vẫn chờ duyệt vì chưa có tài khoản nào sẵn sàng. Kết nối lại tài khoản ở trang Tài khoản rồi bấm \"Duyệt & đăng bài này\".");
   });
+
+  it("names the drafts kept waiting for the final AI approval apart from those waiting for an account", () => {
+    const platformOf = (id: string) => ({ v1: "Mastodon", v2: "Bluesky", v3: "DEV" } as Record<string, string>)[id];
+    const warning = reviewOutcomeWarning({
+      waitingVariantIds: ["v1", "v2", "v3"],
+      unapprovedVariants: [{ id: "v1", platform: "Mastodon", message: "Claude Opus từ chối bài này." }, { id: "v3", platform: "DEV", message: "" }],
+    }, platformOf);
+    expect(warning).toContain("Chưa đăng 2 bài chưa được AI duyệt cuối: Mastodon (Claude Opus từ chối bài này); DEV.");
+    expect(warning).toContain("Bài Bluesky vẫn chờ duyệt vì chưa có tài khoản nào sẵn sàng.");
+    expect(warning).not.toContain("Bài Mastodon");
+    expect(reviewOutcomeWarning({ waitingVariantIds: ["v1"], unapprovedVariants: [{ id: "v1", platform: "Mastodon", message: "Chưa duyệt" }] }, platformOf)).not.toContain("tài khoản");
+  });
+});
+
+describe("final AI approval gate", () => {
+  const approval = (status: AiApproval["status"], extra: Partial<AiApproval> = {}): AiApproval => ({ status, approver: "vpsttt:claude:opus", approverLabel: "Claude Opus", startedAt: new Date().toISOString(), ...extra });
+
+  it("lets every post through when the approver is off (or the backend has no AI roles)", () => {
+    expect(approvalGate({ aiApproval: approval("rejected"), aiApprovalCurrent: true }, false)).toEqual({ ok: true, state: "off", message: "" });
+    expect(approvalGate({}, false).ok).toBe(true);
+  });
+
+  it("only passes a post the approver said yes to for its current text", () => {
+    expect(approvalGate({ aiApproval: approval("approved"), aiApprovalCurrent: true }, true)).toMatchObject({ ok: true, state: "approved" });
+    // Older payloads without the flag are judged by the verdict; the server checks the text itself.
+    expect(approvalGate({ aiApproval: approval("approved") }, true)).toMatchObject({ ok: true, state: "approved" });
+    expect(approvalGate({ aiApproval: approval("approved"), aiApprovalCurrent: false }, true)).toEqual({ ok: false, state: "stale", message: "Bài đã sửa sau lần duyệt cuối, chờ AI duyệt lại." });
+    expect(approvalGate({ aiApproval: null }, true)).toEqual({ ok: false, state: "missing", message: "Chưa được AI duyệt cuối." });
+    expect(approvalGate({}, true)).toMatchObject({ ok: false, state: "missing" });
+  });
+
+  it("explains a running, refused or failed approval with the approver's name", () => {
+    expect(approvalGate({ aiApproval: approval("running"), aiApprovalCurrent: true }, true)).toEqual({ ok: false, state: "running", message: "Claude Opus đang đọc bài…" });
+    // A run on an older text, and a run lost to a server restart, can be started again.
+    expect(approvalGate({ aiApproval: approval("running"), aiApprovalCurrent: false }, true).state).toBe("stale");
+    expect(approvalGate({ aiApproval: approval("running", { startedAt: new Date(Date.now() - 11 * 60_000).toISOString() }), aiApprovalCurrent: true }, true)).toMatchObject({ ok: false, state: "failed", message: expect.stringContaining("bị gián đoạn") });
+    expect(approvalGate({ aiApproval: approval("rejected"), aiApprovalCurrent: true }, true)).toMatchObject({ ok: false, state: "rejected", message: expect.stringContaining("Claude Opus từ chối bài này") });
+    expect(approvalGate({ aiApproval: approval("rejected"), aiApprovalCurrent: false }, true).state).toBe("stale");
+    expect(approvalGate({ aiApproval: approval("failed", { error: "timeout" }), aiApprovalCurrent: true }, true)).toMatchObject({ ok: false, state: "failed", message: expect.stringContaining("Claude Opus chưa duyệt được") });
+    expect(approvalGate({ aiApproval: approval("running", { approverLabel: " " }) }, true).message).toBe("AI duyệt cuối đang đọc bài…");
+  });
+});
+
+describe("AI role names", () => {
+  it("names the writer the way the server names its roles", () => {
+    expect(writerLabel({ id: "vpsttt", label: "VPSTTT AI", model: "gpt:gpt-5" })).toBe("GPT (VPSTTT AI)");
+    expect(writerLabel({ id: "vpsttt", label: "VPSTTT AI", model: "claude:sonnet" })).toBe("Claude Sonnet");
+    expect(writerLabel({ id: "openai", label: "OpenAI", model: "gpt-5-mini" })).toBe("OpenAI · gpt-5-mini");
+  });
+
+  it("shortens a model name for a chip", () => {
+    expect(shortAiLabel("Claude Opus")).toBe("Opus");
+    expect(shortAiLabel("GPT (VPSTTT AI)")).toBe("GPT");
+    expect(shortAiLabel("OpenAI · gpt-5-mini")).toBe("OpenAI");
+    expect(shortAiLabel("")).toBe("AI duyệt cuối");
+  });
+
+  it("finds a writer that is the same provider and model as a judge", () => {
+    const writer = { id: "vpsttt" as const, model: "claude:sonnet" };
+    expect(sameAiModel(writer, { provider: "vpsttt", model: "claude:sonnet" })).toBe(true);
+    expect(sameAiModel(writer, { provider: "vpsttt", model: "" })).toBe(true);
+    expect(sameAiModel(writer, { provider: "vpsttt", model: "claude:opus" })).toBe(false);
+    expect(sameAiModel({ id: "openai", model: "claude:sonnet" }, { provider: "vpsttt", model: "claude:sonnet" })).toBe(false);
+  });
 });
 
 describe("AI score in a review note", () => {
@@ -129,6 +193,11 @@ describe("recommendations in a review note", () => {
     expect(reviewPoints("Cần xem lại (AI chấm 5/10): Thiếu số liệu; Thiếu số liệu")).toEqual(["Thiếu số liệu"]);
     expect(reviewPoints("")).toEqual([]);
     expect(reviewPoints(null)).toEqual([]);
+  });
+
+  it("reads the points of a post the final approver refused", () => {
+    expect(reviewPoints("AI duyệt cuối (GPT (VPSTTT AI)) từ chối: Giọng quảng cáo lộ liễu; Seeding vụng (AI chấm 6/10)")).toEqual(["Giọng quảng cáo lộ liễu", "Seeding vụng"]);
+    expect(reviewPoints("AI duyệt cuối (Claude Opus) từ chối: Nhắc tên đối thủ")).toEqual(["Nhắc tên đối thủ"]);
   });
 });
 

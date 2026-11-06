@@ -5,19 +5,21 @@ import { AiContentView } from "./ai-content-view";
 
 const mocks = vi.hoisted(() => ({
   role: "ADMIN", review: vi.fn(), reviewExisting: vi.fn(), update: vi.fn(), preview: vi.fn(), reviewVariant: vi.fn(), rewrite: vi.fn(), extra: [] as Array<Record<string, unknown>>, revision: null as null | { status: string; instruction?: string; error?: string }, review_: { recommended: true as boolean, reason: "" }, warning: vi.fn(), error: vi.fn(), variantStatus: "GENERATED", image: null as null | { type: string; status: string }, state: "WAITING_REVIEW", ids: ["variant-1"], mode: "AUTOMATION", multipleVersions: false, secondAccount: false,
+  roles: null as null | Record<string, unknown>, approval: null as null | Record<string, unknown>, approvalCurrent: undefined as boolean | undefined, requestApproval: vi.fn(), success: vi.fn(), live: [] as unknown[],
 }));
 vi.mock("@/hooks/use-auth", () => ({ useCurrentUser: () => ({ data: { role: mocks.role } }) }));
 vi.mock("@/hooks/use-resources", () => ({
   useAiCampaigns: () => ({ data: { items: [{ id: "campaign-1", name: "Launch", reviewMode: mocks.mode, status: "DRAFT", content: { id: "content-1" }, automationState: mocks.state, automationVariantIds: mocks.ids, automationAccountIds: mocks.secondAccount ? ["account-1", "account-2"] : ["account-1"], createdAt: "2026-11-02T00:00:00Z" }] } }),
   useAccounts: () => ({ data: { items: [{ id: "account-1", name: "DEV account", enabled: true, status: "CONNECTED", platform: { slug: "devto", name: "DEV", mode: "OFFICIAL_API" } },
     ...(mocks.secondAccount ? [{ id: "account-2", name: "Tumblr vpsttt", enabled: true, status: "CONNECTED", platform: { slug: "tumblr", name: "Tumblr", mode: "OFFICIAL_API" } }] : [])] } }),
-  useVariants: () => ({ data: { items: [{ id: "variant-1", platform: "DEV", platformSlug: "devto", title: "Original title", body: "Original body", status: mocks.variantStatus, image: mocks.image, aiRevision: mocks.revision, recommended: mocks.review_.recommended, reason: mocks.review_.reason }, ...(mocks.multipleVersions ? [{ id: "variant-2", platform: "DEV", platformSlug: "devto", title: "Older version", body: "Older body", status: "APPROVED" }] : []), ...mocks.extra] } }),
+  useVariants: (_id: string, live?: boolean) => (mocks.live.push(live), { data: { items: [{ id: "variant-1", platform: "DEV", platformSlug: "devto", title: "Original title", body: "Original body", status: mocks.variantStatus, image: mocks.image, aiRevision: mocks.revision, recommended: mocks.review_.recommended, reason: mocks.review_.reason, aiApproval: mocks.approval, aiApprovalCurrent: mocks.approvalCurrent }, ...(mocks.multipleVersions ? [{ id: "variant-2", platform: "DEV", platformSlug: "devto", title: "Older version", body: "Older body", status: "APPROVED" }] : []), ...mocks.extra] } }),
   useMedia: () => ({ data: { items: [] } }),
   useAiImageStatus: () => ({ data: { configured: true, model: "vpsttt-image", provider: "vpsttt" } }),
+  useAiRoles: () => ({ data: mocks.roles }),
   useResourceMutation: (fn: (...args: unknown[]) => unknown) => ({ mutateAsync: (...args: unknown[]) => fn(...args), isPending: false }),
 }));
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: mocks.error, warning: mocks.warning } }));
-vi.mock("@/services/resources.service", () => ({ resourcesService: { reviewAiCampaign: mocks.review, updateVariant: mocks.update, reviewExistingContent: mocks.reviewExisting, previewVariant: mocks.preview, reviewAiVariant: mocks.reviewVariant, rewriteVariant: mocks.rewrite } }));
+vi.mock("sonner", () => ({ toast: { success: mocks.success, error: mocks.error, warning: mocks.warning } }));
+vi.mock("@/services/resources.service", () => ({ resourcesService: { reviewAiCampaign: mocks.review, updateVariant: mocks.update, reviewExistingContent: mocks.reviewExisting, previewVariant: mocks.preview, reviewAiVariant: mocks.reviewVariant, rewriteVariant: mocks.rewrite, requestVariantApproval: mocks.requestApproval } }));
 
 /** Posts start folded to their header and decision buttons: open them to read, edit or preview. */
 const openPost = (platform = "DEV") => fireEvent.click(screen.getByRole("button", { name: `Xem nội dung bài ${platform}` }));
@@ -42,6 +44,12 @@ describe("AI content waiting for review", () => {
     mocks.revision = null;
     mocks.extra = [];
     mocks.review_ = { recommended: true, reason: "" };
+    mocks.roles = null;
+    mocks.approval = null;
+    mocks.approvalCurrent = undefined;
+    mocks.requestApproval.mockReset().mockResolvedValue({ status: "running" });
+    mocks.success.mockReset();
+    mocks.live = [];
     mocks.rewrite.mockReset().mockResolvedValue({ status: "generating" });
     mocks.preview.mockReset().mockResolvedValue({ title: "Original title", body: "Original body #vps", format: "markdown", tags: ["vps"], group: "DEVELOPER", engine: "devto", maxChars: null, length: 18, overLimit: false });
   });
@@ -511,4 +519,157 @@ describe("AI content waiting for review", () => {
     } finally { Element.prototype.scrollIntoView = original; }
   });
 
+  describe("final AI approval", () => {
+    const roles = {
+      reviewer: { provider: "vpsttt", model: "claude:sonnet", label: "Claude Sonnet", configured: true },
+      approver: { provider: "vpsttt", model: "claude:opus", label: "Claude Opus", configured: true },
+      approvalEnabled: true,
+    };
+    const verdict = (status: string, extra: Record<string, unknown> = {}) => ({ status, approver: "vpsttt:claude:opus", approverLabel: "Claude Opus", startedAt: new Date().toISOString(), ...extra });
+    const openReview = () => fireEvent.click(screen.getByRole("button", { name: "Review & duyệt" }));
+    const decision = () => screen.getByRole("group", { name: "Duyệt bài DEV" });
+
+    it.each([
+      ["approved", true, "Opus: Đạt"],
+      ["rejected", true, "Opus: Từ chối"],
+      ["running", true, "Opus đang duyệt…"],
+      ["failed", true, "Opus lỗi"],
+      [null, undefined, "Chưa duyệt cuối"],
+      ["approved", false, "Chưa duyệt cuối"],
+    ] as const)("shows the verdict %s (current text: %s) as a chip on the post", (status, current, chip) => {
+      mocks.roles = roles;
+      mocks.approval = status ? verdict(status) : null;
+      mocks.approvalCurrent = current;
+      render(<AiContentView />);
+      openReview();
+      expect(within(screen.getByRole("article", { name: "DEV" })).getByText(chip)).toBeInTheDocument();
+    });
+
+    it("lists why the final approver refused a post and lets nobody approve it", () => {
+      mocks.roles = roles;
+      mocks.review_ = { recommended: false, reason: "AI duyệt cuối (Claude Opus) từ chối: Giọng quảng cáo lộ liễu (AI chấm 7/10)" };
+      mocks.approval = verdict("rejected", { score: 4, risk: "high", seeding: true, reasons: ["Giọng quảng cáo lộ liễu", "Bình luận giả làm khách hàng"] });
+      mocks.approvalCurrent = true;
+      render(<AiContentView />);
+      openReview();
+      expect(within(decision()).getByRole("button", { name: "Duyệt & đăng bài DEV" })).toBeDisabled();
+      expect(within(decision()).getByRole("button", { name: "Hẹn lịch bài DEV" })).toBeDisabled();
+      expect(within(decision()).getByRole("button", { name: "Từ chối bài DEV" })).toBeEnabled();
+      expect(decision()).toHaveTextContent("Claude Opus từ chối bài này.");
+      // A refusal is fixed by editing or rewriting, which has the post approved again by itself.
+      expect(within(decision()).queryByRole("button", { name: /Cho AI duyệt lại/ })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Duyệt & đăng bài đã xong (0)" })).toBeDisabled();
+      expect(screen.getByText("AI chấm 7/10")).toHaveAttribute("title", "Chấm bởi Claude Sonnet");
+      openPost();
+      const box = screen.getByRole("region", { name: "AI duyệt cuối · DEV" });
+      expect(box).toHaveTextContent("Claude Opus từ chối bài này (chấm 4/10)");
+      expect(box).toHaveTextContent("Giọng quảng cáo lộ liễu");
+      expect(box).toHaveTextContent("Bình luận giả làm khách hàng");
+      expect(box).toHaveTextContent("Có dấu hiệu seeding");
+      expect(box).toHaveTextContent("Rủi ro cho công ty: cao");
+      expect(box).toHaveTextContent("Sửa theo khuyến nghị");
+      expect(within(screen.getByRole("region", { name: "Khuyến nghị của AI · DEV" })).getByRole("button", { name: "Sửa theo 1 khuyến nghị đã chọn" })).toBeEnabled();
+    });
+
+    it("waits for the verdict while the approver reads, on a live list that shows it by itself", () => {
+      mocks.roles = roles;
+      mocks.approval = verdict("running");
+      const { rerender } = render(<AiContentView />);
+      openReview();
+      expect(mocks.live).toContain(true);
+      expect(within(decision()).getByRole("button", { name: "Duyệt & đăng bài DEV" })).toBeDisabled();
+      expect(decision()).toHaveTextContent("Claude Opus đang đọc bài…");
+      expect(within(decision()).queryByRole("button", { name: /Cho AI duyệt lại/ })).not.toBeInTheDocument();
+      expect(screen.getByRole("region", { name: "Duyệt nội dung" })).toHaveTextContent("1 chờ AI duyệt cuối");
+      expect(screen.getByRole("button", { name: "Duyệt & đăng bài đã xong (0)" })).toBeDisabled();
+      mocks.approval = verdict("approved");
+      mocks.approvalCurrent = true;
+      rerender(<AiContentView />);
+      expect(within(decision()).getByRole("button", { name: "Duyệt & đăng bài DEV" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Duyệt & đăng bài đã xong (1)" })).toBeEnabled();
+    });
+
+    it("asks the approver again for a failed or never-approved post", async () => {
+      mocks.roles = roles;
+      mocks.approval = verdict("failed", { error: "VPSTTT AI quá tải" });
+      const { unmount } = render(<AiContentView />);
+      openReview();
+      expect(decision()).toHaveTextContent("Claude Opus chưa duyệt được bài này.");
+      fireEvent.click(within(decision()).getByRole("button", { name: "Cho AI duyệt lại bài DEV" }));
+      await waitFor(() => expect(mocks.requestApproval).toHaveBeenCalledWith("variant-1"));
+      expect(mocks.success).toHaveBeenCalledWith("Claude Opus đang đọc lại bài DEV. Kết quả tự hiện khi xong.");
+      openPost();
+      expect(screen.getByRole("region", { name: "AI duyệt cuối · DEV" })).toHaveTextContent("VPSTTT AI quá tải");
+      unmount();
+      mocks.approval = null;
+      render(<AiContentView />);
+      openReview();
+      expect(decision()).toHaveTextContent("Chưa được AI duyệt cuối.");
+      expect(within(decision()).getByRole("button", { name: "Duyệt & đăng bài DEV" })).toBeDisabled();
+      fireEvent.click(within(decision()).getByRole("button", { name: "Cho AI duyệt lại bài DEV" }));
+      await waitFor(() => expect(mocks.requestApproval).toHaveBeenCalledTimes(2));
+    });
+
+    it("saves an edited post for the approver to read again instead of approving the text it read", async () => {
+      mocks.roles = roles;
+      mocks.approval = verdict("approved");
+      mocks.approvalCurrent = true;
+      render(<AiContentView />);
+      openReview();
+      openPost();
+      expect(within(decision()).getByRole("button", { name: "Duyệt & đăng bài DEV" })).toBeEnabled();
+      fireEvent.click(screen.getByRole("button", { name: "Sửa bài DEV" }));
+      fireEvent.change(screen.getByLabelText("Nội dung · DEV"), { target: { value: "Bài đã sửa" } });
+      expect(within(decision()).queryByRole("button", { name: "Duyệt & đăng bài DEV" })).not.toBeInTheDocument();
+      expect(within(decision()).getByRole("button", { name: "Hẹn lịch bài DEV" })).toBeDisabled();
+      expect(decision()).toHaveTextContent("lưu để AI duyệt cuối đọc lại");
+      expect(screen.getByRole("button", { name: "Duyệt & đăng bài đã xong (0)" })).toBeDisabled();
+      fireEvent.click(within(decision()).getByRole("button", { name: "Lưu bài DEV để AI duyệt lại" }));
+      await waitFor(() => expect(mocks.update).toHaveBeenCalledWith("variant-1", { title: "Original title", body: "Bài đã sửa" }));
+      await waitFor(() => expect(mocks.success).toHaveBeenCalledWith("Đã lưu bài DEV. AI duyệt cuối đang đọc lại bài."));
+      expect(mocks.reviewVariant).not.toHaveBeenCalled();
+    });
+
+    it("counts and approves in bulk only the posts the approver passed, and names the ones it kept back", async () => {
+      window.localStorage.removeItem("auto-social:approve-min-score");
+      mocks.roles = roles;
+      mocks.review_ = { recommended: true, reason: "Hợp người đọc (AI chấm 8/10)" };
+      mocks.approval = verdict("approved");
+      mocks.approvalCurrent = true;
+      mocks.ids = ["variant-1", "variant-3", "variant-4"];
+      mocks.extra = [
+        { id: "variant-3", platform: "Tumblr", platformSlug: "tumblr", title: "T", body: "Tumblr body", status: "GENERATED", recommended: true, reason: "Hợp người đọc (AI chấm 9/10)", aiApproval: verdict("rejected"), aiApprovalCurrent: true },
+        { id: "variant-4", platform: "Bluesky", platformSlug: "bluesky", title: null, body: "Bluesky body", status: "GENERATED", recommended: true, reason: "Hợp người đọc (AI chấm 8/10)", aiApproval: verdict("running") },
+      ];
+      render(<AiContentView />);
+      openReview();
+      expect(screen.getByRole("region", { name: "Duyệt nội dung" })).toHaveTextContent("2 chờ AI duyệt cuối");
+      expect(screen.getByRole("button", { name: "Duyệt & đăng bài đã xong (1)" })).toBeEnabled();
+      fireEvent.click(screen.getByRole("button", { name: "Duyệt & đăng bài từ 7 điểm (1)" }));
+      await waitFor(() => expect(mocks.reviewVariant).toHaveBeenCalledTimes(1));
+      expect(mocks.reviewVariant).toHaveBeenCalledWith("campaign-1", "variant-1", "approve", { publishMode: "NOW" });
+      mocks.review.mockResolvedValueOnce({ waitingVariantIds: ["variant-3"], unapprovedVariants: [{ id: "variant-3", platform: "Tumblr", message: "Claude Opus từ chối bài này" }] });
+      fireEvent.click(screen.getByRole("button", { name: "Duyệt & đăng bài đã xong (1)" }));
+      await waitFor(() => expect(mocks.warning).toHaveBeenCalledWith("Chưa đăng 1 bài chưa được AI duyệt cuối: Tumblr (Claude Opus từ chối bài này). Sửa bài hoặc chờ AI duyệt xong rồi duyệt lại.", { duration: 15_000 }));
+    });
+
+    it.each([
+      ["the approver is switched off", { ...roles, approvalEnabled: false }],
+      ["the backend has no AI roles (404)", null],
+    ])("lets people approve as before when %s", (_, value) => {
+      mocks.roles = value;
+      mocks.approval = verdict("rejected");
+      mocks.approvalCurrent = true;
+      render(<AiContentView />);
+      openReview();
+      expect(within(decision()).getByRole("button", { name: "Duyệt & đăng bài DEV" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Duyệt & đăng bài đã xong (1)" })).toBeEnabled();
+      expect(screen.queryByText(/Opus|Chưa duyệt cuối/)).not.toBeInTheDocument();
+      openPost();
+      expect(screen.queryByRole("region", { name: "AI duyệt cuối · DEV" })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Sửa bài DEV" }));
+      fireEvent.change(screen.getByLabelText("Nội dung · DEV"), { target: { value: "Bài đã sửa" } });
+      expect(within(decision()).getByRole("button", { name: "Duyệt & đăng bài DEV" })).toBeEnabled();
+    });
+  });
 });

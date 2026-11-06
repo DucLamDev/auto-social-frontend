@@ -2,10 +2,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { resourcesService, type ListParams } from "@/services/resources.service";
 import { env } from "@/config/env";
+import { aiApprovalRunning, type ContentVariant } from "@/types/domain";
 
 export const resourceKeys = {
   aiProviders: ["ai-providers"] as const,
   aiImageStatus: ["ai-image-status"] as const,
+  aiRoles: ["ai-roles"] as const,
   platforms: (params?: ListParams) => ["platforms", params ?? {}] as const,
   accounts: (params?: ListParams) => ["accounts", params ?? {}] as const,
   sources: (params?: ListParams) => ["sources", params ?? {}] as const,
@@ -26,6 +28,8 @@ export const resourceKeys = {
 };
 export function useAiImageStatus() { return useQuery({ queryKey: resourceKeys.aiImageStatus, queryFn: resourcesService.aiImageStatus, staleTime: 300_000 }); }
 export function useAiProviders() { return useQuery({ queryKey: resourceKeys.aiProviders, queryFn: resourcesService.aiProviders, staleTime: 300_000 }); }
+/** Reviewer and final approver; `data` is null on backends without AI roles (then nothing waits for an AI approval). */
+export function useAiRoles() { return useQuery({ queryKey: resourceKeys.aiRoles, queryFn: resourcesService.aiRoles, staleTime: 300_000 }); }
 export function usePlatforms(params?: ListParams) { return useQuery({ queryKey: resourceKeys.platforms(params), queryFn: () => resourcesService.platforms(params) }); }
 export function useAccounts(params?: ListParams) { return useQuery({ queryKey: resourceKeys.accounts(params), queryFn: () => resourcesService.accounts(params) }); }
 export function useOAuthProviders() { return useQuery({ queryKey: resourceKeys.oauthProviders, queryFn: resourcesService.oauthProviders, staleTime: 300_000 }); }
@@ -37,7 +41,12 @@ export function useSources(params?: ListParams) { return useQuery({ queryKey: re
 export function useSourceArticles(params?: ListParams) { return useQuery({ queryKey: resourceKeys.sourceArticles(params), queryFn: () => resourcesService.sourceArticles(params) }); }
 export function useContents(params?: ListParams) { return useQuery({ queryKey: resourceKeys.contents(params), queryFn: () => resourcesService.contents(params) }); }
 export function useContent(id: string) { return useQuery({ queryKey: resourceKeys.content(id), queryFn: () => resourcesService.content(id), enabled: Boolean(id) }); }
-export function useVariants(id: string, live = false) { return useQuery({ queryKey: resourceKeys.variants(id), queryFn: () => resourcesService.variants(id), enabled: Boolean(id), refetchInterval: (query) => live ? 2_000 : query.state.data?.items.some((v) => v.status === "AI_GENERATING" || v.aiRevision?.status === "generating" || v.image?.status === "generating") ? 3_000 : false }); }
+/** How often the variant list refreshes: always on a live review, otherwise while the server still works on a variant (AI text, rewrite, image, final approval). */
+export function variantsPollInterval(items: ContentVariant[] | undefined, live: boolean): number | false {
+  if (live) return 2_000;
+  return items?.some((v) => v.status === "AI_GENERATING" || v.aiRevision?.status === "generating" || v.image?.status === "generating" || aiApprovalRunning(v.aiApproval)) ? 3_000 : false;
+}
+export function useVariants(id: string, live = false) { return useQuery({ queryKey: resourceKeys.variants(id), queryFn: () => resourcesService.variants(id), enabled: Boolean(id), refetchInterval: (query) => variantsPollInterval(query.state.data?.items, live) }); }
 export function useCampaigns(params?: ListParams) { return useQuery({ queryKey: resourceKeys.campaigns(params), queryFn: () => resourcesService.campaigns(params) }); }
 export function useAiCampaigns() { return useQuery({ queryKey: ["campaigns", "ai-review"], queryFn: resourcesService.aiReviewContents, refetchInterval: 2_000, staleTime: 0 }); }
 export function usePublishJobs(params?: ListParams, polling = true) { return useQuery({ queryKey: resourceKeys.jobs(params), queryFn: () => resourcesService.publishJobs(params), refetchInterval: polling ? env.pollIntervalMs : false }); }

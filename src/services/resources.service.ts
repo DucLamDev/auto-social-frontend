@@ -1,6 +1,7 @@
 import { apiList, apiRequest } from "@/services/api/client";
 import type { ListResult } from "@/services/api/types";
-import type { AiImageStatus, AiProviderId, AiProviderOption, AuditLog, Campaign, Capability, ConnectorMode, Content, ContentSource, ContentVariant, MediaAsset, Platform, PlatformAccount, PlatformAvailability, PlatformGroup, PromptTemplate, PublishJob, SourceArticle, Status, SystemSettings, VariantAiRevision, VariantImagePlan } from "@/types/domain";
+import { ApiError } from "@/services/api/errors";
+import type { AiApproval, AiImageStatus, AiProviderId, AiProviderOption, AiRole, AiRoles, AuditLog, Campaign, Capability, ConnectorMode, Content, ContentSource, ContentVariant, MediaAsset, Platform, PlatformAccount, PlatformAvailability, PlatformGroup, PromptTemplate, PublishJob, SourceArticle, Status, SystemSettings, VariantAiRevision, VariantImagePlan } from "@/types/domain";
 import type { components } from "@/generated/api/schema";
 import type { PublishedPost } from "@/types/domain";
 
@@ -64,7 +65,8 @@ type RawAccount = Omit<Contract["PlatformAccountContractDto"], "platform"> & {
 };
 type RawSource = Contract["ContentSourceContractDto"];
 type RawSourceArticle = Omit<Contract["SourceArticleContractDto"], "content"> & { content?: SourceArticle["content"] };
-type RawVariant = Contract["ContentVariantContractDto"];
+/** `aiApproval` / `aiApprovalCurrent`: the final AI approval (backend with three AI roles; not in the generated schema yet). */
+type RawVariant = Contract["ContentVariantContractDto"] & { aiApproval?: unknown; aiApprovalCurrent?: unknown };
 type RawContent = Contract["ContentContractDto"] & { variants?: RawVariant[] };
 type RawCampaign = { id: string; name: string; status: Status; reviewMode?: "AUTOMATION" | "EXISTING_CAMPAIGN" | "CONTENT"; automationState?: Status | null; automationErrorCode?: string | null; automationVariantIds?: string[]; automationAccountIds?: string[]; scheduledAt?: string | null; createdAt: string; content?: { id: string; title: string }; _count?: { targets?: number }; targets?: Array<{ publishJobs?: RawJob[] }>; progress?: { total?: number; published?: number; failed?: number; needsAction?: number; active?: number; scheduled?: number; cancelled?: number } };
 type RawAttempt = Contract["PublishAttemptLogContractDto"] & { responseMetadata?: unknown };
@@ -105,6 +107,8 @@ type RawAutomateCampaignResult = {
   skippedAccounts?: { id: string; name: string; platform: string; reason: string; reasonLabel: string }[];
   /** Review decisions: drafts kept waiting because their platform had no ready account. */
   waitingVariantIds?: string[];
+  /** Review decisions: drafts kept waiting because the final AI approver has not approved their current text. */
+  unapprovedVariants?: { id: string; platform: string; message: string }[];
 };
 
 const defaultCapability: Capability = { text: false, image: false, video: false, article: false, delete: false, schedule: false, analytics: false };
@@ -135,7 +139,35 @@ const mapAiRevision = (value: unknown): VariantAiRevision | null => {
   const notes = Array.isArray(revision.notes) ? revision.notes.filter((note): note is string => typeof note === "string") : undefined;
   return { status, instruction: text("instruction") ?? "", ...(notes ? { notes } : {}), startedAt: text("startedAt"), finishedAt: text("finishedAt") ?? null, error: text("error") ?? null };
 };
-const mapVariant = (item: RawVariant): ContentVariant => ({ image: mapImagePlan(item.mediaRecommendation), aiRevision: mapAiRevision(item.aiRevision), id: item.id, contentId: item.contentId, platform: item.platform?.name ?? item.platform?.slug ?? "Platform", platformSlug: item.platform?.slug ?? "unknown", title: item.title, body: item.body, summary: item.summary, hashtags: item.hashtags, cta: item.cta, status: item.status, recommended: item.recommended, reason: item.reason, updatedAt: item.updatedAt });
+const AI_APPROVAL_STATUSES: readonly AiApproval["status"][] = ["running", "approved", "rejected", "failed"];
+const AI_BRAND_RISKS: readonly NonNullable<AiApproval["risk"]>[] = ["none", "low", "medium", "high"];
+const mapAiApproval = (value: unknown): AiApproval | null => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const approval = value as Record<string, unknown>;
+  const text = (key: string) => typeof approval[key] === "string" ? approval[key] as string : undefined;
+  const status = AI_APPROVAL_STATUSES.find((item) => item === approval.status);
+  if (!status) return null;
+  const risk = AI_BRAND_RISKS.find((item) => item === approval.risk);
+  const reasons = Array.isArray(approval.reasons) ? approval.reasons.filter((reason): reason is string => typeof reason === "string" && reason.trim() !== "") : undefined;
+  return {
+    status, approver: text("approver") ?? "", approverLabel: text("approverLabel") ?? "",
+    ...(typeof approval.score === "number" && Number.isFinite(approval.score) ? { score: approval.score } : {}),
+    ...(risk ? { risk } : {}),
+    ...(typeof approval.seeding === "boolean" ? { seeding: approval.seeding } : {}),
+    ...(reasons ? { reasons } : {}),
+    startedAt: text("startedAt") ?? "", finishedAt: text("finishedAt") ?? null, error: text("error") ?? null,
+  };
+};
+const AI_PROVIDER_IDS: readonly AiProviderId[] = ["openai", "deepseek", "gemini", "vpsttt"];
+const mapAiRole = (value: unknown): AiRole | null => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const role = value as Record<string, unknown>;
+  const provider = AI_PROVIDER_IDS.find((item) => item === role.provider);
+  if (!provider) return null;
+  const model = typeof role.model === "string" ? role.model : "";
+  return { provider, model, label: typeof role.label === "string" && role.label.trim() ? role.label : model ? `${provider} · ${model}` : provider, configured: role.configured === true };
+};
+const mapVariant = (item: RawVariant): ContentVariant => ({ image: mapImagePlan(item.mediaRecommendation), aiRevision: mapAiRevision(item.aiRevision), aiApproval: mapAiApproval(item.aiApproval), ...(typeof item.aiApprovalCurrent === "boolean" ? { aiApprovalCurrent: item.aiApprovalCurrent } : {}), id: item.id, contentId: item.contentId, platform: item.platform?.name ?? item.platform?.slug ?? "Platform", platformSlug: item.platform?.slug ?? "unknown", title: item.title, body: item.body, summary: item.summary, hashtags: item.hashtags, cta: item.cta, status: item.status, recommended: item.recommended, reason: item.reason, updatedAt: item.updatedAt });
 const mapContent = (item: RawContent): Content => ({ id: item.id, title: item.title, body: item.body, description: item.summary, canonicalUrl: item.canonicalUrl, status: item.status, source: item.sourceArticle?.source ?? null, variantsCount: item._count?.variants ?? item.variants?.length ?? 0, createdAt: item.createdAt, updatedAt: item.updatedAt });
 const mapMedia = (item: RawMedia): MediaAsset => {
   const metadata = item.metadata && typeof item.metadata === "object" && !Array.isArray(item.metadata)
@@ -241,6 +273,20 @@ export const resourcesService = {
     method: "POST", body: { platformSlugs: input.platformSlugs, ...(input.hint?.trim() ? { hint: input.hint.trim() } : {}), ...(input.aiProvider ? { aiProvider: input.aiProvider } : {}) },
   }),
   aiImageStatus: () => apiRequest<AiImageStatus>("/ai/image-status"),
+  /** The reviewer and final approver models; null on older backends without AI roles (404), which have no approval gate. */
+  async aiRoles(): Promise<AiRoles | null> {
+    try {
+      const raw = await apiRequest<{ reviewer?: unknown; approver?: unknown; approvalEnabled?: unknown } | null>("/ai/roles");
+      const reviewer = mapAiRole(raw?.reviewer);
+      const approver = mapAiRole(raw?.approver);
+      return reviewer && approver ? { reviewer, approver, approvalEnabled: raw?.approvalEnabled === true } : null;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return null;
+      throw error;
+    }
+  },
+  /** Starts (or restarts) the final AI approval of one draft; the variant list follows `aiApproval`. */
+  requestVariantApproval: (variantId: string) => apiRequest<{ status: "running" }>(`/content-variants/${variantId}/ai-approval`, { method: "POST" }),
   /** Starts a new AI image for a draft variant; the variant's image status follows it. */
   regenerateVariantImage: (variantId: string, prompt?: string) => apiRequest<{ status: "generating" }>(`/content-variants/${variantId}/image`, { method: "POST", body: prompt?.trim() ? { prompt: prompt.trim() } : {} }),
   /** The post as its destination will show it (same rendering as publishing); unsaved edits can be passed in. */

@@ -30,6 +30,7 @@ vi.mock("@/hooks/use-resources", () => ({
     error: null,
   }),
   useAiImageStatus: () => ({ data: { configured: true, model: "vpsttt-image" }, isPending: false }),
+  useAiRoles: () => ({ data: null, isPending: false }),
   useCampaigns: () => ({ data: { items: [] }, isPending: false, isError: false, error: null }),
   useContents: () => ({ data: { items: [] }, isPending: false, isError: false, error: null }),
   usePlatforms: () => ({
