@@ -3,6 +3,19 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.26.0 · 06/11/2026
+### Tính năng
+- Xoá tài khoản social và thao tác hàng loạt trên danh sách tài khoản
+  Cần backend 1.22.0. Ở trang **Tài khoản** (chỉ quản trị):
+  - mỗi dòng có ô chọn, ô ở đầu bảng chọn mọi tài khoản đang hiện;
+  - khi đã chọn, hiện thanh thao tác: **Kiểm tra**, **Bật**, **Tắt**, **Xoá**, **Bỏ chọn**. Kiểm tra hàng loạt bỏ qua
+    tài khoản Chrome vừa đăng nhập thành công nên không đăng nhập lại tất cả;
+  - mỗi dòng có nút thùng rác để xoá riêng tài khoản đó;
+  - trước khi xoá luôn hỏi xác nhận, nói rõ sẽ mất thông tin đăng nhập, phiên Chrome / 2FA và lịch sử đăng (bài đã lên
+    mạng xã hội vẫn giữ nguyên). Tài khoản đang có bài chờ đăng hoặc đang đăng được giữ lại kèm lý do;
+  - nút lọc **Có thể trùng** gom các tài khoản cùng nền tảng, cùng trang và cùng username (hoặc tên). Nút **Chọn bản
+    thừa để xoá** chọn sẵn các bản thừa, mỗi nhóm giữ lại tài khoản tốt nhất (đã kết nối, nhiều bài hơn, đang bật).
+
 ## 1.25.0 · 06/11/2026
 ### Tính năng
 - Hiện số bài đã đăng ở góc phải mỗi tài khoản khi chọn kênh để tạo nội dung
