@@ -3,6 +3,13 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.34.0 · 06/11/2026
+### Tính năng
+- Thêm social Unraid Forums, aaPanel Forum, cPanel Community vào luồng đăng bằng tiện ích (cần backend 1.29.0)
+  - Phần Tiện ích của tài khoản có hướng dẫn cho 3 kiểu diễn đàn mới: Invision Community (Unraid: dán trang
+    `…/?do=add` của box), Flarum (aaPanel: dán trang tag `…/forum/t/<tag>`), cộng đồng Zendesk (cPanel: ghi tên topic).
+  - Hộp "Thêm social" hiện ô Chuyên mục cho aaPanel (tag) và cPanel (topic).
+
 ## 1.33.1 · 06/11/2026
 ### Sửa lỗi
 - Trang Publishing báo "Tiện ích cần cập nhật" khi tiện ích Chrome là bản cũ và bỏ qua bài (cần backend 1.28.2)

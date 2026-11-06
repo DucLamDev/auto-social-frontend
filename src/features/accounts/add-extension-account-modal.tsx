@@ -11,7 +11,7 @@ import { resourcesService, type ImportOneAccountInput } from "@/services/resourc
 import { importRowNote } from "./account-import-notes";
 
 const EMPTY = { platform: "", provider: "password" as "password" | "google", loginUsername: "", password: "", totpSecret: "", expectedUsername: "", profileUrl: "", targetUrl: "", category: "", tags: "" };
-const COMMUNITY_ENGINES = new Set(["discourse", "lemmy", "discuit", "slideshare", "disqus", "ubiquiti"]);
+const COMMUNITY_ENGINES = new Set(["discourse", "lemmy", "discuit", "slideshare", "disqus", "ubiquiti", "flarum", "zendesk"]);
 
 /**
  * "Thêm social": one social added to the extension posting flow, like one row of
