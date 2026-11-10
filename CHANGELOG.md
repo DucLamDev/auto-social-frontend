@@ -3,6 +3,13 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.36.0 · 10/11/2026
+### Tính năng
+- "Copy & mở" chép cả footer liên hệ công ty ở cuối bài (cần backend 1.32.0)
+  - Với bài tiếng Việt trên kênh của công ty (Medium, Substack, TikTok, Eventbrite…), nội dung chép có thêm khối 6 dòng
+    tên công ty, datacenter, hotline, website, email, Zalo, nằm sau dòng "Nguồn" và trước danh sách ảnh.
+  - Diễn đàn, cộng đồng, bài tiếng Anh: backend không gửi footer nên nội dung chép giữ như cũ.
+
 ## 1.35.0 · 06/11/2026
 ### Tính năng
 - Bấm chuông thông báo mở modal ngay trên trang đang xem

@@ -426,6 +426,8 @@ export const resourcesService = {
       hashtags?: string[];
       cta?: string | null;
       canonicalUrl?: string | null;
+      /** Company contact footer (backend 1.32.0+), null where the destination takes none. */
+      footer?: string | null;
       media?: Array<{ type: string; url: string; altText?: string; mimeType?: string }>;
       openUrl?: string;
     }>(`/publish-jobs/${id}/manual-payload`);
@@ -442,6 +444,8 @@ export const resourcesService = {
         value.hashtags?.map((tag) => `#${tag.replace(/^#/, "")}`).join(" "),
         value.cta,
         value.canonicalUrl ? `Nguồn: ${value.canonicalUrl}` : undefined,
+        // Last line of the post itself; the media links below are notes for the operator.
+        value.footer,
         mediaText,
       ].filter(Boolean).join("\n\n"),
       platformUrl: value.openUrl,

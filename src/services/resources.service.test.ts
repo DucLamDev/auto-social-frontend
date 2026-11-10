@@ -529,6 +529,7 @@ describe("resourcesService contract adapters", () => {
       hashtags: ["vps", "linux"],
       cta: "Read the benchmark",
       canonicalUrl: "https://example.com/vps-guide",
+      footer: "🏢 CÔNG TY CỔ PHẦN TẬP ĐOÀN VPSTTT\n☎ Hotline: 0328.812.674",
       media: [{
         type: "image",
         url: "https://cdn.example.com/dashboard.webp",
@@ -549,6 +550,14 @@ describe("resourcesService contract adapters", () => {
     expect(payload.content).toContain("Nguồn: https://example.com/vps-guide");
     expect(payload.content).toContain("Ảnh 1: https://cdn.example.com/dashboard.webp");
     expect(payload.content).toContain("Alt text: VPS dashboard");
+    // The company footer closes the post: after the source line, before the media notes.
+    expect(payload.content).toContain("Nguồn: https://example.com/vps-guide\n\n🏢 CÔNG TY CỔ PHẦN TẬP ĐOÀN VPSTTT\n☎ Hotline: 0328.812.674\n\nẢnh 1:");
+  });
+
+  it("copies no footer line when the backend sends none", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(apiResponse({ title: "Forum topic", body: "Body", hashtags: [], canonicalUrl: null, footer: null, media: [] })));
+    const payload = await resourcesService.manualPayload("job-forum");
+    expect(payload.content).toBe("Forum topic\n\nBody");
   });
 
   it("separates jobs waiting for the Chrome extension from ones that need the operator", async () => {
