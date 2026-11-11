@@ -26,6 +26,7 @@ vi.mock("@/services/resources.service", () => ({
     resumeBrowserJob: vi.fn(),
     reconcileNotFound: vi.fn(),
     markPublished: vi.fn(),
+    syncModeration: vi.fn(),
   },
 }));
 
@@ -69,6 +70,24 @@ describe("PublishingView extension jobs", () => {
     renderJob({ ...baseJob, needsAction: { kind: "EXTENSION_PENDING" } });
     expect(screen.getByText("Chờ tiện ích Chrome")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Giao lại cho tiện ích" })).not.toBeInTheDocument();
+  });
+
+  it("never offers to mark published a post the extension did not send, only to hand it out again", () => {
+    renderJob({ ...baseJob, status: "NEEDS_ACTION", needsAction: { kind: "EXTENSION_ACTION", reason: "AUTH_REQUIRED", message: "Chưa xác nhận được đúng tài khoản sau đăng nhập." } });
+    expect(screen.queryByRole("button", { name: "Đã đăng" })).toBeNull();
+    expect(screen.getByRole("button", { name: /Giao lại cho tiện ích/ })).toBeTruthy();
+    cleanup();
+  });
+
+  it("shows on pending posts when the server last looked, and syncs them now on request", async () => {
+    mocks.mutateAsync.mockReset().mockResolvedValue({ checked: 2, published: 1, notFound: 1, unsupported: 0, failed: 0 });
+    renderJob({ ...baseJob, needsAction: { kind: "MODERATION", unconfirmed: true, lastCheck: { at: "2026-11-08T03:10:00.000Z", outcome: "not-found" } } }, true);
+    expect(screen.getByText("Đã gửi, chờ xác nhận")).toBeTruthy();
+    expect(screen.getByText(/chưa thấy bài được duyệt/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Đã được duyệt" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Đồng bộ ngay/ }));
+    await waitFor(() => expect(mocks.mutateAsync).toHaveBeenCalled());
+    cleanup();
   });
 
   it("asks to update the extension when the polling Chrome cannot post to this destination", () => {

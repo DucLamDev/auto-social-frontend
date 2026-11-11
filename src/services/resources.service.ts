@@ -213,8 +213,11 @@ const mapJob = (item: RawJob): PublishJob => {
   };
   const workerCrashUncertain = item.lastErrorCode === "WORKER_CRASH_UNCERTAIN_RESULT";
   const extensionCode = item.lastErrorCode?.startsWith("EXTENSION_") ? item.lastErrorCode.slice("EXTENSION_".length) : undefined;
-  const providerAction = extensionCode === "MODERATION_PENDING" || metadata.moderationQueue === true
-    ? { kind: "MODERATION" as const, ...commonProviderFields, ...(item.lastErrorMessage ? { message: item.lastErrorMessage } : {}) }
+  const check = metadata.moderationCheck && typeof metadata.moderationCheck === "object" && !Array.isArray(metadata.moderationCheck) ? metadata.moderationCheck as Record<string, unknown> : null;
+  const lastCheck = check && typeof check.at === "string" && typeof check.outcome === "string" ? { lastCheck: { at: check.at, outcome: check.outcome } } : {};
+  // Sent to the platform: held by its moderators, or sent without a confirmation. Both wait for the sync.
+  const providerAction = extensionCode === "MODERATION_PENDING" || extensionCode === "SUBMIT_UNCONFIRMED" || metadata.moderationQueue === true
+    ? { kind: "MODERATION" as const, ...commonProviderFields, ...lastCheck, ...(extensionCode === "SUBMIT_UNCONFIRMED" ? { unconfirmed: true } : {}), ...(item.lastErrorMessage ? { message: item.lastErrorMessage } : {}) }
     : metadata.extensionQueued === true && item.status === "NEEDS_ACTION"
     ? extensionCode
       ? { kind: "EXTENSION_ACTION" as const, reason: extensionCode, ...(item.lastErrorMessage ? { message: item.lastErrorMessage } : {}) }
@@ -453,6 +456,7 @@ export const resourcesService = {
     };
   },
   markPublished: (id: string, input: { externalPostId: string; url?: string }) => apiRequest<{ published: boolean }>(`/publish-jobs/${id}/mark-published`, { method: "POST", body: input }),
+  syncModeration: () => apiRequest<{ checked: number; published: number; notFound: number; unsupported: number; failed: number }>("/publish-jobs/moderation-sync", { method: "POST" }),
   async prompts(params?: ListParams) { const raw = await apiList<RawPrompt>("/prompts"); return result(raw, filterItems(raw.items.map((item): PromptTemplate => ({ id: item.id, platform: item.platform?.name ?? item.platform?.slug ?? "Global", platformSlug: item.platform?.slug ?? "global", name: item.name, systemPrompt: item.systemPrompt, userPrompt: item.userTemplate, version: item.version, active: item.active, updatedAt: item.updatedAt })), params, (item) => `${item.platform} ${item.name}`)); },
   async updatePrompt(id: string, input: Pick<PromptTemplate, "systemPrompt" | "userPrompt" | "active">) { const current = (await resourcesService.prompts()).items.find((item) => item.id === id); if (!current) throw new Error("Không tìm thấy prompt template."); const raw = await apiRequest<RawPrompt>("/prompts", { method: "POST", body: { platformSlug: current.platformSlug, name: current.name, systemPrompt: input.systemPrompt, userTemplate: input.userPrompt ?? "{{body}}", active: input.active } }); return { ...current, ...input, id: raw.id, version: raw.version, updatedAt: raw.updatedAt }; },
   async logs(params?: ListParams) { const raw = await apiList<RawAuditLog>("/logs/audit"); const items = raw.items.map((item): AuditLog => ({ id: item.id, action: item.action, resource: item.entityType, resourceId: item.entityId, actor: item.actor ? { name: item.actor.displayName ?? item.actor.email ?? "System", email: item.actor.email } : item.actorId ? { name: `User ${item.actorId.slice(0, 8)}` } : { name: "System" }, requestId: item.requestId ?? undefined, metadata: item.after ?? undefined, createdAt: item.createdAt })); return result(raw, filterItems(items, params, (item) => `${item.action} ${item.resource} ${item.resourceId ?? ""} ${item.actor?.name ?? ""}`, (item) => item.status ?? "")); },

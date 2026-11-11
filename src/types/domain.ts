@@ -83,6 +83,10 @@ export type PublishNeedsAction = {
   outdatedExtension?: { deviceName: string; engine: string };
   externalPostId?: string;
   url?: string;
+  /** MODERATION: the extension sent the post but could not confirm it (not a moderator queue). */
+  unconfirmed?: boolean;
+  /** MODERATION: the server's last automatic look for the approved post (backend 1.32.0, every 10 minutes). */
+  lastCheck?: { at: string; outcome: string };
   canRetryAfterNotFound?: boolean;
   canResumeBrowser?: boolean;
   accountId?: string;
