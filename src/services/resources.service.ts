@@ -50,7 +50,7 @@ export type VariantPreview = {
   /** Where on the site the post goes, from the account's settings. */
   destination?: { community?: string; category?: string; flair?: string; language?: "vi" | "en" };
 };
-export type ExtensionEngine = "xenforo" | "discourse" | "phpbb" | "medium" | "substack" | "quora" | "reddit" | "slideshare" | "aws-builder" | "tinhte" | "pixelfed" | "mastodon" | "bluesky" | "tumblr" | "devto" | "minds" | "stackexchange" | "lemmy" | "discuit" | "linkedin" | "differ" | "dzone" | "dailydev" | "producthunt" | "disqus" | "mewe" | "vanilla" | "ubiquiti" | "huggingface" | "blogger" | "invision" | "flarum" | "zendesk";
+export type ExtensionEngine = "xenforo" | "discourse" | "phpbb" | "medium" | "substack" | "quora" | "reddit" | "slideshare" | "aws-builder" | "tinhte" | "pixelfed" | "mastodon" | "bluesky" | "tumblr" | "devto" | "minds" | "stackexchange" | "lemmy" | "discuit" | "linkedin" | "differ" | "dzone" | "dailydev" | "producthunt" | "disqus" | "mewe" | "vanilla" | "ubiquiti" | "huggingface" | "blogger" | "invision" | "flarum" | "zendesk" | "wordpress";
 export type ExtensionDeliveryInput = { enabled: boolean; engine?: ExtensionEngine; targetUrl?: string; autoSubmit?: boolean; tags?: string[]; category?: string; flair?: string };
 export type ExtensionSessionInput = { deviceId: string; expectedUsername: string; profileUrl?: string; identitySelector?: string; provider: "password" | "google"; autoLogin: boolean; autoTotp: boolean; loginUrl?: string; loginUsername?: string; password?: string; totpSecret?: string };
 
