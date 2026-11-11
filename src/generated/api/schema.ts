@@ -834,6 +834,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/publish-jobs/moderation-sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Look up now whether posts waiting for platform approval are published (also runs every 10 minutes) */
+        post: operations["PublishJobs_syncModeration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/publish-jobs/metrics": {
         parameters: {
             query?: never;
@@ -1321,6 +1338,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/extension/agent/tasks/{id}/auth-hint": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask the AI where a sign-in page shows the account, its menu or its sign-in button (answers within ~8 s or poll) */
+        post: operations["ExtensionAgent_authHint"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extension/agent/tasks/{id}/auth-hint/{hintId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExtensionAgent_authHintStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extension/agent/tasks/{id}/auth-hint/{hintId}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The extension confirmed the AI account element against the configured username: keep it as the identity selector */
+        post: operations["ExtensionAgent_authHintConfirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/extension/agent/tasks/{id}/form-fill": {
         parameters: {
             query?: never;
@@ -1509,6 +1576,54 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["ExtensionLoginCheckAgent_result"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extension/agent/login-checks/{id}/auth-hint": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ExtensionLoginCheckAgent_authHint"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extension/agent/login-checks/{id}/auth-hint/{hintId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ExtensionLoginCheckAgent_authHintStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extension/agent/login-checks/{id}/auth-hint/{hintId}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ExtensionLoginCheckAgent_authHintConfirm"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2414,6 +2529,8 @@ export interface components {
             cta?: string | null;
             /** Format: uri */
             canonicalUrl?: string | null;
+            /** @description Company contact footer to print last, after the source line; null on destinations without one */
+            footer?: string | null;
             media: {
                 /** @enum {string} */
                 type: "image" | "video" | "document";
@@ -2613,7 +2730,7 @@ export interface components {
             /** @description true: publish through the paired Chrome extension */
             enabled: boolean;
             /** @enum {string} */
-            engine?: "xenforo" | "discourse" | "phpbb" | "vanilla" | "medium" | "substack" | "quora" | "reddit" | "slideshare" | "aws-builder" | "tinhte" | "pixelfed" | "mastodon" | "bluesky" | "tumblr" | "devto" | "minds" | "stackexchange" | "lemmy" | "discuit" | "linkedin" | "differ" | "dzone" | "dailydev" | "producthunt" | "disqus" | "mewe" | "ubiquiti" | "huggingface" | "blogger" | "invision" | "flarum" | "zendesk";
+            engine?: "xenforo" | "discourse" | "phpbb" | "vanilla" | "medium" | "substack" | "quora" | "reddit" | "slideshare" | "aws-builder" | "tinhte" | "pixelfed" | "mastodon" | "bluesky" | "tumblr" | "devto" | "minds" | "stackexchange" | "lemmy" | "discuit" | "linkedin" | "differ" | "dzone" | "dailydev" | "producthunt" | "disqus" | "mewe" | "ubiquiti" | "huggingface" | "blogger" | "invision" | "flarum" | "zendesk" | "wordpress";
             /** @example https://voz.vn/f/chuyen-tro-linh-tinh.17/post-thread */
             targetUrl?: string;
             /** @description false: fill the form and wait for the operator to click Post */
@@ -2622,7 +2739,7 @@ export interface components {
         UiCandidateDto: {
             index: number;
             /** @enum {string} */
-            kind: "input" | "textarea" | "contenteditable" | "textbox" | "button" | "submit" | "link";
+            kind: "input" | "textarea" | "contenteditable" | "textbox" | "button" | "submit" | "link" | "image" | "text";
             tag: string;
             type?: string;
             role?: string;
@@ -2634,6 +2751,10 @@ export interface components {
             inDialog: boolean;
             inForm: boolean;
             disabled: boolean;
+            /** @enum {string} */
+            region?: "header" | "nav" | "aside" | "menu" | "main";
+            /** @description Inside a post, comment or feed item */
+            inArticle?: boolean;
             /** @description Unique CSS path of the element in its document or shadow root */
             selector: string;
         };
@@ -2642,6 +2763,14 @@ export interface components {
             /** @description Current page URL; must be on the task destination */
             url: string;
             candidates: components["schemas"]["UiCandidateDto"][];
+        };
+        AuthHintRequestDto: {
+            /** @description Current page URL; must be on the account sign-in origins */
+            url: string;
+            candidates: components["schemas"]["UiCandidateDto"][];
+        };
+        AuthHintConfirmDto: {
+            selector: string;
         };
         FormOptionDto: {
             value: string;
@@ -5857,6 +5986,45 @@ export interface operations {
             };
         };
     };
+    PublishJobs_syncModeration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
     PublishJobs_metrics: {
         parameters: {
             query: {
@@ -7287,6 +7455,139 @@ export interface operations {
             };
         };
     };
+    ExtensionAgent_authHint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthHintRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ExtensionAgent_authHintStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                hintId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ExtensionAgent_authHintConfirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                hintId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthHintConfirmDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
     ExtensionAgent_formFillRequest: {
         parameters: {
             query?: never;
@@ -7813,6 +8114,139 @@ export interface operations {
         };
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ExtensionLoginCheckAgent_authHint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthHintRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ExtensionLoginCheckAgent_authHintStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                hintId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ExtensionLoginCheckAgent_authHintConfirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                hintId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthHintConfirmDto"];
+            };
+        };
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
