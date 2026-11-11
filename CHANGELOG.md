@@ -3,15 +3,22 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
-## 1.36.0 · 08/11/2026
+## 1.37.0 · 11/11/2026
 ### Tính năng
-- Bài chờ duyệt tự đồng bộ; nút "Đã đăng" không còn ở bài lỗi (cần backend 1.32.0)
+- Bài chờ duyệt tự đồng bộ; nút "Đã đăng" không còn ở bài lỗi (cần backend 1.33.0)
   - **Sửa lỗi:** hàng "Tiện ích cần bạn" (tiện ích dừng vì chưa đăng nhập, sai tài khoản…) có nút "Đã đăng" dù bài chưa
     gửi lên nền tảng. Nay hàng này chỉ còn "Giao lại cho tiện ích"; đánh dấu đã đăng chỉ có ở Bài chờ duyệt.
   - Bài tiện ích đã gửi nhưng chưa xác nhận được nay hiện ở **Bài chờ duyệt** với nhãn "Đã gửi, chờ xác nhận".
   - Mỗi bài chờ duyệt hiện lần **tự kiểm** gần nhất của hệ thống (mỗi 10 phút) và kết quả ("chưa thấy bài được duyệt",
     "chưa đọc được diễn đàn"…). Bài được duyệt tự chuyển sang Bài đã đăng, không cần bấm.
   - Nút **Đồng bộ ngay** trên trang Bài chờ duyệt kiểm tra ngay tất cả bài và báo bao nhiêu bài đã được duyệt.
+
+## 1.36.0 · 10/11/2026
+### Tính năng
+- "Copy & mở" chép cả footer liên hệ công ty ở cuối bài (cần backend 1.32.0)
+  - Với bài tiếng Việt trên kênh của công ty (Medium, Substack, TikTok, Eventbrite…), nội dung chép có thêm khối 6 dòng
+    tên công ty, datacenter, hotline, website, email, Zalo, nằm sau dòng "Nguồn" và trước danh sách ảnh.
+  - Diễn đàn, cộng đồng, bài tiếng Anh: backend không gửi footer nên nội dung chép giữ như cũ.
 
 ## 1.35.0 · 06/11/2026
 ### Tính năng
