@@ -11,6 +11,8 @@ export type PublishJobContent = {
   moderationPending: boolean; contentUpdatedAt?: string;
   reviewUrl?: string; reviewUrlKind?: PublishJob["reviewUrlKind"];
   title?: string | null; body: string; hashtags: string[]; canonicalUrl?: string | null;
+  /** How the destination shows the body (backend 1.36.0+); older backends leave it out and the text shows as typed. */
+  format?: "markdown" | "plain" | "html";
   media: Array<{ type: string; url: string; altText?: string; mimeType?: string }>;
 };
 export type AccountHealth = components["schemas"]["AccountHealthContractDto"];
