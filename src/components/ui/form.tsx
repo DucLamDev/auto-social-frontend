@@ -12,7 +12,8 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
 export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(function Select({ className, children, ...props }, ref) {
   return <div className="relative"><select ref={ref} className={cn("h-11 w-full appearance-none rounded-xl border border-border bg-white px-3.5 pr-9 text-sm outline-none transition focus:border-primary/60 focus:ring-4 focus:ring-primary/10", className)} {...props}>{children}</select><ChevronDown className="pointer-events-none absolute right-3 top-3.5 size-4 text-slate-400" /></div>;
 });
-export function FieldError({ children }: { children?: React.ReactNode }) { return children ? <p role="alert" className="mt-1.5 text-xs font-medium text-danger">{children}</p> : null; }
+/** `id`: for the field's aria-describedby while the error shows. */
+export function FieldError({ children, id }: { children?: React.ReactNode; id?: string }) { return children ? <p id={id} role="alert" className="mt-1.5 text-xs font-medium text-danger">{children}</p> : null; }
 export function Switch({ checked, onChange, disabled, label }: { checked: boolean; onChange?: (checked: boolean) => void; disabled?: boolean; label?: string }) {
   return <button type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled} onClick={() => onChange?.(!checked)} className={cn("relative h-6 w-11 rounded-full transition", checked ? "bg-primary" : "bg-slate-300", disabled && "opacity-50")}><span className={cn("absolute top-1 size-4 rounded-full bg-[#fff] shadow-sm transition-all", checked ? "left-6" : "left-1")} /></button>;
 }

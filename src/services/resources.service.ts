@@ -19,6 +19,8 @@ export type MaintenanceRun = components["schemas"]["MaintenanceRunContractDto"];
 export type ExtensionDevice = { id: string; name: string; lastSeenAt?: string | null; createdAt: string };
 export type GeminiKeysSettings = { revision: string; source: "environment" | "saved"; maxKeys: number; slots: Array<{ slot: number; configured: boolean; active: boolean; retryAt: string | null }> };
 export type GeminiKeysUpdate = { revision: string; changes: Array<{ slot: number; apiKey?: string; clear?: boolean }> };
+export type BrandProfileView = components["schemas"]["BrandProfileViewDto"];
+export type BrandProfileContent = components["schemas"]["BrandProfileContentDto"];
 export type AccountDeleteResult = { deleted: string[]; blocked: Array<{ id: string; name: string; reason: string }>; notFound: string[] };
 export type AccountImportResult ={ imported: number; skipped?: number; queued: number; batchId: string | null; rows: Array<{ id?: string; row: string; name: string; setup?: string; issue?: string }> };
 /** One social added by hand to the extension flow: the same fields as one row of the accounts file. */
@@ -312,6 +314,10 @@ export const resourcesService = {
   removeVariantImage: (variantId: string, mediaId: string) => apiRequest<{ removed: boolean }>(`/content-variants/${variantId}/image/${mediaId}`, { method: "DELETE" }),
   geminiKeys: () => apiRequest<GeminiKeysSettings>("/ai/gemini-keys"),
   updateGeminiKeys: (input: GeminiKeysUpdate) => apiRequest<GeminiKeysSettings>("/ai/gemini-keys", { method: "PUT", body: input }),
+  /** The brand profile the AI writes with (ADMIN); `suggested` is where the form starts when none is saved. */
+  brandProfile: () => apiRequest<BrandProfileView>("/ai/brand-profile"),
+  /** Saves the fields the form edits; the server keeps the reading languages already saved. */
+  updateBrandProfile: (profile: BrandProfileContent) => apiRequest<BrandProfileView>("/ai/brand-profile", { method: "PUT", body: { profile } }),
   async platforms(params?: ListParams) { const raw = await apiList<RawPlatform>("/platforms", { query: { page: params?.page, limit: params?.limit, search: params?.search, group: params?.group, mode: params?.mode, availability: params?.availability, enabled: params?.enabled } }); return result(raw, raw.items.map(mapPlatform)); },
   async accounts(params?: ListParams) { const raw = await apiList<RawAccount>("/platform-accounts"); let items = raw.items.map(mapAccount); if (params?.platformId) items = items.filter((item) => item.platformId === params.platformId); return result(raw, filterItems(items, params, (item) => `${item.name} ${item.username ?? ""} ${item.platform?.name ?? ""}`, (item) => item.status)); },
   async createAccount(input: { platformSlug: string; name: string; username?: string; externalId?: string; settings?: Record<string, unknown>; credential?: Record<string, unknown>; enabled?: boolean }) { return mapAccount(await apiRequest<RawAccount>("/platform-accounts", { method: "POST", body: input })); },
