@@ -2524,6 +2524,11 @@ export interface components {
             reviewUrlKind?: "pending_queue" | "platform";
             title?: string | null;
             body: string;
+            /**
+             * @description How the destination shows the body: Markdown rendered (Discourse…), text as typed, or HTML
+             * @enum {string}
+             */
+            format: "markdown" | "plain" | "html";
             summary?: string | null;
             hashtags: string[];
             cta?: string | null;
