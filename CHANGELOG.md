@@ -3,6 +3,13 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.39.1 · 20/11/2026
+### Sửa lỗi
+- Trang "Nội dung bài viết" của Bài chờ duyệt hiển thị bài như trên diễn đàn, không còn dấu `##`, `-`, `` ` `` thô (cần backend 1.36.0)
+  - Bài OpenNebula trên diễn đàn vẫn hiển thị đúng; chỉ trang này của ứng dụng in nguyên văn Markdown nên trông lạ.
+  - Nay với diễn đàn dựng Markdown (Discourse…), trang hiện tiêu đề mục, danh sách, đoạn mã như diễn đàn. Diễn đàn
+    chữ thường vẫn hiện đúng như đã gõ. Nút **Sao chép nội dung** vẫn chép bản Markdown để dán vào diễn đàn.
+  - Backend cũ (chưa báo định dạng) thì trang hiện như trước.
 ## 1.39.0 · 20/11/2026
 ### Tính năng
 - Trang Cài đặt có thẻ "Hồ sơ thương hiệu" để sửa điều AI được nói về VPSTTT (cần backend 1.35.0)

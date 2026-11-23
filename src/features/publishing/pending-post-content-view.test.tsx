@@ -35,6 +35,17 @@ describe("pending post content", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sao chép nội dung" }));
     await waitFor(() => expect(mocks.copy).toHaveBeenCalledWith(`${post.title}\n\n${post.body}\n\n#caddy`));
   });
+  it("shows a Markdown post the way the forum does: headings, lists and code without the #, - and ` marks", () => {
+    const body = "## 4. Make the proxy the only way out\n\nRestrict outbound traffic.\n\n- Allowing `CONNECT` to any port.\n- Leaving Squid open.\n\n```\napt-get update\n```\n\n<script>alert(\"test\")</script>";
+    show({ ...post, format: "markdown", body });
+    const shown = screen.getByTestId("post-body");
+    expect(screen.getByText("4. Make the proxy the only way out")).toBeInTheDocument();
+    expect(shown.textContent).not.toMatch(/##|`/);
+    expect(shown.querySelectorAll("li")).toHaveLength(2);
+    expect(shown.querySelector("li code")?.textContent).toBe("CONNECT");
+    expect(shown.querySelector("pre")?.textContent).toBe("apt-get update");
+    expect(shown.querySelector("script")).toBeNull();
+  });
   it("keeps content readable when provider and media links are invalid", () => {
     show({ ...post, reviewUrl: "javascript:alert(1)", canonicalUrl: "https://user:secret@example.com", media: [{ type: "image", url: "data:text/html,test" }] });
     expect(screen.getByTestId("post-body")).toBeInTheDocument();
