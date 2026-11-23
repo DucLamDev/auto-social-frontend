@@ -402,6 +402,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/brand-profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BrandProfile_get"];
+        put: operations["BrandProfile_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/gemini-keys": {
         parameters: {
             query?: never;
@@ -2150,6 +2166,53 @@ export interface components {
             /** @example vpsttt-image */
             model: string;
         };
+        BrandProfileLinkDto: {
+            label: string;
+            /** @description http(s) only */
+            url: string;
+        };
+        BrandProfileDto: {
+            brandName?: string;
+            oneLiner?: string;
+            audience?: string;
+            voice?: string;
+            /** @description Each at most 300 characters */
+            facts?: string[];
+            links?: components["schemas"]["BrandProfileLinkDto"][];
+            disclosure?: string;
+            /** @description Each at most 200 characters */
+            avoid?: string[];
+            /** @enum {string} */
+            defaultLanguage?: "vi" | "en";
+            platformLanguages?: {
+                [key: string]: "vi" | "en";
+            };
+        };
+        BrandProfileContentDto: {
+            brandName?: string;
+            oneLiner?: string;
+            audience?: string;
+            voice?: string;
+            /** @description Each at most 300 characters */
+            facts?: string[];
+            links?: components["schemas"]["BrandProfileLinkDto"][];
+            disclosure?: string;
+            /** @description Each at most 200 characters */
+            avoid?: string[];
+        };
+        BrandProfileViewDto: {
+            /** @description The profile the AI writes with; null when none is saved or it is ignored */
+            profile: components["schemas"]["BrandProfileDto"] | null;
+            /** @description A profile is saved but the AI ignores it (invalid, over 8 KB or stored as a secret) */
+            invalid: boolean;
+            /** Format: date-time */
+            updatedAt: string | null;
+            /** @description Where the form starts when nothing is saved */
+            suggested: components["schemas"]["BrandProfileContentDto"];
+        };
+        UpdateBrandProfileDto: {
+            profile: components["schemas"]["BrandProfileContentDto"];
+        };
         GeminiKeyChangeDto: {
             slot: number;
             apiKey?: string;
@@ -2574,6 +2637,11 @@ export interface components {
             reviewUrlKind?: "pending_queue" | "platform";
             title?: string | null;
             body: string;
+            /**
+             * @description How the destination shows the body: Markdown rendered (Discourse…), text as typed, or HTML
+             * @enum {string}
+             */
+            format: "markdown" | "plain" | "html";
             summary?: string | null;
             hashtags: string[];
             cta?: string | null;
@@ -4462,6 +4530,102 @@ export interface operations {
                         /** @example true */
                         success: boolean;
                         data: components["schemas"]["AiImageStatusContractDto"];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    BrandProfile_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["BrandProfileViewDto"];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    BrandProfile_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateBrandProfileDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["BrandProfileViewDto"];
                         meta: components["schemas"]["ApiMetaContractDto"];
                     };
                 };

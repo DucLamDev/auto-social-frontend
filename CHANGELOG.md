@@ -13,6 +13,25 @@ danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số k�
 - Nút "Gửi tin thử" vào kênh, và trạng thái lần gửi gần nhất.
 - Địa chỉ nhận webhook để dán bên chat. Thời hạn khoá webhook cũ còn được nhận sau khi đổi khoá.
 - Đủ trạng thái đang tải / lỗi / không quyền.
+## 1.39.1 · 20/11/2026
+### Sửa lỗi
+- Trang "Nội dung bài viết" của Bài chờ duyệt hiển thị bài như trên diễn đàn, không còn dấu `##`, `-`, `` ` `` thô (cần backend 1.36.0)
+  - Bài OpenNebula trên diễn đàn vẫn hiển thị đúng; chỉ trang này của ứng dụng in nguyên văn Markdown nên trông lạ.
+  - Nay với diễn đàn dựng Markdown (Discourse…), trang hiện tiêu đề mục, danh sách, đoạn mã như diễn đàn. Diễn đàn
+    chữ thường vẫn hiện đúng như đã gõ. Nút **Sao chép nội dung** vẫn chép bản Markdown để dán vào diễn đàn.
+  - Backend cũ (chưa báo định dạng) thì trang hiện như trước.
+## 1.39.0 · 20/11/2026
+### Tính năng
+- Trang Cài đặt có thẻ "Hồ sơ thương hiệu" để sửa điều AI được nói về VPSTTT (cần backend 1.35.0)
+  - Trước đây hồ sơ chỉ sửa được bằng JSON nên đang trống: AI viết bài mà không có thông tin công ty nào để dựa vào.
+  - Các mục: tên thương hiệu, giới thiệu một câu, người đọc, giọng văn, thông tin AI được dùng (mỗi dòng một điều),
+    liên kết AI được dẫn vào bài, câu tự giới thiệu khi đăng diễn đàn, điều không được nói.
+  - Chưa có hồ sơ thì form điền sẵn bản gợi ý từ thông tin VPSTTT đã công bố (dịch vụ, datacenter, điều không được
+    hứa như "rẻ nhất", "uptime 100%"); xem lại rồi bấm **Lưu hồ sơ thương hiệu**. Góc thẻ cho biết AI đang dùng hồ sơ,
+    chưa lưu, hay đang bỏ qua hồ sơ hỏng.
+  - Báo lỗi ngay dưới ô (dòng quá dài, quá nhiều dòng, liên kết thiếu `https://`) và giữ nguyên chữ đã gõ khi lưu
+    không được. Ngôn ngữ đăng theo nền tảng đã đặt không bị đổi khi lưu.
+  - Chỉ ADMIN thấy và lưu được (máy chủ cũng chặn).
 
 ## 1.38.0 · 11/11/2026
 ### Tính năng

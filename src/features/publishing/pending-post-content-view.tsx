@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ErrorState, PageLoader } from "@/components/ui/states";
+import { PostBody } from "@/features/campaigns/post-preview";
 import { usePublishJobContent } from "@/hooks/use-resources";
 import { formatDate } from "@/lib/utils";
 import { safeReviewUrl } from "./review-links";
@@ -48,7 +49,10 @@ export function PendingPostContentView({ id }: { id: string }) {
         </div>
         <article className="space-y-6 p-5 [overflow-wrap:anywhere] sm:p-8" aria-label="Nội dung bài viết">
           <h2 className="text-xl font-bold leading-8 sm:text-2xl">{post.title || "Bài viết không có tiêu đề"}</h2>
-          <div className="whitespace-pre-wrap text-[15px] leading-7" data-testid="post-body">{post.body}</div>
+          {/* As the forum shows it: Markdown sites render headings, lists and code (no "##", "-", "`" marks); plain-text sites show the text as typed. */}
+          {post.format === "markdown" || post.format === "html"
+            ? <div className="text-[15px] leading-7" data-testid="post-body"><PostBody text={post.body} format={post.format} accent="var(--primary)" /></div>
+            : <div className="whitespace-pre-wrap text-[15px] leading-7" data-testid="post-body">{post.body}</div>}
           {post.hashtags.length > 0 && <div className="flex flex-wrap gap-2" aria-label="Hashtags">{post.hashtags.map((tag, index) => <span key={`${tag}-${index}`} className="rounded-lg bg-primary-soft px-2.5 py-1 text-sm text-primary">#{tag.replace(/^#/, "")}</span>)}</div>}
           {sourceUrl && <p className="text-sm">Nguồn: <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">{sourceUrl}</a></p>}
           {post.media.length > 0 && <div><h3 className="mb-2 font-semibold">Tệp đính kèm</h3><ul className="space-y-2">{post.media.map((media, index) => {
