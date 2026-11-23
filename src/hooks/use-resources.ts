@@ -60,6 +60,7 @@ export const usePublishLogs = useLogs;
 export function useMedia(params?: ListParams, refetchInterval?: number | false) { return useQuery({ queryKey: resourceKeys.media(params), queryFn: () => resourcesService.media(params), refetchInterval: refetchInterval ?? false }); }
 export function useSettings() { return useQuery({ queryKey: resourceKeys.settings, queryFn: resourcesService.settings }); }
 export function useGeminiKeys() { return useQuery({ queryKey: ["gemini-keys"], queryFn: resourcesService.geminiKeys, refetchInterval: 30_000 }); }
+export function useChatIntegration() { return useQuery({ queryKey: ["chat-integration"], queryFn: resourcesService.chatIntegration, refetchInterval: 30_000 }); }
 export function useBrandProfile() { return useQuery({ queryKey: ["brand-profile"], queryFn: resourcesService.brandProfile }); }
 export function useInvalidate() { const client = useQueryClient(); return (...keys: string[]) => Promise.all(keys.map((key) => client.invalidateQueries({ queryKey: [key] }))); }
 export function useResourceMutation<TVariables, TResult>(mutationFn: (variables: TVariables) => Promise<TResult>, invalidate: string[]) { const client = useQueryClient(); return useMutation({ mutationFn, onSuccess: async () => { await Promise.all(invalidate.map((key) => client.invalidateQueries({ queryKey: [key] }))); } }); }

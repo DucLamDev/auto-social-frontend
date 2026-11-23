@@ -1043,6 +1043,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/settings/chat-integration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ChatIntegrationSettings_get"];
+        put: operations["ChatIntegrationSettings_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/chat-integration/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send one test message to the "Auto Social" channel */
+        post: operations["ChatIntegrationSettings_test"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/chat/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approval events from the VPSTTT chat (signed webhook, see CHAT_INTEGRATION.md) */
+        post: operations["ChatEvents_receive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/settings": {
         parameters: {
             query?: never;
@@ -2686,6 +2736,67 @@ export interface components {
             after?: {
                 [key: string]: unknown;
             } | null;
+        };
+        ChatLastDeliveryContractDto: {
+            /** Format: date-time */
+            at: string;
+            ok: boolean;
+            kind: string;
+            error?: string | null;
+        };
+        ChatIntegrationContractDto: {
+            revision: string;
+            configured: boolean;
+            enabled: boolean;
+            baseUrl: string | null;
+            channelId: string | null;
+            botTokenConfigured: boolean;
+            /** @description Masked bot key, for example wtb_…a1b2. */
+            botTokenHint: string | null;
+            webhookSecretConfigured: boolean;
+            /** @description An old webhook secret is still accepted (24 h after the rotation). */
+            previousWebhookSecretConfigured: boolean;
+            /**
+             * Format: date-time
+             * @description When the old webhook secret stops being accepted.
+             */
+            previousWebhookSecretExpiresAt: string | null;
+            /** @description Path chat must call, under the API origin. */
+            webhookPath: string;
+            /** @description Events still waiting to be sent. */
+            pendingCount: number;
+            /** @description Events that gave up after all retries. */
+            failedCount: number;
+            lastDelivery: components["schemas"]["ChatLastDeliveryContractDto"] | null;
+        };
+        UpdateChatIntegrationDto: {
+            /** @description Revision returned by GET; a stale value is refused with 409. */
+            revision: string;
+            enabled?: boolean;
+            /** @description Chat server origin, https only (for example https://chat.example.com). */
+            baseUrl?: string;
+            /**
+             * Format: uuid
+             * @description Id of the "Auto Social" channel the bot is installed in.
+             */
+            channelId?: string;
+            /** @description New bot key (wtb_…). Omit to keep the saved one. */
+            botToken?: string;
+            /** @description New outgoing-webhook secret. The previous one is kept as the old key. */
+            webhookSecret?: string;
+            /** @description Old webhook secret, accepted for 24 hours from now while chat rotates keys. */
+            previousWebhookSecret?: string;
+            /** @description Forget the old webhook secret. */
+            clearPreviousWebhookSecret?: boolean;
+        };
+        ChatTestResultContractDto: {
+            ok: boolean;
+            error?: string | null;
+        };
+        ChatEventAckContractDto: {
+            received: boolean;
+            duplicate?: boolean;
+            ignored?: boolean;
         };
         SystemSettingContractDto: {
             key: string;
@@ -6705,6 +6816,199 @@ export interface operations {
                         /** @example true */
                         success: boolean;
                         data: components["schemas"]["AuditLogContractDto"][];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ChatIntegrationSettings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["ChatIntegrationContractDto"];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ChatIntegrationSettings_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateChatIntegrationDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["ChatIntegrationContractDto"];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ChatIntegrationSettings_test: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["ChatTestResultContractDto"];
+                        meta: components["schemas"]["ApiMetaContractDto"];
+                    };
+                };
+            };
+            /** @description Standard application error envelope */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example false */
+                        success: boolean;
+                        error: {
+                            code: string;
+                            message: string;
+                            details?: unknown;
+                        };
+                        meta: {
+                            requestId: string;
+                            /** Format: date-time */
+                            timestamp: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    ChatEvents_receive: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-WebTui-Event-ID": string;
+                "X-WebTui-Signature-Previous"?: string;
+                "X-WebTui-Signature": string;
+                "X-WebTui-Timestamp": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success: boolean;
+                        data: components["schemas"]["ChatEventAckContractDto"];
                         meta: components["schemas"]["ApiMetaContractDto"];
                     };
                 };

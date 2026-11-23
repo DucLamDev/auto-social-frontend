@@ -20,6 +20,9 @@ export type AttentionAccount = components["schemas"]["AttentionAccountContractDt
 export type MaintenanceRun = components["schemas"]["MaintenanceRunContractDto"];
 export type ExtensionDevice = { id: string; name: string; lastSeenAt?: string | null; createdAt: string };
 export type GeminiKeysSettings = { revision: string; source: "environment" | "saved"; maxKeys: number; slots: Array<{ slot: number; configured: boolean; active: boolean; retryAt: string | null }> };
+export type ChatIntegrationSettings = components["schemas"]["ChatIntegrationContractDto"];
+export type ChatIntegrationUpdate = components["schemas"]["UpdateChatIntegrationDto"];
+export type ChatTestResult = components["schemas"]["ChatTestResultContractDto"];
 export type GeminiKeysUpdate = { revision: string; changes: Array<{ slot: number; apiKey?: string; clear?: boolean }> };
 export type BrandProfileView = components["schemas"]["BrandProfileViewDto"];
 export type BrandProfileContent = components["schemas"]["BrandProfileContentDto"];
@@ -316,6 +319,9 @@ export const resourcesService = {
   removeVariantImage: (variantId: string, mediaId: string) => apiRequest<{ removed: boolean }>(`/content-variants/${variantId}/image/${mediaId}`, { method: "DELETE" }),
   geminiKeys: () => apiRequest<GeminiKeysSettings>("/ai/gemini-keys"),
   updateGeminiKeys: (input: GeminiKeysUpdate) => apiRequest<GeminiKeysSettings>("/ai/gemini-keys", { method: "PUT", body: input }),
+  chatIntegration: () => apiRequest<ChatIntegrationSettings>("/settings/chat-integration"),
+  updateChatIntegration: (input: ChatIntegrationUpdate) => apiRequest<ChatIntegrationSettings>("/settings/chat-integration", { method: "PUT", body: input }),
+  testChatIntegration: () => apiRequest<ChatTestResult>("/settings/chat-integration/test", { method: "POST" }),
   /** The brand profile the AI writes with (ADMIN); `suggested` is where the form starts when none is saved. */
   brandProfile: () => apiRequest<BrandProfileView>("/ai/brand-profile"),
   /** Saves the fields the form edits; the server keeps the reading languages already saved. */

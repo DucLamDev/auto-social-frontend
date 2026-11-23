@@ -15,6 +15,7 @@ import { useAiProviders, useResourceMutation, useSettings } from "@/hooks/use-re
 import { settingsSchema, type SettingsInput } from "@/schemas/settings";
 import { resourcesService } from "@/services/resources.service";
 import type { AiProviderOption, SystemSettings } from "@/types/domain";
+import { ChatIntegrationForm } from "./chat-integration-form";
 import { BrandProfileForm } from "./brand-profile-form";
 import { GeminiKeysForm } from "./gemini-keys-form";
 
@@ -76,5 +77,5 @@ function SettingsAdmin() {
   const aiProviders = useAiProviders();
   if (query.isPending || aiProviders.isPending) return <PageLoader />;
   if (query.isError || aiProviders.isError) return <><PageHeader title="Cài đặt" /><Card><ErrorState error={query.error ?? aiProviders.error} onRetry={() => { void query.refetch(); void aiProviders.refetch(); }} /></Card></>;
-  return <div className="animate-enter"><PageHeader eyebrow="System" title="Cài đặt" description="Quản lý API key Gemini, hồ sơ thương hiệu cho AI và cấu hình dùng chung cho hệ thống." action={<span className="inline-flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700"><ShieldCheck className="size-4" />API key được mã hóa</span>} /><GeminiKeysForm /><BrandProfileForm /><SettingsForm settings={query.data} aiProviders={aiProviders.data} /></div>;
+  return <div className="animate-enter"><PageHeader eyebrow="System" title="Cài đặt" description="Quản lý API key Gemini, hồ sơ thương hiệu cho AI, kết nối chat và cấu hình dùng chung cho hệ thống." action={<span className="inline-flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700"><ShieldCheck className="size-4" />API key được mã hóa</span>} /><GeminiKeysForm /><BrandProfileForm /><ChatIntegrationForm /><SettingsForm settings={query.data} aiProviders={aiProviders.data} /></div>;
 }
