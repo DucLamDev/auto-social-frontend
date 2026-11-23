@@ -3,6 +3,19 @@
 Mỗi lần sửa (mỗi Pull Request): tăng VERSION (sửa lỗi → số cuối, tính năng → số giữa) và thêm đúng một mục mới ở đầu
 danh sách, theo mẫu bên dưới. Hàng chờ gộp tự đổi sang số kế tiếp khi hai nhánh cùng lấy một số.
 
+## 1.39.0 · 20/11/2026
+### Tính năng
+- Trang Cài đặt có thẻ "Hồ sơ thương hiệu" để sửa điều AI được nói về VPSTTT (cần backend 1.35.0)
+  - Trước đây hồ sơ chỉ sửa được bằng JSON nên đang trống: AI viết bài mà không có thông tin công ty nào để dựa vào.
+  - Các mục: tên thương hiệu, giới thiệu một câu, người đọc, giọng văn, thông tin AI được dùng (mỗi dòng một điều),
+    liên kết AI được dẫn vào bài, câu tự giới thiệu khi đăng diễn đàn, điều không được nói.
+  - Chưa có hồ sơ thì form điền sẵn bản gợi ý từ thông tin VPSTTT đã công bố (dịch vụ, datacenter, điều không được
+    hứa như "rẻ nhất", "uptime 100%"); xem lại rồi bấm **Lưu hồ sơ thương hiệu**. Góc thẻ cho biết AI đang dùng hồ sơ,
+    chưa lưu, hay đang bỏ qua hồ sơ hỏng.
+  - Báo lỗi ngay dưới ô (dòng quá dài, quá nhiều dòng, liên kết thiếu `https://`) và giữ nguyên chữ đã gõ khi lưu
+    không được. Ngôn ngữ đăng theo nền tảng đã đặt không bị đổi khi lưu.
+  - Chỉ ADMIN thấy và lưu được (máy chủ cũng chặn).
+
 ## 1.38.0 · 11/11/2026
 ### Tính năng
 - Thêm WordPress vào luồng đăng bằng tiện ích (cần backend 1.34.0)
